@@ -17,6 +17,37 @@ target; the stretch card only if credit is left after card 5 is reported.
 | 5 | `dt_prep` | **Raid-prep bag check**, **recruitment rotator** | S-M | 1 |
 | 6 | `dt_stretch` | Stretch, budget permitting: crafting request board, guild stash search (opt-in), slowest-leveller award, event tracker (STV Fishing Extravaganza) | M-L | 2 (requests), 1 |
 
+## Branching and testing rule
+
+The promo credit expires (2026-11-04) before Forever goes live (Wed 2026-11-04, 3pm PT /
+11pm UK), so cards are built before they can be walked in game. That is allowed, under these
+rules:
+
+1. **Every later card branches off `card/dt_foundation`, never off another card.** Card 3 is
+   `card/dt_crypt` off `card/dt_foundation`, and so on. No chains: a fix to card 1 is made once,
+   on card 1's branch, then merged into each card branch.
+2. **Nothing merges to `main` until its walk-sheet passes in game.** The offline tests run at
+   build time. The in-game checks wait until launch: postponed, never skipped.
+3. **Walk card 1 first.** If card 1's sheet fails, stop: fix card 1 and merge the fix into the
+   other card branches before walking any of them. A walk on a broken foundation proves nothing.
+4. **A card that hangs on an unanswered question about the live client is not built until the
+   question is answered.** Card 2 waits for the native guild recipe probe (below).
+5. A build session that finds it needs to change card 1's code from a later card's branch
+   **stops and reports** instead. Card 1 changes happen on card 1's branch only.
+
+## Plan of action (proposed 2026-11-02)
+
+| When | What |
+|---|---|
+| Now | Build card 1 (`dt_foundation`). |
+| After card 1 is reported, while credit lasts | Cards 3, 4, 5, each on its own branch off card 1, in that order. A brief is written and ratified for each before it is built. |
+| Launch night (Wed 4 Nov) | Walk card 1. If it passes, merge it to `main`, then walk 3, 4, 5 and merge each that passes. Do the one-login recipe probe for card 2. |
+| After launch | Card 2, briefed against the probe result. Card 6 only if there is budget. |
+
+Cost of this plan, accepted: a launch-night surprise in card 1 means fixing four branches, not
+one. Benefit: credit that would otherwise expire is spent on the cards least likely to be thrown
+away.
+
 ## Design notes carried forward
 
 - **Card 2: check the native guild recipe lookup first.** The beta client exposes
