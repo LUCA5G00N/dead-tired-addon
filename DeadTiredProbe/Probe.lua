@@ -23,11 +23,12 @@ local SECRET, NIL, ABSENT = "<secret>", "<nil>", "<absent>"
 local PREFIX = "DTPROBE"
 local CAP = { runs = 5, msgs = 10, targets = 10, deaths = 5, played = 5, channels = 5,
   slots = 200, calendar = 60, members = 40, recipes = 5, guildEvents = 5, errors = 10,
-  recipeEvents = 5, bagIndexKeys = 40 }
+  recipeEvents = 5, bagIndexKeys = 40,
+  loggingReads = 5, loggingTries = 3, blockedEvents = 5, worlds = 10, zones = 10 }   -- Amendment 2
 P.CAP = CAP
 local ITEMS = { 13446, 17029, 17020, 17033, 17026, 17030, 6265, 5140 }   -- card 5's starter list
 local ORDER = { "build", "login", "guild", "comms", "channels", "bags", "items", "time",
-  "played", "target", "death", "calendar", "recipes" }
+  "played", "target", "death", "calendar", "recipes", "logging", "instances" }
 P.ORDER = ORDER
 
 -- ---------------------------------------------------------------- guarded reads
@@ -250,7 +251,9 @@ function S.build(sec)
   sec.normalizedRealm = A1("GetNormalizedRealmName")
   sec.gameMode = A1("C_GameRules.GetActiveGameMode")
   sec.hardcore = A1("C_GameRules.IsHardcoreActive")
-  sec.selfFound = A1("C_GameRules.IsSelfFoundActive")
+  -- Amendment 2 B1: the first build named C_GameRules.IsSelfFoundActive, which the client lacks.
+  sec.selfFoundAllowed = A1("C_GameRules.IsSelfFoundAllowed")
+  sec.selfFoundActive = A1("C_PlayerInfo.IsSelfFoundActive")
   sec.level = A1("UnitLevel", "player")
   sec.class = A("UnitClass", "player")
 end
@@ -742,6 +745,100 @@ function S.recipeEvent(sec)
   end
 end
 
+-- ---------------------------------------------------------------- 14 logging (PEW + 15 s, command)
+-- Amendment 2 B2. The globals LoggingCombat and LoggingChat SWITCH logging when given an argument.
+-- So outside S.loggingTry neither is ever called: only their type is read. LoggingChat is never
+-- called at all. S.loggingTry makes the probe's one switching call, and only while the client
+-- says combat logging is off.
+
+local function isBlockedText(v)
+  local t = type(v) == "string" and v:lower() or ""
+  return (t:find("blocked", 1, true) or t:find("forbidden", 1, true) or t:find("protected", 1, true)) and true or false
+end
+
+function S.logging(sec)
+  sec.reads = sec.reads or {}
+  sec.readCount = (sec.readCount or 0) + 1
+  if #sec.reads >= CAP.loggingReads then return end
+  sec.reads[#sec.reads + 1] = { t = A1("GetTime"),
+    combat = A1("C_ChatInfo.IsLoggingCombat"), chat = A1("C_ChatInfo.IsLoggingChat"),
+    combatGlobal = type(fn("LoggingCombat")), chatGlobal = type(fn("LoggingChat")) }
+end
+
+local watching   -- the try attempt listening for ADDON_ACTION_BLOCKED / _FORBIDDEN, for 1 s
+
+-- Returns the reply text and whether it was refused, or nil when the reply comes 1 s later.
+function S.loggingTry(sec, reply)
+  sec.attempts = sec.attempts or {}
+  if #sec.attempts >= CAP.loggingTries then                         -- guard: attempt cap
+    sec.refused = (sec.refused or 0) + 1
+    return "already " .. CAP.loggingTries .. " attempts", true
+  end
+  local a = { t = A1("GetTime"), before = A1("C_ChatInfo.IsLoggingCombat"), blockedEvents = {} }
+  sec.attempts[#sec.attempts + 1] = a
+  local state = T("C_ChatInfo.IsLoggingCombat")
+  if state ~= false then                                            -- guard: only if off
+    a.called = false
+    a.why = state == true and "already on: nothing called"
+      or ("state unknown (" .. tostring(a.before) .. "): nothing called")
+    return a.why
+  end
+  a.called = true
+  watching = a
+  local t0 = now()
+  a.watchUntil = t0 and t0 + 1 or nil
+  a.result = A("LoggingCombat", true)
+  a.blockedByError = isBlockedText(a.result)
+  local function finish()
+    if watching == a then watching = nil end
+    a.after1s = A1("C_ChatInfo.IsLoggingCombat")
+    a.blocked = a.blockedByError or #a.blockedEvents > 0
+    local line
+    if a.after1s == true then line = "combat logging is now on (it was off). /combatlog switches it off."
+    elseif a.after1s == false then line = "combat logging is still off" .. (a.blocked and "; the client blocked the call." or ".")
+    else line = "combat logging state unknown after the call (" .. tostring(a.after1s) .. ")." end
+    reply(line)
+  end
+  if not after(1, function() run("logging", finish) end) then
+    a.readAt = "at once (no timer)"
+    finish()
+  end
+  return nil
+end
+
+function S.blocked(sec, ev, addon, func)
+  if clean(addon) ~= ADDON then return end
+  local a = watching
+  local t = now()
+  if not a or (t and a.watchUntil and t > a.watchUntil) then
+    sec.strayBlocked = (sec.strayBlocked or 0) + 1
+    sec.lastStray = { event = ev, func = rec(func), t = rec(t) }
+    return
+  end
+  if #a.blockedEvents < CAP.blockedEvents then
+    a.blockedEvents[#a.blockedEvents + 1] = { event = ev, func = rec(func), t = rec(t) }
+  end
+end
+
+-- ---------------------------------------------------------------- 15 instances (automatic)
+-- Amendment 2 B3.
+
+function S.world(sec, isLogin, isReload)
+  sec.worldCount = (sec.worldCount or 0) + 1
+  sec.worlds = sec.worlds or {}
+  if #sec.worlds >= CAP.worlds then return end                      -- guard: instance cap
+  sec.worlds[#sec.worlds + 1] = { t = A1("GetTime"), isLogin = rec(isLogin), isReload = rec(isReload),
+    instance = A("IsInInstance"), info = A("GetInstanceInfo"), zone = A1("GetRealZoneText"),
+    lockdown = A1("InCombatLockdown"), loggingCombat = A1("C_ChatInfo.IsLoggingCombat") }
+end
+
+function S.zone(sec)
+  sec.zoneCount = (sec.zoneCount or 0) + 1
+  sec.zones = sec.zones or {}
+  if #sec.zones >= CAP.zones then return end                        -- guard: zone cap
+  sec.zones[#sec.zones + 1] = { t = A1("GetTime"), instance = A("IsInInstance"), zone = A1("GetRealZoneText") }
+end
+
 -- ---------------------------------------------------------------- headlines
 
 local function s(v) if type(v) == "table" then return tostring(v[1]) end return tostring(v) end
@@ -751,8 +848,8 @@ local H = {}
 function H.build(x)
   local b = x.buildInfo
   if type(b) == "table" then
-    return string.format("%s (build %s, interface %s), realm %s, hardcore: %s", tostring(b[1]),
-      tostring(b[2]), tostring(b[4]), tostring(x.realm), yn(x.hardcore))
+    return string.format("%s (build %s, interface %s), realm %s, hardcore: %s, self-found: %s", tostring(b[1]),
+      tostring(b[2]), tostring(b[4]), tostring(x.realm), yn(x.hardcore), yn(x.selfFoundActive))
   end
   return "build info " .. tostring(b) .. ", realm " .. tostring(x.realm)
 end
@@ -838,6 +935,26 @@ function H.recipes(x)
   return string.format("attempt %d%s: recipe %s, line %s, answers %d, members %d", #x.attempts, guild,
     tostring(a.recipeID), tostring(a.queryLine), #a.events, members)
 end
+function H.logging(x)
+  local r = x.reads and x.reads[#x.reads]
+  local base = r and string.format("combat log on: %s, chat log on: %s, LoggingCombat is a %s",
+    yn(r.combat), yn(r.chat), tostring(r.combatGlobal)) or "no read"
+  local a = x.attempts and x.attempts[#x.attempts]
+  if not a then return base end
+  local last
+  if not a.called then last = tostring(a.why)
+  elseif a.after1s == nil then last = "waiting 1 s"
+  else last = "after: " .. yn(a.after1s) .. (a.blocked and ", blocked" or "") end
+  return string.format("%s; tries %d, last %s", base, #x.attempts, last)
+end
+function H.instances(x)
+  local w = x.worlds and x.worlds[#x.worlds]
+  if not w then return "no entry" end
+  local inst = type(w.instance) == "table" and w.instance or {}
+  return string.format("%d world entr%s, last %s, in instance: %s (%s), %d zone change(s)",
+    x.worldCount or 0, (x.worldCount == 1) and "y" or "ies", tostring(w.zone), yn(inst[1]),
+    tostring(inst[2]), x.zoneCount or 0)
+end
 P.H = H
 
 local function headline(name)
@@ -859,6 +976,7 @@ local function delayed()
   R("comms")
   R("channels")
   R("time")
+  R("logging")
 end
 P.delayed = delayed
 
@@ -880,6 +998,7 @@ end
 E.PLAYER_ENTERING_WORLD = function(a, b)
   attach()
   R("login", "PLAYER_ENTERING_WORLD", a, b)
+  run("instances", S.world, a, b)
   if worldOnce then return end
   worldOnce = true
   if not after(15, delayed) then
@@ -903,6 +1022,9 @@ E.CALENDAR_UPDATE_EVENT_LIST = function()
   if calPending then run("calendar", S.calendarRead, "event") end
 end
 E.GUILD_RECIPE_KNOWN_BY_MEMBERS = function() run("recipes", S.recipeEvent) end
+E.ZONE_CHANGED_NEW_AREA = function() run("instances", S.zone) end
+E.ADDON_ACTION_BLOCKED = function(...) run("logging", S.blocked, "ADDON_ACTION_BLOCKED", ...) end
+E.ADDON_ACTION_FORBIDDEN = function(...) run("logging", S.blocked, "ADDON_ACTION_FORBIDDEN", ...) end
 
 local function onEvent(_, ev, ...)
   local h = E[ev]
@@ -922,7 +1044,7 @@ P.frame = okF and frame or nil
 
 -- ---------------------------------------------------------------- /dtprobe
 
-local LIST = "/dtprobe ping, channels, bags, items, target, calendar, recipes, report, reset."
+local LIST = "/dtprobe ping, channels, bags, items, target, calendar, recipes, logging, logging try, report, reset."
 
 local REPLY = {
   ping = function(r) return "ping: " .. tostring(r) end,
@@ -950,6 +1072,12 @@ local function command(verb)
     out("this character's runs cleared. A fresh one is recording.")
     return
   end
+  if verb == "loggingTry" then
+    local okT, r, refused = run("logging", S.loggingTry, function(m) out("recorded logging try: " .. m) end)
+    if not okT then out("logging try: failed: " .. tostring(cur.sections.logging.failed))
+    elseif type(r) == "string" then out((refused and "logging try: " or "recorded logging try: ") .. r) end
+    return
+  end
   local name = verb == "ping" and "comms" or verb
   local okRun, r = run(name, S[verb])
   if not okRun then out(verb .. ": failed: " .. tostring(cur.sections[name].failed)) return end
@@ -959,10 +1087,12 @@ local function command(verb)
 end
 
 local VERBS = { ping = true, channels = true, bags = true, items = true, target = true,
-  calendar = true, recipes = true, report = true, reset = true }
+  calendar = true, recipes = true, logging = true, loggingTry = true, report = true, reset = true }
 
 function P.dispatch(msg)
-  local verb = (type(msg) == "string" and msg or ""):lower():match("^%s*(%S*)")
+  local verb, arg = (type(msg) == "string" and msg or ""):lower():match("^%s*(%S*)%s*(%S*)")
+  if verb == "logging" and arg == "try" then verb = "loggingTry"
+  elseif verb == "loggingtry" then verb = "" end
   if not VERBS[verb] then out(LIST) return end
   command(verb)
 end

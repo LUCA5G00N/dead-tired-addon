@@ -286,3 +286,186 @@ None tripped:
 - every guard removal went red. The one weak test was fixed in the test file only.
 
 `docs/UAT_dt_probe_results.md` and `docs/PROBE_launch_results.md` were not written.
+
+---
+
+## Amendment 2 (self-found fix, logging, instances)
+
+Built 2026-11-02 from the brief's *Amendment 2*, on `card/dt_probe` after merging `main`
+(`cbf3477`) into it (merge commit `0cf5f7f`, no conflicts). The merge brought the amendment, card
+7's brief and walk-sheet (`dt_logs`) and `reference/wizardry/LogPrompt/`. No file under
+`DeadTiredProbe/` changed in the merge, and nothing in `DeadTired/` changed.
+
+**Result:** 153 checks pass (124 before). All 21 guard removals went red: the 17 from the first
+build, re-run, plus the 4 new ones. G3 still finds nothing. No stop condition tripped, and no test
+needed strengthening this time.
+
+### Lookups
+
+| Function | Line | Namespace header |
+|---|---:|---:|
+| `C_GameRules.IsSelfFoundAllowed` | **1367** | 1355 |
+| `C_PlayerInfo.IsSelfFoundActive` | 2336 | 2322 |
+| `C_ChatInfo.IsLoggingChat` | 766 | 754 |
+| `C_ChatInfo.IsLoggingCombat` | 767 | 754 |
+
+**Correction:** the first report said `IsSelfFoundAllowed` is on line 1363, and the amendment
+copied that. It is on **line 1367**: 1363 is the first line of that wrapped block, which is where I
+misread it. Nothing else depends on the number.
+
+**Globals, guarded:** `LoggingCombat` and `LoggingChat` (outside the `try` path only their
+`type` is read), `GetInstanceInfo`. **Events:** `ADDON_ACTION_BLOCKED`, `ADDON_ACTION_FORBIDDEN`,
+`ZONE_CHANGED_NEW_AREA`. Each is registered under `pcall` like the rest.
+
+**Copied:** nothing new from `reference/` or `DeadTired/`. I read
+`reference/wizardry/LogPrompt/LogPrompt.lua` for context only. Its header says the
+`LoggingCombat`/`LoggingChat` globals are unobserved on this client. That is the question
+`logging try` answers.
+
+### What was built
+
+- **B1, `build`:** `selfFound` is gone. In its place, `selfFoundAllowed` =
+  `C_GameRules.IsSelfFoundAllowed()` and `selfFoundActive` = `C_PlayerInfo.IsSelfFoundActive()`,
+  both through `ask`. The `build` headline gains `self-found: <selfFoundActive>`.
+- **B2, `logging`:** an automatic read at PEW + 15 s, and another on each `/dtprobe logging`.
+  Each read holds `IsLoggingCombat()`, `IsLoggingChat()`, and the `type` of the globals
+  `LoggingCombat` and `LoggingChat`. Reads are capped at 5 (my choice: the amendment sets no
+  cap), and every read is counted.
+- **B2, `/dtprobe logging try`:**
+  - It acts only when `IsLoggingCombat()` reads exactly `false`. "Already on", absent, error or
+    secret all record why and call nothing.
+  - Otherwise it calls `LoggingCombat(true)` through `ask`, which is `pcall`. That is the probe's
+    one switching call.
+  - It records the call's results or error, and `blockedByError` (the error text contains
+    "blocked", "forbidden" or "protected").
+  - `ADDON_ACTION_BLOCKED` and `ADDON_ACTION_FORBIDDEN` naming this addon are recorded within 1 s
+    (up to 5 per attempt). The listener is set before the call, so an event fired during it
+    counts. Events outside that window go to `strayBlocked` and `lastStray`. Other addons' events
+    are ignored.
+  - `IsLoggingCombat()` is read again 1 s later. If there's no timer it is read at once
+    (`readAt`).
+  - Up to 3 attempts. An attempt that called nothing still counts toward the 3; I read "up to 3
+    attempts" that way.
+  - Its one reply line is printed when the 1 s read is made, not when the command is typed.
+- **B3, `instances`:** every `PLAYER_ENTERING_WORLD` (10 kept, `worldCount` counts all):
+  - its two arguments;
+  - `IsInInstance()` and `GetInstanceInfo()` (all returns);
+  - zone, `InCombatLockdown()`, `IsLoggingCombat()`.
+
+  Every `ZONE_CHANGED_NEW_AREA` (10 kept, `zoneCount`): `IsInInstance()` and the zone.
+- `/dtprobe report` now has **15** lines: `logging` and `instances` come after `recipes`.
+
+### Tests (new and changed)
+
+- The old check `build: IsSelfFoundActive missing reads <absent>` is replaced by one for the two
+  new self-found reads.
+- **Absent and throwing:** both new sections exist and none failed. Their reads, and B1's, read
+  `<absent>` / `<error: …>`. `logging try` calls nothing when the state can't be read.
+- **`LoggingCombat` counts:**
+  - off → called exactly once, with `true`;
+  - on → never;
+  - `IsLoggingCombat` absent → never;
+  - `LoggingCombat` itself absent → recorded as `<absent>`.
+- **No calls over the whole scripted session:** zero `LoggingCombat` or `LoggingChat` calls,
+  across login, every command, 20 addon messages, deaths, `/played`, bank and the automatic
+  `logging` read. `LoggingChat` is zero in every test.
+- **Caps:** 3 try attempts; 10 world entries and 10 zone changes, with the counts going on.
+- **Blocked:**
+  - an `ADDON_ACTION_BLOCKED` for this addon fired during the call is recorded, and the line says
+    blocked;
+  - another addon's event is ignored;
+  - a `FORBIDDEN` after the window is stray;
+  - a "protected function" error sets `blockedByError`.
+- **Replies:** the reply waits for the 1 s read (nothing at the command, one line at 1 s); with no
+  timer it is read at once, still one line. `Logging   TRY` works in any case and spacing.
+- A battleground entry records `"pvp"`. Entries and zone changes print nothing.
+
+```
+probe: 153 passed, 0 failed
+```
+
+### Guard proofs (added)
+
+Same method as before: each guard removed in a scratchpad copy of `Probe.lua`.
+
+| # | Guard removed | Checks that went red |
+|---|---|---|
+| A2-1 | `try`'s "only if off" (`if state ~= false` → `if false`) | absent: logging try calls nothing when the state can't be read; throw: the same; try, on: nothing called, says so; try: third attempt, any case and spacing; try: 3 attempts at most; try, state absent: LoggingCombat never called |
+| A2-2 | `try`'s attempt cap (3) | try: 3 attempts at most; try: nothing else printed afterwards |
+| A2-3a | instance cap: world entries (10) | instances: 10 world entries kept, all counted |
+| A2-3b | instance cap: zone changes (10) | instances: 10 zone changes kept, all counted |
+
+The first build's 17 removals were re-run against the amended file, and all are still red.
+Guard 2 now turns 5 checks red (it was 3), because the A2 absent reads are added.
+
+### Greps
+
+- **G3** (unchanged): `grep -rnE "SendChatMessage|RequestTimePlayed|JoinChannel|LeaveChannel|COMBAT_LOG|CombatLog" DeadTiredProbe/ --include=*.lua | grep -v "/tests/"`
+  → no output (exit 1).
+- `grep -n "LoggingCombat\|LoggingChat" DeadTiredProbe/Probe.lua`:
+  ```
+  749:-- Amendment 2 B2. The globals LoggingCombat and LoggingChat SWITCH logging when given an argument.
+  750:-- So outside S.loggingTry neither is ever called: only their type is read. LoggingChat is never
+  764:    combat = A1("C_ChatInfo.IsLoggingCombat"), chat = A1("C_ChatInfo.IsLoggingChat"),
+  765:    combatGlobal = type(fn("LoggingCombat")), chatGlobal = type(fn("LoggingChat")) }
+  777:  local a = { t = A1("GetTime"), before = A1("C_ChatInfo.IsLoggingCombat"), blockedEvents = {} }
+  779:  local state = T("C_ChatInfo.IsLoggingCombat")
+  790:  a.result = A("LoggingCombat", true)
+  794:    a.after1s = A1("C_ChatInfo.IsLoggingCombat")
+  832:    lockdown = A1("InCombatLockdown"), loggingCombat = A1("C_ChatInfo.IsLoggingCombat") }
+  940:  local base = r and string.format("combat log on: %s, chat log on: %s, LoggingCombat is a %s",
+  ```
+  Where they appear:
+  - 749-750: comments.
+  - 765: `type()` reads only, in the automatic read.
+  - 777-794: inside `S.loggingTry`. **790 is the only call** to either global, and it is behind
+    the "only if off" check on 779.
+  - 832: an `IsLoggingCombat` read in `instances`.
+  - 940: headline text.
+
+  `LoggingChat` is never called.
+
+### New and changed lines, verbatim
+
+- The command list now reads:
+  `Dead Tired probe: /dtprobe ping, channels, bags, items, target, calendar, recipes, logging, logging try, report, reset.`
+- `/dtprobe logging`: `Dead Tired probe: recorded logging: combat log on: <yes|no|…>, chat log on: <yes|no|…>, LoggingCombat is a <function|nil>[; tries <n>, last <…>]`
+- `/dtprobe logging try`, one of:
+  - one second later: `Dead Tired probe: recorded logging try: combat logging is now on (it was off). /combatlog switches it off.`
+  - one second later: `Dead Tired probe: recorded logging try: combat logging is still off.`
+  - one second later: `Dead Tired probe: recorded logging try: combat logging is still off; the client blocked the call.`
+  - one second later: `Dead Tired probe: recorded logging try: combat logging state unknown after the call (<value>).`
+  - at once: `Dead Tired probe: recorded logging try: already on: nothing called`
+  - at once: `Dead Tired probe: recorded logging try: state unknown (<absent|<error: …>|<secret>|…>): nothing called`
+  - at once, after 3: `Dead Tired probe: logging try: already 3 attempts`
+  - `Dead Tired probe: logging try: failed: <message>`
+- Report lines:
+  - `build: … hardcore: <…>, self-found: <…>` (gains the self-found field)
+  - `logging: <as /dtprobe logging>`, or `logging: no read`
+  - `instances: <n> world entr(y|ies), last <zone>, in instance: <yes|no> (<type>), <m> zone change(s)`,
+    or `instances: no entry`
+
+**Worth knowing before you type `logging try`:** if the call works, combat logging stays **on**
+for the session, and the line says so. If the client blocks it, retail clients normally show
+their own "action blocked" popup for the addon. That popup is the client's, not the probe's.
+
+### Where to read each answer
+
+Path as before: `DeadTiredProbeDB.chars["<Realm>-<Name>"].runs[<n>].sections.<section>.<field>`.
+
+| Section | Question | Read |
+|---|---|---|
+| `build` (B1) | is this a self-found character? card 3 | `selfFoundActive` (this character), `selfFoundAllowed` (the realm's rule) |
+| `logging` (B2) | combat-log prompt card (7): can the logs be read, and can addon code switch combat logging? | `reads[i].combat` / `.chat` (the log state; at login, `reads[1]`); `reads[i].combatGlobal` / `.chatGlobal` (do the globals exist?); `attempts[i].called`, `.result` (returns or `<error: …>`), `.blockedByError`, `.blockedEvents[j].event`/`.func`, `.blocked`, `.after1s` (**`true` = addon code can switch it on**); `strayBlocked` |
+| `instances` (B3) | card 7: what entering an instance looks like; card 3: does `IsInInstance` say `"pvp"` in a battleground? | `worlds[i].isLogin`/`.isReload`, `.instance[1]`/`[2]` (in instance, type), `.info` (`GetInstanceInfo`: name, type, difficulty…, instance map ID at `[8]`), `.zone`, `.lockdown`, `.loggingCombat` (was logging already on at each entry?); `zones[i]`; `worldCount`, `zoneCount` |
+
+### Stop conditions
+
+None tripped:
+- nothing in `DeadTired/` changed;
+- the only call that switches anything is the single `LoggingCombat(true)` on the `try` path;
+  `LoggingChat` is never called;
+- every section runs with every function absent, and with every function throwing;
+- every guard removal went red without a test fix.
+
+`docs/UAT_dt_probe_results.md` and `docs/PROBE_launch_results.md` were not written.

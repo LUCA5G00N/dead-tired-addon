@@ -14,6 +14,7 @@ end
 -- ---------------------------------------------------------------- the world
 
 local S, frames
+local fire   -- forward: the LoggingCombat stub fires ADDON_ACTION_BLOCKED
 local SECRET_V = setmetatable({}, { __tostring = function() return "SECRETVALUE" end })
 
 local GLOBAL_FNS = { "GetTime", "time", "date", "GetBuildInfo", "GetRealmName",
@@ -22,9 +23,10 @@ local GLOBAL_FNS = { "GetTime", "time", "date", "GetBuildInfo", "GetRealmName",
   "IsInGroup", "GetGuildInfo", "Ambiguate", "GetChannelList", "EnumerateServerChannels",
   "GetChannelName", "GetRealZoneText", "GetServerTime", "GetGameTime", "IsInInstance",
   "GetGuildRecipeInfoPostQuery", "GetGuildRecipeMember", "hooksecurefunc", "issecretvalue",
-  "SendChatMessage", "RequestTimePlayed", "JoinChannelByName", "LeaveChannelByName" }
+  "SendChatMessage", "RequestTimePlayed", "JoinChannelByName", "LeaveChannelByName",
+  "GetInstanceInfo", "LoggingCombat", "LoggingChat" }
 local NAMESPACES = { "C_GameRules", "C_GuildInfo", "C_ChatInfo", "C_Container", "C_Item",
-  "C_DateAndTime", "C_Calendar", "C_TradeSkillUI", "C_Timer" }
+  "C_DateAndTime", "C_Calendar", "C_TradeSkillUI", "C_Timer", "C_PlayerInfo" }
 
 local function count(k) S.calls[k] = (S.calls[k] or 0) + 1 end
 
@@ -62,7 +64,23 @@ local function fullWorld()
   function GetRealZoneText() return "Orgrimmar" end
   function GetServerTime() return 1793836800 end
   function GetGameTime() return 23, 5 end
-  function IsInInstance() return false, "none" end
+  function IsInInstance() return S.inInstance, S.instanceType end
+  function GetInstanceInfo() return "Orgrimmar", S.instanceType, 0, "", 0, 0, false, 1454, 0 end
+  -- Amendment 2: the logging globals. With an argument they switch logging (S.logCombat).
+  function LoggingCombat(arg)
+    count("LoggingCombat")
+    S.logArgs[#S.logArgs + 1] = arg
+    if S.blockMode == "error" then
+      error("[ADDON_ACTION_FORBIDDEN] AddOn 'DeadTiredProbe' tried to call the protected function 'LoggingCombat()'.", 0)
+    elseif S.blockMode == "event" then
+      fire("ADDON_ACTION_BLOCKED", "DeadTiredProbe", "LoggingCombat()")
+      return S.logCombat
+    end
+    if arg ~= nil then S.logCombat = arg and true or false end
+    return S.logCombat
+  end
+  function LoggingChat(arg) count("LoggingChat") return false end
+  C_PlayerInfo = { IsSelfFoundActive = function() return false end }
   function GetGuildRecipeInfoPostQuery() return 185, S.recipeIDs[1], S.numMembers end
   function GetGuildRecipeMember(i) return "Cook" .. i, true end
   function hooksecurefunc(t, k, post)
@@ -79,7 +97,7 @@ local function fullWorld()
   C_GameRules = {
     GetActiveGameMode = function() return 2 end,
     IsHardcoreActive = function() return S.hardcore end,
-    -- IsSelfFoundActive is not in the reference (Task 1): absent here too
+    IsSelfFoundAllowed = function() return false end,   -- Amendment 2 B1
   }
   C_GuildInfo = {
     IsGuildOfficer = function() return S.officer end,
@@ -90,6 +108,8 @@ local function fullWorld()
   C_ChatInfo = {
     AreOutgoingAddonChatMessagesRestricted = function() return S.restricted end,
     InChatMessagingLockdown = function() return false end,
+    IsLoggingCombat = function() return S.logCombat end,
+    IsLoggingChat = function() return false end,
     RegisterAddonMessagePrefix = function() return true end,
     SendAddonMessage = function(prefix, text, chan)
       count("SendAddonMessage")
@@ -149,7 +169,8 @@ local function setup(mode)
     tname = "Nameless", trealm = nil, tlevel = 60, secrets = { [SECRET_V] = true },
     calls = {}, sent = {}, printed = {}, timers = {}, numSlots = {}, bagItems = {},
     itemNames = { [13446] = "Major Healing Potion", [17029] = "Sacred Candle" },
-    recipeIDs = { 2546, 2547 }, numMembers = 3, calN = 1 }
+    recipeIDs = { 2546, 2547 }, numMembers = 3, calN = 1,
+    logCombat = false, logArgs = {}, inInstance = false, instanceType = "none" }
   -- items: bag 0 has 3 items, bank -1 has 2
   S.numSlots[0], S.numSlots[-1] = 16, 24
   S.bagItems[0] = { [1] = { itemID = 6948, isBound = true }, [2] = { itemID = 13446, isBound = false },
@@ -191,7 +212,7 @@ local function setup(mode)
   end
 end
 
-local function fire(ev, ...)
+function fire(ev, ...)
   for _, f in ipairs(frames) do
     if f.events[ev] and f.scripts.OnEvent then f.scripts.OnEvent(f, ev, ...) end
   end
@@ -294,7 +315,15 @@ check("login: the run sits under Realm-Name (not the cold 'Unknown')", st.key ==
 check("record: version 1, run has at, inGuild, sections", DeadTiredProbeDB.version == 1
   and type(st.cur.at) == "number" and st.cur.inGuild == true and type(st.cur.sections) == "table")
 check("build: GetBuildInfo, all returns", x.build.buildInfo[1] == "1.60.1" and x.build.buildInfo[4] == 16001)
-check("build: IsSelfFoundActive missing reads <absent>", x.build.selfFound == "<absent>")
+check("build (A2 B1): self-found from IsSelfFoundAllowed and C_PlayerInfo.IsSelfFoundActive",
+  x.build.selfFoundAllowed == false and x.build.selfFoundActive == false and x.build.selfFound == nil)
+check("logging (A2 B2): automatic read at PEW + 15 s", x.logging.reads[1].combat == false
+  and x.logging.reads[1].chat == false and x.logging.reads[1].combatGlobal == "function"
+  and x.logging.reads[1].chatGlobal == "function" and x.logging.reads[1].t == 1015)
+check("instances (A2 B3): the login's world entry", x.instances.worlds[1].isLogin == true
+  and x.instances.worlds[1].isReload == false and x.instances.worlds[1].instance[2] == "none"
+  and x.instances.worlds[1].info[1] == "Orgrimmar" and x.instances.worlds[1].info[2] == "none"
+  and x.instances.worlds[1].lockdown == false and x.instances.worlds[1].loggingCombat == false)
 check("build: game mode, hardcore, level, class", x.build.gameMode == 2 and x.build.hardcore == false
   and x.build.level == 60 and x.build.class[2] == "WARRIOR")
 check("login: loaded, login, world stamps", x.login.loaded.t == 1000 and x.login.login.t == 1000
@@ -325,7 +354,7 @@ check("login: first 5 guild and roster updates kept, all counted", #x.login.guil
 local before = #S.printed
 for _, c in ipairs(COMMANDS) do slash(c) end
 local replies = #S.printed - before
-check("one reply per command, 13 report lines", replies == (#COMMANDS - 1) + 13)
+check("one reply per command, 15 report lines", replies == (#COMMANDS - 1) + 15)
 check("ping: one addon message on GUILD, prefix DTPROBE, text ping", S.calls.SendAddonMessage == 1
   and S.sent[1].chan == "GUILD" and S.sent[1].prefix == "DTPROBE" and S.sent[1].text == "ping"
   and x.comms.pings[1].channel == "GUILD" and x.comms.pings[1].result[1] == 0)
@@ -461,6 +490,8 @@ check("secret: never stored raw anywhere in the saved table",
   not deepFind(DeadTiredProbeDB, function(v) return rawequal(v, SECRET_V) end))
 
 -- what was never called
+check("zero LoggingCombat and LoggingChat over the whole scripted session (A2)",
+  (S.calls.LoggingCombat or 0) == 0 and (S.calls.LoggingChat or 0) == 0)
 check("zero SendChatMessage", (S.calls.SendChatMessage or 0) == 0)
 check("zero C_ChatInfo.SendChatMessage", (S.calls["C_ChatInfo.SendChatMessage"] or 0) == 0)
 check("zero RequestTimePlayed", (S.calls.RequestTimePlayed or 0) == 0)
@@ -482,15 +513,16 @@ check("every line is the probe's, and none has a |", ok)
 before = #S.printed
 slash("")
 check("/dtprobe alone: the command list, one line", #S.printed == before + 1
-  and S.printed[#S.printed] == "Dead Tired probe: /dtprobe ping, channels, bags, items, target, calendar, recipes, report, reset.")
+  and S.printed[#S.printed] == "Dead Tired probe: /dtprobe ping, channels, bags, items, target, calendar, recipes, logging, logging try, report, reset.")
 slash("nonsense")
 check("an unknown verb: the list", S.printed[#S.printed] == S.printed[#S.printed - 1])
 before = #S.printed
 slash("report")
 local rep = {}
 for i = before + 1, #S.printed do rep[#rep + 1] = S.printed[i] end
-check("report: one line per section, in order", #rep == 13 and rep[1]:find("^Dead Tired probe: build: 1%.60%.1")
-  and rep[13]:find("^Dead Tired probe: recipes: ") ~= nil)
+check("report: one line per section, in order", #rep == 15 and rep[1]:find("^Dead Tired probe: build: 1%.60%.1")
+  and rep[13]:find("^Dead Tired probe: recipes: ") ~= nil and rep[14]:find("^Dead Tired probe: logging: ") ~= nil
+  and rep[15]:find("^Dead Tired probe: instances: ") ~= nil)
 check("no errors were raised anywhere", P.state().cur.errors == nil)
 
 -- reset
@@ -535,6 +567,10 @@ local function everything(mode)
   if type(SlashCmdList.PLAYED) == "function" then pcall(SlashCmdList.PLAYED, "") end
   fire("TIME_PLAYED_MSG", 1, 1)
   fire("PLAYER_DEAD")
+  slash("logging")
+  slash("logging try")
+  fire("ZONE_CHANGED_NEW_AREA")
+  fire("ADDON_ACTION_BLOCKED", "DeadTiredProbe", "LoggingCombat()")
   advance(60)
   return p
 end
@@ -565,6 +601,12 @@ for _, mode in ipairs({ "absent", "throw" }) do
       and isMarker(x2.death.deaths[1].zone, m) and isMarker(x2.items.list[1].instant, m)
       and isMarker(x2.calendar.open, m) and isMarker(x2.recipes.attempts[1].ready, m)
       and isMarker(x2.comms.restricted, m) and isMarker(x2.login.loaded.t, m))
+    check(mode .. ": A2 reads are " .. m, isMarker(x2.build.selfFoundAllowed, m)
+      and isMarker(x2.build.selfFoundActive, m) and isMarker(x2.logging.reads[1].combat, m)
+      and isMarker(x2.logging.reads[1].chat, m) and isMarker(x2.instances.worlds[1].info, m)
+      and isMarker(x2.instances.zones[1].instance, m) and isMarker(x2.logging.attempts[1].before, m))
+    check(mode .. ": logging try calls nothing when the state can't be read",
+      x2.logging.attempts[1].called == false and (S.calls.LoggingCombat or 0) == 0)
     check(mode .. ": the hook is recorded as not placed, with why", x2.played.hook.placed == false
       and type(x2.played.hook.why) == "string")
     check(mode .. ": recipes says why there's no query", x2.recipes.attempts[1].why ~= nil
@@ -657,6 +699,98 @@ check("hook: no PLAYED handler, recorded as not placed", x.played.hook.placed ==
   and x.played.hook.why:find("not a function", 1, true) ~= nil and not x.played.failed)
 fire("TIME_PLAYED_MSG", 5, 5)
 check("hook: events still recorded, with no stamp", x.played.events[1].stampAge == "<no stamp>")
+
+-- ---------------------------------------------------------------- Amendment 2: logging try
+local function fresh(f)
+  setup("full")
+  if f then f() end
+  DeadTiredProbeDB = nil
+  local p = load()
+  login(p)
+  return p
+end
+P = fresh()
+x = secs(P)
+before = #S.printed
+slash("logging")
+check("logging: /dtprobe logging records a read and replies one line", #x.logging.reads == 2
+  and #S.printed == before + 1 and S.printed[#S.printed]:find("^Dead Tired probe: recorded logging: combat log on: no") ~= nil
+  and (S.calls.LoggingCombat or 0) == 0)
+before = #S.printed
+slash("logging try")
+check("try, off: LoggingCombat called once, with true", S.calls.LoggingCombat == 1 and S.logArgs[1] == true
+  and x.logging.attempts[1].called == true and x.logging.attempts[1].before == false)
+check("try, off: the reply waits for the 1 s read", #S.printed == before)
+advance(1)
+check("try, off: one line, logging now on", #S.printed == before + 1 and S.printed[#S.printed] ==
+  "Dead Tired probe: recorded logging try: combat logging is now on (it was off). /combatlog switches it off.")
+check("try, off: results and the 1 s read recorded", x.logging.attempts[1].result[1] == true
+  and x.logging.attempts[1].after1s == true and x.logging.attempts[1].blocked == false)
+slash("logging try")
+check("try, on: nothing called, says so", S.calls.LoggingCombat == 1 and x.logging.attempts[2].called == false
+  and S.printed[#S.printed] == "Dead Tired probe: recorded logging try: already on: nothing called")
+S.logCombat = false
+slash("Logging   TRY")
+advance(1)
+check("try: third attempt, any case and spacing", S.calls.LoggingCombat == 2 and #x.logging.attempts == 3)
+S.logCombat = false
+slash("logging try")
+check("try: 3 attempts at most", #x.logging.attempts == 3 and S.calls.LoggingCombat == 2
+  and x.logging.refused == 1 and S.printed[#S.printed] == "Dead Tired probe: logging try: already 3 attempts")
+advance(5)
+check("try: nothing else printed afterwards", S.printed[#S.printed] == "Dead Tired probe: logging try: already 3 attempts")
+
+P = fresh(function() end)
+C_ChatInfo.IsLoggingCombat = nil
+slash("logging try")
+check("try, state absent: LoggingCombat never called", (S.calls.LoggingCombat or 0) == 0
+  and secs(P).logging.attempts[1].why == "state unknown (<absent>): nothing called")
+P = fresh()
+LoggingCombat = nil
+slash("logging try")
+advance(1)
+check("try, LoggingCombat absent: recorded <absent>", secs(P).logging.attempts[1].result == "<absent>"
+  and secs(P).logging.attempts[1].after1s == false)
+
+P = fresh()
+S.blockMode = "event"
+fire("ADDON_ACTION_BLOCKED", "OtherAddon", "Something()")
+slash("logging try")
+advance(1)
+local la = secs(P).logging.attempts[1]
+check("try, blocked: ADDON_ACTION_BLOCKED for this addon recorded", la.blocked == true and #la.blockedEvents == 1
+  and la.blockedEvents[1].event == "ADDON_ACTION_BLOCKED" and la.blockedEvents[1].func == "LoggingCombat()")
+check("try, blocked: another addon's event is ignored", secs(P).logging.strayBlocked == nil)
+check("try, blocked: the line says so", S.printed[#S.printed] ==
+  "Dead Tired probe: recorded logging try: combat logging is still off; the client blocked the call.")
+fire("ADDON_ACTION_FORBIDDEN", "DeadTiredProbe", "LoggingCombat()")
+check("try, blocked: an event after the 1 s window is stray", #la.blockedEvents == 1 and secs(P).logging.strayBlocked == 1)
+P = fresh()
+S.blockMode = "error"
+slash("logging try")
+advance(1)
+la = secs(P).logging.attempts[1]
+check("try, blocked by error text", la.blockedByError == true and la.blocked == true
+  and isMarker(la.result, "<error: %[ADDON_ACTION_FORBIDDEN%]"))
+P = fresh(function() C_Timer = nil end)
+before = #S.printed
+slash("logging try")
+check("try, no timer: read at once, one line", #S.printed == before + 1 and secs(P).logging.attempts[1].readAt
+  == "at once (no timer)" and S.calls.LoggingCombat == 1)
+
+-- ---------------------------------------------------------------- Amendment 2: instances
+P = fresh()
+x = secs(P)
+S.inInstance, S.instanceType = true, "pvp"
+for i = 1, 12 do fire("PLAYER_ENTERING_WORLD", false, false) fire("ZONE_CHANGED_NEW_AREA") end
+check("instances: 10 world entries kept, all counted", #x.instances.worlds == 10 and x.instances.worldCount == 13)
+check("instances: 10 zone changes kept, all counted", #x.instances.zones == 10 and x.instances.zoneCount == 12)
+check("instances: a battleground entry", x.instances.worlds[2].instance[1] == true
+  and x.instances.worlds[2].instance[2] == "pvp" and x.instances.worlds[2].isLogin == false
+  and x.instances.zones[1].instance[2] == "pvp" and x.instances.zones[1].zone == "Orgrimmar")
+check("instances: entries print nothing", #S.printed == 1)
+check("logging and instances: no LoggingCombat or LoggingChat call", (S.calls.LoggingCombat or 0) == 0
+  and (S.calls.LoggingChat or 0) == 0)
 
 realPrint(string.format("probe: %d passed, %d failed", passes, fails))
 os.exit(fails == 0 and 0 or 1)
