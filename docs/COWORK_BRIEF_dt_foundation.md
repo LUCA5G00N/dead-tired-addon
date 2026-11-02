@@ -29,8 +29,10 @@ builds on, plus the first small feature that proves the guild comms work end to 
 
 - P1: `main` holds `CLAUDE.md`, `docs/ROADMAP.md`, this brief, its walk-sheet and `reference/`,
   and no `DeadTired/` folder.
-- P2: **Live interface number:** `16001` *(beta value. Tim replaces this with the live number from
-  `/dump select(4, GetBuildInfo())` before the round opens, or confirms 16001.)*
+- P2: **Interface number:** `16001`, the beta's value. The live client can't be checked until
+  launch (2026-11-04 evening). Build against 16001. If the live client reports a different number
+  (`/dump select(4, GetBuildInfo())`), Tim changes the one `## Interface:` line before walking;
+  nothing else in the round depends on it.
 
 ## Depends on: rulings
 
@@ -48,8 +50,8 @@ A new addon, **`DeadTired/` version 0.1.0**, loading on the Forever client:
 
 - **`DeadTired.toc`**: `## Interface:` set to the number in P2. Title `Dead Tired`,
   `## SavedVariables: DeadTiredDB`, files listed in the order below.
-- **`Config.lua`**: `GUILD_NAME = "Dead Tired"` (matched case-insensitively, surrounding spaces
-  ignored, so "DEAD TIRED" also matches), `PREFIX = "DEADTIRED"`, `PROTOCOL = 1`.
+- **`Config.lua`**: `GUILD_NAME = "DEAD TIRED"` (the in-game guild name; matched
+  case-insensitively, surrounding spaces ignored), `PREFIX = "DEADTIRED"`, `PROTOCOL = 1`.
 - **`Core.lua`**: `ns.DT` with the guarded-read helpers copied from the reference (`try`, `clean`,
   `secret`, `now`, `stamp`, `after`, `charKey`, `build`), `out()` printing with the prefix
   `|cff7fa650Dead Tired|r`, `module(def)` with the reference's semantics, and one slash router
