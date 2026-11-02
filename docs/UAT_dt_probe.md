@@ -1,6 +1,6 @@
 # UAT walk-sheet: dt_probe (launch-night probe)
 
-Brief: `docs/COWORK_BRIEF_dt_probe.md`. **Checks: 5 offline, 1 in-game run. `[H]` count: 0.**
+Brief: `docs/COWORK_BRIEF_dt_probe.md`. **Checks: 5 offline, 1 in-game run (6 boxes). `[H]` count: 0.**
 The probe is a tool; its results go to `docs/PROBE_launch_results.md`, written from the saved
 file by a session working with Tim, and checked by Tim.
 

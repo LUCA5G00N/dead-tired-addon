@@ -12,11 +12,11 @@ online. If someone's missing, they probably don't have it (or have that sharing 
 It's quiet: one welcome line when you log in, and otherwise nothing unless you ask, apart from
 the few things listed under *What it prints on its own*.
 
-This is release candidate **0.1.0-rc1**, for testing on launch night.
+This is release candidate **0.1.0-rc2**, for testing on launch night.
 
 ## Install
 
-1. Download `DeadTired-0.1.0-rc1.zip`.
+1. Download `DeadTired-0.1.0-rc2.zip`.
 2. Unzip it into your WoW Forever AddOns folder, `_forever_\Interface\AddOns`, so you end up with
    `_forever_\Interface\AddOns\DeadTired\DeadTired.toc`. (Not `DeadTired\DeadTired\...`.)
 3. At the character screen, click **AddOns**, make sure **Dead Tired** is ticked. If it says

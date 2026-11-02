@@ -256,10 +256,10 @@ do
     and a:said("minutes. Bring a rod, or a grudge."))
   check("all opt-ins on: the login prompt (card 7 R2, opt-in) is the only dialog at login",
     #inWorld == 1 and inWorld[1] == "DeadTiredLogsLogin")
-  -- Recorded in the release report, not fixed here: an unanswered login prompt is still open when
-  -- the dungeon prompt opens over it.
-  check("all opt-ins on: entering a dungeon with the combat log off shows card 7's prompt (R1); nothing else",
-    #inDungeon == 2 and inDungeon[1] == "DeadTiredLogsInstance" and inDungeon[2] == "DeadTiredLogsLogin")
+  -- Fix round 2 (F12): the unanswered login prompt already offers the combat log, so entering a
+  -- dungeon with it still up opens no second prompt (rc1 showed both).
+  check("all opt-ins on: entering a dungeon with the login prompt still up: still only that one prompt",
+    #inDungeon == 1 and inDungeon[1] == "DeadTiredLogsLogin")
   check("all opt-ins on: the only message sent at login is the HELLO (card 1)", #sent == 1 and sent[1] == "HELLO")
 end
 
