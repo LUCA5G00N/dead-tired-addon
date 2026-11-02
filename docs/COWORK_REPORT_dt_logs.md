@@ -278,3 +278,32 @@ in first: clean, card 1's files identical to its branch, all suites green before
   (the unknown branch removed): 6 red, incl. *F10: entering with the combat log unknown: no
   dialog, nothing armed*. F11 removed: *F11: leaving the instance hides it*, *F11: combat over:
   hidden*.
+
+## Fix round 2 (F12, F13)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes2.md` (the release round's *Noticed, not
+fixed* item 1: with `/dt logs login on`, an unanswered login prompt and the instance prompt could
+both be up, both armed with `/combatlog`, so a click on each switched the log back off). Round
+report: `docs/COWORK_REPORT_dt_fixes2.md` on `release/0.1.0-rc2`.
+
+- **F12, `Logs.lua`:** `L.askInstance` returns `"covered"`, showing nothing, while the login
+  prompt is on screen or waiting for combat to end; the visit is already recorded, so it counts as
+  asked. `L.showLogin`, about to show (always out of combat: in combat it defers), hides an
+  instance prompt that is up first.
+- **F13, `Logs.lua`:** `finish()` (every logs button's click) hides the clicked prompt and, out of
+  combat, every other open logs prompt; in combat the existing `pendingHide` hides them all when
+  combat ends.
+- No player-facing line changed.
+- **Tests:** 16 new checks (logs: 122). F12: login prompt up then a dungeon (one prompt; the visit
+  counts as asked; a new visit asks); a deferred login prompt covers a dungeon entered meanwhile;
+  instance prompt up then `/dt logs now` (one prompt), and the same in combat (nothing moves until
+  combat ends). F13: a click on one hides the other, out of combat and (after combat) in combat.
+  The release round's sequence, both ways round: one `/combatlog` run, the log stays on. A test
+  `press()` refuses a button on a prompt that isn't on screen, as the game would.
+- **Guard proofs:** F12's "login prompt covers" removed: 4 red, incl. *F12: walking into a
+  dungeon with the login prompt up: no second prompt*. F12's "instance hidden for login" removed:
+  2 red, incl. *F12: /dt logs now with the instance prompt up: only the login prompt*. F13
+  removed: 2 red, incl. *F13: ... so Log it can't be pressed after Combat log: one /combatlog run,
+  the log on*. (With only F12's first rule removed, the end-to-end sequence check stays green
+  because F13 alone also stops it: each layer holds by itself.)
+- Walk-sheet: G9b added (fixes2 G5).

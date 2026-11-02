@@ -611,4 +611,113 @@ do
   check("F11: back inside before combat ends: not hidden", instShown(a))
 end
 
+-- ------------------------------------------------------------ fix round 2 (F12, F13)
+-- A click as a player can make it: only on a prompt that is on screen. Counts /combatlog runs.
+local function press(c, button, dialog)
+  local d = c.named[dialog]
+  if not d or not d:IsShown() then return "hidden" end
+  local b = c.named[button]
+  if b.enabled and b.attrs.type == "macro" and (b.attrs.macrotext or ""):find("/combatlog", 1, true) then
+    c.combatRuns = (c.combatRuns or 0) + 1
+  end
+  return click(c, button)
+end
+local LOGIN, INST = "DeadTiredLogsLogin", "DeadTiredLogsInstance"
+local function upCount(c) return (loginShown(c) and 1 or 0) + (instShown(c) and 1 or 0) end
+
+-- F12: login prompt up, then a dungeon: one prompt, and the visit counts as asked
+do
+  local a = newClient(w, { guild = G, db = { logs = { login = true } } })
+  counter(a)
+  a:login()
+  check("F12 baseline: the login prompt is up", loginShown(a) and a.loginShows == 1)
+  go(a, RFC)
+  check("F12: walking into a dungeon with the login prompt up: no second prompt", upCount(a) == 1
+    and a.instShows == 0)
+  press(a, "DeadTiredLogsButton_Neither", LOGIN)
+  go(a, RFC, true); go(a, RFC)
+  check("F12: the visit counts as asked: no prompt later in the same visit", upCount(a) == 0 and a.instShows == 0)
+  a.combatLog = false
+  go(a, WORLD); go(a, WC)
+  check("F12: a new visit asks as usual", instShown(a) and a.instShows == 1)
+end
+
+-- F12: login prompt waiting for combat to end, then a dungeon: still one prompt
+do
+  local a = newClient(w, { guild = G, db = { logs = { login = true } } })
+  counter(a)
+  a.combat = true
+  a:login()
+  go(a, RFC)
+  a.combat = false
+  a:fire("PLAYER_REGEN_ENABLED")
+  check("F12: a deferred login prompt covers a dungeon entered meanwhile: one prompt", upCount(a) == 1
+    and loginShown(a) and a.instShows == 0)
+end
+
+-- F12: instance prompt up, then /dt logs now: the instance prompt goes first
+do
+  local a = newClient(w, { guild = G, db = {} })
+  counter(a)
+  a:login(); go(a, RFC)
+  check("F12 baseline: the instance prompt is up", instShown(a))
+  a:slash("logs now")
+  check("F12: /dt logs now with the instance prompt up: only the login prompt", loginShown(a) and not instShown(a))
+  -- the same in combat: the show waits, and so does the hide
+  local b = newClient(w, { guild = G, db = {} })
+  counter(b)
+  b:login(); go(b, RFC)
+  b.combat = true
+  local ok = pcall(b.slash, b, "logs now")
+  check("F12: in combat, nothing moves (no error, the instance prompt stays, no login prompt yet)", ok
+    and instShown(b) and not loginShown(b) and (b:db().errors.logs or 0) == 0)
+  b.combat = false
+  b:fire("PLAYER_REGEN_ENABLED")
+  check("F12: combat over: the instance prompt hidden, then the login prompt shown", loginShown(b) and not instShown(b))
+end
+
+-- F13: a click on one prompt hides any other still open (forced: F12 stops this happening)
+do
+  local a = newClient(w, { guild = G, db = {} })
+  counter(a)
+  a:slash("logs now")                                   -- builds and shows the login prompt
+  press(a, "DeadTiredLogsButton_Neither", LOGIN)
+  a:login(); go(a, RFC)
+  a.named[LOGIN]:Show()                                 -- a stale login prompt, both up
+  check("F13 setup: both prompts up", upCount(a) == 2)
+  press(a, "DeadTiredLogsButton_Combat", LOGIN)
+  check("F13: a click on the login prompt hides the instance prompt too", upCount(a) == 0)
+  check("F13: ... so Log it can't be pressed after Combat log: one /combatlog run, the log on",
+    press(a, "DeadTiredLogsButton_LogIt", INST) == "hidden" and a.combatRuns == 1 and a.combatLog == true)
+  -- the other way round, and in combat
+  a.combatLog = false
+  go(a, WORLD); go(a, WC)
+  a.named[LOGIN]:Show()
+  a.combat = true
+  press(a, "DeadTiredLogsButton_NotNow", INST)
+  check("F13: in combat, the hides wait for combat to end", upCount(a) == 2)
+  a.combat = false
+  a:fire("PLAYER_REGEN_ENABLED")
+  check("F13: combat over: both hidden", upCount(a) == 0)
+end
+
+-- The sequence the release round found: Combat log, then Log it. One /combatlog, never two.
+do
+  local a = newClient(w, { guild = G, db = { logs = { login = true } } })
+  counter(a)
+  a:login(); go(a, RFC)
+  press(a, "DeadTiredLogsButton_Combat", LOGIN)
+  local r = press(a, "DeadTiredLogsButton_LogIt", INST)
+  check("F12/F13: login prompt, walk in, Combat log, then Log it: one /combatlog run, the log stays on",
+    r == "hidden" and a.combatRuns == 1 and a.combatLog == true)
+  local b = newClient(w, { guild = G, db = {} })
+  counter(b)
+  b:login(); go(b, RFC)
+  b:slash("logs now")
+  press(b, "DeadTiredLogsButton_LogIt", INST)
+  press(b, "DeadTiredLogsButton_Combat", LOGIN)
+  check("F12/F13: instance prompt, /dt logs now, then both buttons: one /combatlog run, the log on",
+    (b.combatRuns or 0) == 1 and b.combatLog == true)
+end
+
 H.finish("logs")

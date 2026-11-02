@@ -21,6 +21,9 @@
 --   * Fix round 1: F10, a log whose state can't be read is never armed (both commands toggle);
 --     with nothing to arm, one line says so instead of a dialog. F11, leaving the instance hides
 --     its dialog (after combat, if in combat).
+--   * Fix round 2: F12, one logs prompt at a time (an open or pending login prompt covers a
+--     dungeon visit; the login prompt hides an instance prompt before it shows). F13, a click on
+--     any logs button hides every other open logs prompt.
 --
 -- STORED (members only): DeadTiredDB.logs = { ask, login, visit }. ask/login: nil means the
 -- default (ask on, login off). visit: the key of the instance visit in progress, so a /reload
@@ -103,6 +106,7 @@ end
 -- ---------------------------------------------------------------- dialogs (copied: build et al.)
 
 local dialogs = {}                    -- login, instance
+local function shown(d) return d ~= nil and d:IsShown() == true end
 local pendingShow, pendingHide
 local pendingHideInstance             -- F11: the visit ended in combat; hide when it's over
 
@@ -117,6 +121,12 @@ local function finish(dlg, report)
     pendingHide = true                -- a frame holding secure buttons can't hide in combat
   else
     dlg:Hide()
+    -- Fix round 2 (F13): a click closes every other logs prompt too, so a stale button armed
+    -- with the same toggle can't be clicked after this one ran. (In combat, pendingHide above
+    -- hides them all when combat ends.)
+    for _, d in pairs(dialogs) do
+      if d ~= dlg and d:IsShown() then d:Hide() end                       -- guard: hide the others (F13)
+    end
   end
   if not report then return end
   if not DT.after(0.5, report) then report() end
@@ -230,6 +240,9 @@ function L.showLogin(force)
     if h == nil then DT.out(UNKNOWN.chat) end
     return "unknown"
   end
+  -- Fix round 2 (F12): one prompt at a time. The login prompt offers the combat log too, so an
+  -- instance prompt still up goes first (this runs out of combat: in combat the show was deferred).
+  if shown(dialogs.instance) then dialogs.instance:Hide() end              -- guard: instance hidden for login (F12)
   local dlg = buildLogin()
   arm(dlg.buttons.combat, p.combat)
   arm(dlg.buttons.chat, p.chat)
@@ -239,11 +252,17 @@ function L.showLogin(force)
   return "shown"
 end
 
--- The instance dialog (R1, R3): combat log only. Returns "shown", "deferred", "on", "quiet" or
--- "unknown" (F10: the state can't be read, so no dialog; one line, once per visit).
+-- The instance dialog (R1, R3): combat log only. Returns "shown", "deferred", "on", "quiet",
+-- "unknown" (F10: the state can't be read, so no dialog; one line, once per visit) or "covered"
+-- (F12: the login prompt is up or pending, and already offers the combat log).
 local toldUnknown                     -- the visit key the F10 line was printed for
 function L.askInstance(key)
   if not L.asking() then return "quiet" end
+  -- Fix round 2 (F12): the login prompt already offers the combat log. If it's up (or waiting for
+  -- combat to end), no second prompt: the visit counts as asked.
+  if shown(dialogs.login) or (pendingShow and pendingShow.kind == "login") then   -- guard: login prompt covers (F12)
+    return "covered"
+  end
   local c = L.state()
   if c == true then return "on" end
   if c == nil then                                                          -- guard: unknown, no dialog (F10)

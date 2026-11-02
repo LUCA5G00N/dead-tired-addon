@@ -4,6 +4,10 @@
 and AUD-14):** a log whose state can't be read is never armed; the instance dialog hides when the
 visit ends. Marked *(amended, fix round 1)*.
 
+**Amended 2026-11-02 (fix round 2, F12 and F13 in `docs/COWORK_BRIEF_dt_fixes2.md`):** one logs
+prompt at a time, and a click on any logs button hides every other open logs prompt. Marked
+*(amended, fix round 2)*.
+
 Read first, in order:
 1. `CLAUDE.md`.
 2. This brief and its walk-sheet, `docs/UAT_dt_logs.md`.
@@ -105,6 +109,12 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
   visit ends, the instance dialog hides (after combat ends, if in combat, and only if no visit has
   begun again by then). Escape is not added. The visit key is the instance type plus
   `GetInstanceInfo()`'s instance ID (8th return) when readable, else the zone text.
+- *(amended, fix round 2)* **One prompt at a time (F12, F13).** If the login prompt is showing
+  (or waiting for combat to end) when a dungeon or raid visit begins, the instance prompt is not
+  shown and the visit counts as asked. If the instance prompt is up when the login prompt is about
+  to show (`/dt logs now`), the instance prompt is hidden first (both wait for combat to end in
+  combat). When any logs button's click runs, every other open logs prompt is hidden (after
+  combat, in combat).
 - **Login dialog (R2):** `LogPrompt.lua`'s four-button dialog, near enough as it is. Title:
   `The dead keep records. Turn them on?`. Status line as the beta's (`combat log ON/OFF/?    chat
   log ON/OFF/?`). Buttons `Combat log`, `Chat log`, `Both`, `Neither`. After a click, the beta's
