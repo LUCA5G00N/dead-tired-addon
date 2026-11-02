@@ -1,6 +1,6 @@
 # UAT walk-sheet: dt_logs (combat-log prompt)
 
-Brief: `docs/COWORK_BRIEF_dt_logs.md`. **Checks: 10. `[H]` count: 1** (whether the prompt helps
+Brief: `docs/COWORK_BRIEF_dt_logs.md`. **Checks: 11. `[H]` count: 1** *(amended, fix round 2: G9b added)* (whether the prompt helps
 or nags is the guild's call).
 
 **Offline (the build session runs these):**
@@ -26,5 +26,8 @@ or nags is the guild's call).
   shows. **Chat log**: the line says chat log ON, and `WoWChatLog.txt` starts growing. `/reload`
   again: the dialog shows with only the combat log offered. `/dt logs login off`, `/reload`: no
   dialog. Entering a dungeon never offers the chat log.
+- [ ] `[G]` G9b *(added, fix round 2, `docs/UAT_dt_fixes2.md` G5)*: with `/dt logs login on` and the
+  combat log off, log in at a dungeon entrance, leave the login prompt unanswered and walk in:
+  still only one prompt on screen.
 - [ ] `[H]` H1: **after a week of dungeons and a raid night: did the prompt mean the logs got
   taken, or did people just click it away?**
