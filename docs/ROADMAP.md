@@ -2,11 +2,46 @@
 
 Source: Tim's idea list, `L5GN/_desk/dead-tired_addon_ideas.md` (2026-11-02). Which features
 made the cut is Tim's ruling; **the order of cards below is a proposal** and is settled when
-each brief is ratified. Only card 1 has a brief. Later briefs are written against the code
-card 1 actually lands, not against this page.
+each brief is ratified. Every card from 1 to 6 now has a brief (card 2's is a draft waiting for
+the launch-night probe). Later briefs were written against the code card 1 actually landed, not
+against this page. **Where each card stands is the next section.**
 
-Budget: promotional cloud credit, **$74 remaining, expiring 2026-11-04**. Cards 1-5 are the
-target; the stretch card only if credit is left after card 5 is reported.
+Budget: promotional cloud credit, **$74 at the start (2026-11-02), expiring 2026-11-04**. Cards
+1-5 were the target, the stretch card only if credit was left after card 5; card 6 was built
+too, on Tim's ruling (its R6). The build sessions can't see the remaining balance.
+
+## Where every card stands (2026-11-02)
+
+Nothing is on `main` yet: `main` is still `b5c0ab0`, the seeded repo. **No card has been walked
+in game**; Forever goes live Wed 2026-11-04, 11pm UK. Each built card's ratified brief, walk-sheet
+and report live on its own branch. `claude/loving-meitner-yzdxtn` is where the briefs were
+drafted, and it carries card 1's code plus every brief.
+
+| Card | Slug | Branch (head) | Brief | Build | Offline tests | In game | Waiting on |
+|---|---|---|---|---|---|---|---|
+| 1 | `dt_foundation` | `card/dt_foundation` (`61fe2d3`) | ratified | **built**, 0.1.0 | 6 suites, 174 checks green; 7 guards proved | not walked | Tim's walk (`docs/UAT_dt_foundation.md`), first, on launch night |
+| 2 | `dt_professions` | none yet | **draft, not ratifiable**; R1-R5 proposed | not built | - | - | Tim's launch-night probe (in the brief) written to `docs/PROBE_guild_recipes_results.md`, then a ruling on R1-R5 |
+| 3 | `dt_crypt` | `card/dt_crypt` (`f73817b`) | ratified (R1-R3) | **built** | 7 suites, 246 checks green; 9 guards proved | not walked | card 1 passing, then its walk. Its report records one tripped stop condition (a weak test), fixed test-side: Tim to accept or reject |
+| 4 | `dt_pvp` | `card/dt_pvp` (`be22a1d`) | ratified (R1-R3) | **built** | 7 suites, 224 checks green; 8 guards proved | not walked | card 1 passing, then its walk. G11 (an enemy's name in combat) answers a question later cards need |
+| 5 | `dt_prep` | `card/dt_prep` (`1132d64`) | ratified (R1-R5) | **built** | 8 suites, 249 checks green; 12 guards proved | not walked | card 1 passing, then its walk. The prep list's item IDs are unverified (G7). Channel ruled: `LookingForGroup` |
+| 6 | `dt_stretch` | `card/dt_stretch` (`8115dd3`) | ratified (R1-R6), amended (4 stash hits, 24-byte holders) | **built** | 9 suites, 271 checks green; 17 guards proved | not walked | card 1 passing, then its walk. The Fishing Extravaganza schedule is from memory (G9) |
+| - | `dt_professions_native` | - | not written | - | - | - | only if the probe says `Native: works` (card 2's R1); written after card 2 is built |
+| - | crafting request board | - | not written | - | - | - | moved out of card 6 (its R1); written after card 2 is built |
+
+Check counts are each branch's whole `run_all.sh`, card 1's suites included.
+
+**Merging, when the walks pass.** Cards 3-6 each append at the same two places, so they conflict
+there, as expected. Keep every line, in card order:
+- **`DeadTired.toc`, after `Welcome.lua`:** `Crypt.lua`, `Gank.lua`, `PrepList.lua`, `Prep.lua`,
+  `RecruitLines.lua`, `Recruit.lua`, `Stash.lua`, `Played.lua`, `EventsList.lua`, `Events.lua`
+  (then card 2's `Professions.lua`, `Crafts.lua`, when it exists);
+- **`tests/run_all.sh`:** `… welcome:Welcome crypt:Crypt gank:Gank prep:Prep recruit:Recruit stash:Stash played:Played events:Events; do`.
+
+Once card 5 is on `main`, the `SendChatMessage` greps in cards 1, 3 and 4's walk-sheets will find
+card 5's one ratified call site (`Recruit.lua`). Except that line when re-running them.
+
+**Fixes to card 1** found on launch night go on `card/dt_foundation` first, then get merged into
+each card branch (rule 1), before any of them is walked (rule 3).
 
 | Card | Slug | Features | Size | Depends on |
 |---|---|---|---|---|
@@ -15,7 +50,7 @@ target; the stretch card only if credit is left after card 5 is reported.
 | 3 | `dt_crypt` | **"Rest in Pieces" death notices**, **graveyard memorial**, **bedtime nag** | S-M | 1 |
 | 4 | `dt_pvp` | **Gank diary** (target an Alliance player, log name/class/level/zone, shared board) | S-M | 1 |
 | 5 | `dt_prep` | **Raid-prep bag check**, **recruitment rotator** | S-M | 1 |
-| 6 | `dt_stretch` | Stretch, budget permitting: crafting request board, guild stash search (opt-in), slowest-leveller award, event tracker (STV Fishing Extravaganza) | M-L | 2 (requests), 1 |
+| 6 | `dt_stretch` | Stretch, budget permitting: ~~crafting request board~~ (moved out, see below), guild stash search (opt-in), slowest-leveller award, event tracker (STV Fishing Extravaganza) | M-L | 1 |
 
 ## Branching and testing rule
 
@@ -35,7 +70,7 @@ rules:
 5. A build session that finds it needs to change card 1's code from a later card's branch
    **stops and reports** instead. Card 1 changes happen on card 1's branch only.
 
-## Plan of action (proposed 2026-11-02)
+## Plan of action (proposed 2026-11-02; what happened is in the status table above)
 
 | When | What |
 |---|---|
@@ -44,7 +79,15 @@ rules:
 | Launch night (Wed 4 Nov) | Walk card 1. If it passes, merge it to `main`, then walk 3, 4, 5 and merge each that passes. Do the one-login recipe probe for card 2. |
 | After launch | Card 2, briefed against the probe result. Card 6 only if there is budget. |
 
-Cost of this plan, accepted: a launch-night surprise in card 1 means fixing four branches, not
+**As it went:** cards 1, 3, 4, 5 and 6 were built on 2026-11-02, card 6 ahead of plan on Tim's
+ruling. Card 2's brief was drafted ahead of the probe, with the probe written into it.
+
+**Launch night, now:**
+1. Walk card 1. If it passes, merge it to `main`.
+2. Walk 3, 4, 5 and 6, merging each that passes, in that order (the merge note above).
+3. Run card 2's probe, rule on its R1-R5, then build it.
+
+Cost of this plan, accepted: a launch-night surprise in card 1 means fixing five branches, not
 one. Benefit: credit that would otherwise expire is spent on the cards least likely to be thrown
 away.
 
@@ -54,14 +97,19 @@ away.
   `C_GuildInfo.QueryGuildMembersForRecipe` and `C_GuildInfo.QueryGuildMemberRecipes`
   (`reference/SPEC_forever_namespaces.md`). If they answer on the live client, the directory may
   only need to *present* what the game already knows, plus cover people who don't run the addon.
-  A one-login probe by Tim settles it before card 2's brief is written.
+  A one-login probe by Tim settles it. **Card 2's draft brief now holds the probe** (five
+  commands) and proposes building the addon directory either way, with a native layer as its own
+  card if the probe says it works.
 - **Card 3:** a death notice carries name, level and zone only. Killer needs combat data, which
   the client doesn't give addons. Hardcore deaths are the point; normal-realm deaths are off by
   default.
 - **Card 4:** the gank diary is a *button press on a target*, not a kill detector. It's the
   no-combat-log route to names for the PvP tally and bounty board later.
 - **Card 5:** the recruitment rotator posts one line per click (Blizzard rule). The five lines
-  live in `L5GN/_desk/dead-tired_recruitment_2026-11-01.md`.
+  came from `L5GN/_desk/dead-tired_recruitment_2026-11-01.md`. They are now in
+  `docs/RECRUIT_lines.md` on `card/dt_prep`, without their leading `/1 `.
+- **Card 6:** the crafting request board left it, because it depends on card 2. Stash answers
+  carry at most 4 hits so that accented 12-letter names fit (Tim, 2026-11-02).
 
 ## Not carded yet
 
