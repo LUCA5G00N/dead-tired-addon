@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: Wizardry Log Prompt
+## Notes: Beta telemetry reminder. At login, offers to turn on /combatlog and /chatlog, whichever are off. Keeps no saved data.
+## Author: WoWWizardry
+## Version: 0.1.0
+
+LogPrompt.lua
