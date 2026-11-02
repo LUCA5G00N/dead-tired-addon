@@ -122,7 +122,15 @@ ALL GREEN
 ```
 
 G3: `grep -rnE "COMBAT_LOG|CombatLog|SendChatMessage|Logging(Combat|Chat)\([^)]" DeadTired/ --include=*.lua | grep -v "/tests/"` finds nothing.
-G4: `git diff origin/card/dt_foundation --stat -- DeadTired/` (after the commit) is below.
+G4: `git diff origin/card/dt_foundation --stat -- DeadTired/` after the commit:
+
+```
+ DeadTired/DeadTired.toc       |   1 +
+ DeadTired/Logs.lua            | 351 ++++++++++++++++++++++++++++
+ DeadTired/tests/run_all.sh    |   2 +-
+ DeadTired/tests/test_logs.lua | 517 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 870 insertions(+), 1 deletion(-)
+```
 
 ## Task 6: guard proofs
 
@@ -132,7 +140,7 @@ the final suite (85 checks).
 
 | # | Guard removed | Checks that went red |
 |---|---|---|
-| 1a | member gate in `zoneCheck` | `another guild: no dialog`, `another guild: nothing stored`, `no guild: no dialog, nothing stored`, `guild info late: no dialog yet`, `and nothing stored for it` (+1) |
+| 1a | member gate in `zoneCheck` | `another guild: no dialog`, `another guild: nothing stored`, `no guild: no dialog, nothing stored`, `guild info late: no dialog yet`, `and nothing stored for it`, `/dt logs outside the guild: card 1's one line, nothing stored` |
 | 1b | member gate in `loginCheck` | `login asking on, character outside the guild: no login dialog` |
 | 2 | `"party"`/`"raid"` type check in `L.where` | `battleground, arena and open world: never`, `open world at login: no dialog` (+10) |
 | 3 | logging-already-on skip in `askInstance` | `raid with logging on: no dialog`, `fallback read sees logging on: no dialog` (+1) |
