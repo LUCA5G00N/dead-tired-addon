@@ -14,3 +14,7 @@ Comms.lua
 Roster.lua
 Alts.lua
 Welcome.lua
+PrepList.lua
+Prep.lua
+RecruitLines.lua
+Recruit.lua
