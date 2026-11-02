@@ -15,3 +15,4 @@ Roster.lua
 Alts.lua
 Welcome.lua
 Crypt.lua
+Gank.lua
