@@ -5,7 +5,8 @@ Brief: `docs/COWORK_BRIEF_dt_release.md`. **Checks: 9. `[H]` count: 1.**
 **Offline (the build session runs these):**
 - [ ] `[G]` G1: on `release/0.1.0-rc1`, `DeadTired/tests/run_all.sh` exits 0 and runs every card's
   suites plus `together`.
-- [ ] `[G]` G2: `grep -c "" DeadTired/DeadTired.toc` lines list every module once, in the Q2 order.
+- [ ] `[G]` G2: the `.lua` lines in `DeadTired/DeadTired.toc` name every module once, card 1's first,
+  then the Q2 order.
 - [ ] `[G]` G3: the report lists the verbs, DB keys and message kinds with no duplicates.
 - [ ] `[G]` G4: each zip unzipped and `diff -r` against its source folder minus `tests/` shows no
   differences; neither zip contains `tests/`.
