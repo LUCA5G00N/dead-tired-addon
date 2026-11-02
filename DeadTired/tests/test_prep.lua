@@ -125,15 +125,16 @@ do
   a:db().prep.share, c:db().prep.share = true, true
   a.bags[13446], a.bags[17029] = 5, 20                                           -- ready
   tim:slash("prep check")
-  check("/dt prep check sends PREPQ and says so", #sentKind(tim, "PREPQ") == 1 and sentKind(tim, "PREPQ")[1] == "1^PREPQ^q~1"
+  local q1 = tostring(tim.env.time() % 1000000)   -- F8a: the id is the clock, not a counter
+  check("/dt prep check sends PREPQ and says so", #sentKind(tim, "PREPQ") == 1 and sentKind(tim, "PREPQ")[1] == "1^PREPQ^q~" .. q1
     and tim.printed[1] == P .. "Roll call sent. Answers in 10 seconds.")
   w:advance(0.5)
   check("nobody answers before 1 s", #a.sent == 0 and #c.sent == 0)
   w:advance(1)
   check("a sharing member answers once with ok and short only", #sentKind(a, "PREP") == 1
-    and sentKind(a, "PREP")[1] == "1^PREP^ok~1^q~1^short~0^to~Classic Beta PvP-Stromham")
+    and sentKind(a, "PREP")[1] == "1^PREP^ok~1^q~" .. q1 .. "^short~0^to~Classic Beta PvP-Stromham")
   w:advance(4)
-  check("the second within 5 s, short 2", sentKind(c, "PREP")[1] == "1^PREP^ok~0^q~1^short~2^to~Classic Beta PvP-Stromham")
+  check("the second within 5 s, short 2", sentKind(c, "PREP")[1] == "1^PREP^ok~0^q~" .. q1 .. "^short~2^to~Classic Beta PvP-Stromham")
   check("a member with sharing off sends nothing at all, and doesn't even note the question", #b.sent == 0
     and next(b.DT._prep.answered()) == nil)
   tim.printed = {}
@@ -142,7 +143,7 @@ do
     and tim.printed[1] == P .. "Ready (1): Ghoul. Short (1): Wight (2 short)." and tim.printed[2] == CLOSING)
   check("receivers print nothing", #a.printed == 0 and #b.printed == 0 and #c.printed == 0)
   -- a duplicate PREPQ (same asker, same q) gets no second answer
-  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^PREPQ^q~1", "GUILD", "Stromham-ClassicBetaPvP")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^PREPQ^q~" .. q1, "GUILD", "Stromham-ClassicBetaPvP")
   w:advance(10)
   check("a duplicate question gets no second answer", #sentKind(a, "PREP") == 1)
   -- the 60 s window
@@ -151,7 +152,9 @@ do
     and #sentKind(tim, "PREPQ") == 1)
   w:advance(45)
   tim:slash("prep check")
-  check("after 60 s: a new roll call, a new id", #sentKind(tim, "PREPQ") == 2 and sentKind(tim, "PREPQ")[2] == "1^PREPQ^q~2")
+  local q2 = tostring(tim.env.time() % 1000000)
+  check("after 60 s: a new roll call, a new id", #sentKind(tim, "PREPQ") == 2 and sentKind(tim, "PREPQ")[2] == "1^PREPQ^q~" .. q2
+    and q2 ~= q1)
   w:advance(2)
   check("a new question gets a new answer", #sentKind(a, "PREP") == 2)
   -- turning sharing off between question and answer: no answer
@@ -170,16 +173,18 @@ do
   w:advance(10)
   check("nobody answered: both parts read none", tim.printed[1] == P .. "Ready (0): none. Short (0): none."
     and tim.printed[2] == CLOSING)
+  qOld = tostring((tim.env.time() - 10) % 1000000)   -- the first roll call's id (F8a: the clock)
   w:advance(60)
   tim:slash("prep check")
-  inject("1^PREP^ok~0^q~2^short~3^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^PREP^ok~0^q~2^short~1^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^PREP^ok~1^q~2^short~0^to~Classic Beta PvP-Someoneelse", "Wight")
-  inject("1^PREP^ok~1^q~1^short~0^to~Classic Beta PvP-Stromham", "Lich")
+  local q = tostring(tim.env.time() % 1000000)
+  inject("1^PREP^ok~0^q~" .. q .. "^short~3^to~Classic Beta PvP-Stromham", "Ghoul")
+  inject("1^PREP^ok~0^q~" .. q .. "^short~1^to~Classic Beta PvP-Stromham", "Ghoul")
+  inject("1^PREP^ok~1^q~" .. q .. "^short~0^to~Classic Beta PvP-Someoneelse", "Wight")
+  inject("1^PREP^ok~1^q~" .. qOld .. "^short~0^to~Classic Beta PvP-Stromham", "Lich")
   tim.printed = {}
   w:advance(10)
   check("once per sender; addressed elsewhere and old questions ignored", tim.printed[1] == P .. "Ready (0): none. Short (1): Ghoul (3 short).")
-  inject("1^PREP^ok~1^q~2^short~0^to~Classic Beta PvP-Stromham", "Wight")
+  inject("1^PREP^ok~1^q~" .. q .. "^short~0^to~Classic Beta PvP-Stromham", "Wight")
   check("an answer after the summary is ignored (no print, nothing kept)", #tim.printed == 2 and tim.DT._prep.open() == nil)
   local bad = { "1^PREP^ok~1^q~x^short~0^to~R-N", "1^PREP^ok~1^q~1234567^short~0^to~R-N", "1^PREP^ok~2^q~1^short~0^to~R-N",
     "1^PREP^ok~1^q~1^short~1^to~R-N", "1^PREP^ok~0^q~1^short~0^to~R-N", "1^PREP^ok~0^q~1^short~51^to~R-N",
@@ -212,6 +217,56 @@ do
   tim:slash("prep check"); w:advance(11)
   check("a roll call works end to end", tim:said("Short (1): Ghoul (2 short).") ~= nil)
   check("the non-member sends and prints nothing", #x.sent == 0 and #x.printed == 0)
+end
+
+-- ---------------------------------------------------------------- fix round 1 (F8a, F6c)
+do
+  local w = H.world()
+  local tim = client(w, { name = "Stromham" })
+  local a = client(w, { name = "Ghoul", random = function() return 0 end })
+  a:db().prep.share = true
+  a.bags[13446], a.bags[17029] = 5, 20
+  tim:login(); a:login()
+  w:advance(60)
+  tim:slash("prep check")
+  w:advance(11)
+  check("F8a baseline: Ghoul answers the first roll call", tim:said("Ready (1): Ghoul") ~= nil)
+  w:advance(120)
+  local tim2 = tim:reload()
+  w:advance(30)
+  tim2:slash("prep check")
+  w:advance(11)
+  check("F8a: after the asker's /reload, the roll call is answered", tim2:said("Ready (1): Ghoul") ~= nil)
+  local tim3 = tim2:reboot(900)
+  w:advance(60)
+  tim3:slash("prep check")
+  w:advance(11)
+  check("F8a: after a restart too", tim3:said("Ready (1): Ghoul") ~= nil)
+end
+
+do
+  local w = H.world()
+  local a = client(w, { name = "Ghoul", random = function() return 0 end })
+  a:db().prep.share = true
+  local function ask(q, from)
+    a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^PREPQ^q~" .. q, "GUILD", (from or "Stromham") .. "-ClassicBetaPvP")
+  end
+  ask(1)
+  for i = 2, 10 do w:advance(1); ask(i) end
+  w:advance(10)
+  check("F6c: ten roll calls from one asker in 10 s, each with a new id: one answer", #sentKind(a, "PREP") == 1)
+  check("F6c: the rest are counted in prep.dropped", a:db().prep.dropped == 9)
+  ask(11, "Wight")
+  w:advance(10)
+  check("F6c: the limit is per asker: another asker is answered", #sentKind(a, "PREP") == 2)
+  w:advance(31)   -- 60 s after the first (t0 + 9 + 10 + 10 + 31)
+  ask(12)
+  w:advance(10)
+  check("F6c: 60 s later the same asker is answered again", #sentKind(a, "PREP") == 3)
+  a:db().prep.share = false
+  local before = a:db().prep.dropped
+  w:advance(61); ask(13); ask(14)
+  check("F6c: with sharing off nothing is answered or counted", a:db().prep.dropped == before and #sentKind(a, "PREP") == 3)
 end
 
 H.finish("prep")

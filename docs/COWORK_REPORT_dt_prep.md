@@ -263,3 +263,24 @@ rotation, alt-sharing and 24-hour no-automatic-post checks all still pass.
 | A1 name match exact only (no ` - ` prefix) | 6 incl. *a post: line 1 … General - Orgrimmar's number*, then the suite errors out (non-zero) |
 
 Each restored; `run_all.sh` exits 0 (recruit: 55 passed, 0 failed).
+
+## Fix round 1 (F8a, F6c)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes1.md` (audit AUD-02, AUD-07). Round report:
+`docs/COWORK_REPORT_dt_fixes1.md` on the session branch. `card/dt_foundation` (F1-F5) was merged
+in first: clean, card 1's files identical to its branch, all suites green before these fixes.
+
+- **F8a, `Prep.lua`:** a roll call's id is `time() % 1000000` (guarded; the old counter only if
+  the clock can't be read). Wire and validation unchanged (1-6 digits); the 60 s window keeps ids
+  unique per asker.
+- **F6c, `Prep.lua`:** a received PREPQ, with sharing on, is answered at most once per asker per
+  60 s (memory only); the rest count in `prep.dropped`. With sharing off nothing is noted, as
+  before.
+- **Tests:** checks that pinned `q~1`/`q~2` now compute the id from the stub clock (card 1's
+  harness `time()` now moves with the world clock, fix round 1 F3). New: F8a (3 checks:
+  baseline, after the asker's reload, after a restart) and F6c (5 checks). prep: 50 checks.
+- **Guard proofs:** F8a, the counter put back: 7 red, incl. *F8a: after the asker's /reload,
+  the roll call is answered*. F6c removed: 5 red, incl. *F6c: ten roll calls from one asker in
+  10 s, each with a new id: one answer*.
+- The audit's `test_prep_reload.lua` passes unchanged. Recruit untouched. No player-facing line
+  changed.

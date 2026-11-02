@@ -12,6 +12,10 @@ for guild officers only (`C_GuildInfo.IsGuildOfficer() == true`, nothing else), 
 **General**, found by scanning the joined channels for one named `General` or beginning
 `General - `. One chat call site, still. The places below that changed are marked *(amended)*.
 
+**Amended 2026-11-02 (fix round 1, F8a and F6c in `docs/COWORK_BRIEF_dt_fixes1.md`, audit AUD-02
+and AUD-07):** the roll-call id comes from the clock, and one roll call per asker per 60 s is
+answered. Marked *(amended, fix round 1)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_prep.md`.
@@ -164,7 +168,9 @@ this ID`.
 **`/dt prep check`:**
 - At most one check per **60 seconds** per client. A second inside the window prints *"Patience.
   The last roll call is still out."* and sends nothing.
-- Sends `PREPQ {q=<n>}`, where `n` is a per-session counter. Prints *"Roll call sent. Answers in
+- Sends `PREPQ {q=<n>}`, where `n` is `time() % 1000000` (guarded; a per-session counter only if
+  the clock can't be read) *(amended, fix round 1: was a per-session counter, reused after a
+  `/reload`)*. Prints *"Roll call sent. Answers in
   10 seconds."*
 - After 10 seconds, prints *"Ready (<k>): <names>. Short (<m>): <name> (<s> short), …"* (either
   part reads `none` when empty), then always: *"Only guildies running the addon with sharing on
@@ -174,7 +180,8 @@ this ID`.
 
 **Answering (receiving `PREPQ`):**
 - Only when `share` is true; with it off, nothing at all.
-- At most **one answer per asker and question id**.
+- At most **one answer per asker and question id**, and at most one roll call per asker per
+  60 s is answered; another inside the window is counted in `prep.dropped` *(amended, fix round 1)*.
 - After a random 1-5 second delay, run the same check as `/dt prep` (no print) and send
   `PREP {q=<n>, to=<asker key>, ok="1"|"0", short=<count of short entries>}`.
 

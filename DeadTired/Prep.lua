@@ -3,6 +3,8 @@
 --
 -- R3: the list is data (PrepList.lua). R4: sharing is opt-in and sends a verdict only (ready
 -- yes/no and how many entries are short), never item names or counts. Bags only, never the bank.
+-- Fix round 1: F8a, the question id is time() % 1000000, not a per-session counter; F6c, one
+-- roll call per asker per 60 s is answered.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -109,7 +111,10 @@ local function check()
     return DT.out("Patience. The last roll call is still out.")
   end
   lastCheck = t
-  qid = qid + 1
+  -- Fix round 1 (F8a): the question id comes from the clock, so a /reload doesn't reuse ids the
+  -- guild has already answered. 1-6 digits as before; the 60 s window keeps it unique.
+  local now = clean(try(time))
+  if type(now) == "number" then qid = math.floor(now) % 1000000 else qid = qid + 1 end
   open = { q = qid, answers = {}, order = {} }
   DT.send("PREPQ", { q = tostring(qid) })
   DT.out("Roll call sent. Answers in 10 seconds.")
@@ -119,10 +124,19 @@ end
 local function isKey(s) return type(s) == "string" and #s >= 1 and #s <= 64 and s:match("^.+%-[^%-]+$") ~= nil end
 local function isQ(s) return type(s) == "string" and s:match("^%d%d?%d?%d?%d?%d?$") ~= nil end
 
+-- Fix round 1 (F6c): at most one roll call per asker per 60 s is answered (the asker's own window).
+local lastAsk = {}
+
 DT.on("PREPQ", function(from, f)
   local p = prep()
   if not isQ(f.q) then p.badPrep = p.badPrep + 1 return end
   if not p.share then return end                                      -- guard: share gate
+  local t = DT.now()
+  if lastAsk[from] and t - lastAsk[from] < CHECK_WINDOW then          -- guard: per-asker limit (F6c)
+    p.dropped = (p.dropped or 0) + 1
+    return
+  end
+  lastAsk[from] = t
   local key = from .. "#" .. f.q
   if answered[key] then return end                                    -- guard: one answer per question
   answered[key] = true
