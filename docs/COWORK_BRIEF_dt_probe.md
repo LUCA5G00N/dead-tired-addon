@@ -34,6 +34,12 @@ and card 2 (professions) can be ratified the same night.
 - It **records** into its own SavedVariables, `DeadTiredProbeDB`, and prints only when Tim types
   a `/dtprobe` command (plus one load line, below). It decides nothing and fixes nothing.
 
+**Amended 2026-11-02 (Tim):** the guild may not exist on launch night. On the beta a charter cost
+10 silver and could be handed in with no signatures; Forever's price and signature rule are
+unknown until launch. So every section must work, and record usefully, **outside a guild**:
+sections 2, 3 and 13 record that there is no guild, and `ping` falls back to a party. The probe
+can be run again once the guild exists; each run is kept (see *Shape of the record*).
+
 ## Ratified for this round
 
 - **Q1: the probe may read what the cards may not.** It is Tim's diagnostic tool, run on his own
@@ -63,7 +69,9 @@ DeadTiredProbeDB = {
   version = 1,
   chars = {
     ["Realm-Name"] = {
-      at = <time()>, sections = { build = {...}, login = {...}, ... },
+      runs = {   -- one per login, newest last, up to 5 (amended)
+        { at = <time()>, inGuild = <bool>, sections = { build = {...}, login = {...}, ... } },
+      },
     },
   },
 }
@@ -100,8 +108,9 @@ Each names the card question it answers. **Automatic** ones run without a comman
 4. **`comms`** (automatic at the same moment, plus `/dtprobe ping`; card 1):
    `C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()`, `C_ChatInfo.InChatMessagingLockdown()`,
    the result of `C_ChatInfo.RegisterAddonMessagePrefix("DTPROBE")`. `/dtprobe ping` sends one
-   addon message, `"ping"`, prefix `DTPROBE`, channel `GUILD`, only if `IsInGuild()`; records the
-   send's return values. Every `CHAT_MSG_ADDON` with prefix `DTPROBE` records (up to 10): the raw
+   addon message, `"ping"`, prefix `DTPROBE`: on `GUILD` if `IsInGuild()`, otherwise on `PARTY`
+   if `IsInGroup()`, otherwise nothing (and says so); records the channel used and the send's
+   return values. *(amended: the guild may not exist on launch night, see below)* Every `CHAT_MSG_ADDON` with prefix `DTPROBE` records (up to 10): the raw
    sender string exactly as given, `Ambiguate(sender, "none")`, the channel, the text (cut to 20
    bytes), and whether the sender is this character.
 5. **`channels`** (automatic at `PLAYER_ENTERING_WORLD` + 15 s, and again on
@@ -163,7 +172,7 @@ Each names the card question it answers. **Automatic** ones run without a comman
   print one line saying it was recorded, with its headline (for example
   `target: Nameless, level 60, in combat: yes, name secret: no`).
 - `/dtprobe report`: one line per section with its headline, or `not run yet`.
-- `/dtprobe reset`: clears this character's record.
+- `/dtprobe reset`: clears this character's runs.
 - Nothing else prints. Lines use `|` only as chat escapes produced by the client, never in the
   addon's own text.
 
@@ -200,6 +209,8 @@ Each names the card question it answers. **Automatic** ones run without a comman
      `SendChatMessage`, `C_ChatInfo.SendChatMessage`, `RequestTimePlayed`, `JoinChannelByName`,
      `LeaveChannelByName`, and exactly one `SendAddonMessage` per `/dtprobe ping` while in a guild
      and zero while not;
+   - with no guild: every section completes, `ping` goes to `PARTY` in a group and sends nothing
+     solo, and a second login adds a second run without touching the first (amended);
    - every cap holds: 10 addon messages, 10 targets, 5 deaths, 5 played events, 5 channel
      snapshots, 200 bag slots, 60 calendar events, 40 recipe members, 5 recipe attempts;
    - the `played` stamp's age is recorded, and `"<no stamp>"` when `/played` wasn't typed;
@@ -209,7 +220,7 @@ Each names the card question it answers. **Automatic** ones run without a comman
    2. `ask`'s absent-function branch;
    3. `ask`'s error branch;
    4. `rec`'s secret branch;
-   5. the in-guild check on ping;
+   5. the channel choice on ping (guild, else party, else nothing);
    6. each cap (prove at least the bag-slot and addon-message caps);
    7. the hook's own `pcall` at load.
 7. **Greps:** `grep -rnE "SendChatMessage|RequestTimePlayed|JoinChannel|LeaveChannel|COMBAT_LOG|CombatLog" DeadTiredProbe/ --include=*.lua | grep -v "/tests/"` finds nothing.

@@ -15,6 +15,10 @@ file by a session working with Tim, and checked by Tim.
 
 **Launch night (Tim, about 15 minutes, before walking card 1):**
 
+*No guild yet?* Run it anyway: everything except the guild, officer and recipe sections still
+answers. Do step 3 with your guildie **in a party** instead. Run steps 1, 3, 7 and 9 again once
+the guild exists; the second login is kept as its own run.
+
 Set up: copy `DeadTiredProbe/` into `_forever_\Interface\AddOns`. Your guildie does the same.
 On the character screen, tick **Load out of date AddOns** if the probe shows as out of date
 (that itself is an answer: the interface number changed).
