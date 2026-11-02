@@ -14,3 +14,7 @@ Comms.lua
 Roster.lua
 Alts.lua
 Welcome.lua
+Stash.lua
+Played.lua
+EventsList.lua
+Events.lua
