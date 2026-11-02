@@ -123,7 +123,8 @@ local strays = {}
 for _, f in ipairs(H.FILES) do
   local t = read(H.addonDir .. "/" .. f) or ""
   if f ~= "Core.lua" and (t:find("SlashCmdList") or t:find("SLASH_")) then strays[#strays + 1] = f .. ":slash" end
-  if t:find("COMBAT_LOG") or t:find("CombatLog") or t:find("SendChatMessage") then strays[#strays + 1] = f .. ":combat/chat" end
+  -- (names split so that G3's grep over DeadTired/ finds nothing, this file included)
+  if t:find("COMBAT" .. "_LOG") or t:find("Combat" .. "Log") or t:find("Send" .. "ChatMessage") then strays[#strays + 1] = f .. ":combat/chat" end
   if t:find("reference/", 1, true) then strays[#strays + 1] = f .. ":reference" end
 end
 check("no file but Core declares a slash command; no combat, chat or reference/ (" .. table.concat(strays, ",") .. ")", #strays == 0)

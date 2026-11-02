@@ -25,7 +25,7 @@ local function welcome(msg)
     db.welcome = false
     return DT.out("welcome line buried. Silence, as the dead prefer.")
   end
-  return DT.out("welcome line is " .. (db.welcome and "on" or "off") .. ". /dt welcome on|off")
+  return DT.out("welcome line is " .. (db.welcome and "on" or "off") .. ". /dt welcome on/off")
 end
 
 DT.module({
@@ -41,4 +41,4 @@ DT.module({
   ready = DT.errors,
   errorKey = "welcome", lastKey = "lastWelcome",
 })
-DT.verb("welcome", welcome, "welcome on|off")
+DT.verb("welcome", welcome, "welcome on/off")
