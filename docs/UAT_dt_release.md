@@ -1,6 +1,6 @@
 # UAT walk-sheet: dt_release (0.1.0-rc1)
 
-Brief: `docs/COWORK_BRIEF_dt_release.md`. **Checks: 9. `[H]` count: 1.**
+Brief: `docs/COWORK_BRIEF_dt_release.md`. **Checks: 10. `[H]` count: 1.**
 
 **Offline (the build session runs these):**
 - [ ] `[G]` G1: on `release/0.1.0-rc1`, `DeadTired/tests/run_all.sh` exits 0 and runs every card's
@@ -8,12 +8,14 @@ Brief: `docs/COWORK_BRIEF_dt_release.md`. **Checks: 9. `[H]` count: 1.**
 - [ ] `[G]` G2: the `.lua` lines in `DeadTired/DeadTired.toc` name every module once, card 1's first,
   then the Q2 order.
 - [ ] `[G]` G3: the report lists the verbs, DB keys and message kinds with no duplicates.
-- [ ] `[G]` G4: each zip unzipped and `diff -r` against its source folder minus `tests/` shows no
+- [ ] `[G]` G4: each of the three zips unzipped and `diff -r` against its source folder minus `tests/` shows no
   differences; neither zip contains `tests/`.
 - [ ] `[G]` G5: `git diff main --stat -- DeadTired/` on the release branch equals the union of the
   card branches' diffs plus `tests/test_together.lua` (no module code changed by the merge).
 - [ ] `[G]` G6: every command named in `docs/GUIDE_guildies.md` and `docs/GUIDE_officers.md`
   appears in the code (`grep` each), and `docs/ANNOUNCE_discord.md` is at most 1,500 characters.
+- [ ] `[G]` G6b: `docs/LAUNCH_NIGHT.md` names, for every step, a zip that exists in `dist/` and a
+  walk-sheet that exists in `docs/`, with that sheet's check count.
 
 **Tim:**
 - [ ] `[G]` G7: download `dist/DeadTired-0.1.0-rc1.zip` from GitHub, unzip into

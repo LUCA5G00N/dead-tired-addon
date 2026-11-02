@@ -7,8 +7,13 @@ Read first, in order:
    (the known conflicts and the order).
 4. Each card's report on its branch, for its commands and player-facing lines.
 
-**Draft-status: ratified by Tim 2026-11-02.** Launch is Wed 2026-11-04, 11pm UK; no card has been
-walked. This build is **for walking**, not for members yet.
+**Draft-status: ratified by Tim 2026-11-02; amended after fix round 1 (same day).** Launch is
+Wed 2026-11-04, 11pm UK; no card has been walked. This build is **for walking**, not for members
+yet. It is built from the card heads **after fix round 1** (`docs/COWORK_REPORT_dt_fixes1.md` on
+`claude/busy-allen-rqw4o5`): `card/dt_foundation` `696dd87`, `card/dt_crypt` `f6f97c9`,
+`card/dt_pvp` `b57c6db`, `card/dt_prep` `6fb903b`, `card/dt_stretch` `39e636f`, `card/dt_logs`
+`a871c2b`, `card/dt_probe` `a25b538`. Every card branch already has fixed card 1 merged in, so
+card 1's files should merge without conflict.
 
 ## Origin
 
@@ -32,14 +37,17 @@ it does.
   after their walks (ROADMAP rule 2). A later re-cut (after audit fixes) is `-rc2`, and so on.
 - **Q2: conflicts are resolved, not designed.** `DeadTired.toc` and `tests/run_all.sh` keep every
   card's lines, in card order (Crypt; Gank; PrepList, Prep, RecruitLines, Recruit; Stash, Played,
-  EventsList, Events; Logs). Docs conflicts (`ROADMAP.md`, `CLAUDE.md`) take `main`'s version.
-  Any conflict inside a module's code → stop.
+  EventsList, Events; Logs). Docs conflicts (`ROADMAP.md`, `CLAUDE.md`) take `main`'s version;
+  card 1's docs take `card/dt_foundation`'s; each card's own docs take its own branch's. Any
+  conflict inside a module's code or a test harness → stop.
 - **Q3: the version stays `0.1.0`** in the `.toc` and `DT.VERSION`. The zip name carries `-rc1`.
-- **Q4: two zips, built by a script.** `tools/package.sh` (new) builds:
+- **Q4: three zips, built by a script.** `tools/package.sh` (new) builds:
   - `dist/DeadTired-0.1.0-rc1.zip`: the `DeadTired/` folder without `tests/`, so unzipping into
     `Interface\AddOns` gives `Interface\AddOns\DeadTired\DeadTired.toc`;
+  - `dist/DeadTired-0.1.0-card1.zip`: the same, built from `card/dt_foundation` alone, for
+    walking card 1 on its own first (ROADMAP rule 3);
   - `dist/DeadTiredProbe-0.1.0.zip`: `DeadTiredProbe/` from `card/dt_probe`, without `tests/`.
-  Both zips are committed on `release/0.1.0-rc1` so Tim can download them from GitHub.
+  All three zips are committed on `release/0.1.0-rc1` so Tim can download them from GitHub.
 - **Q5: the guides are written from the combined code,** not from the briefs: every command and
   every quoted line is copied from the code as merged.
 
@@ -73,7 +81,7 @@ announcement draft. `run_all.sh` on the branch exits 0, and the zips' contents m
      item is one a ruling allows (`CLAUDE.md` *Ruled exceptions*);
    - outside the guild with every opt-in on: nothing printed, nothing sent;
    - every card's commands still answer when all are loaded together.
-4. **`tools/package.sh`** and the two zips (Q4). The script runs from the repo root, needs only
+4. **`tools/package.sh`** and the three zips (Q4). The script runs from the repo root, needs only
    `zip`, and prints each zip's file list. Check: unzip each into a scratch folder and `diff -r`
    against the source folder minus `tests/`.
 5. **`docs/GUIDE_guildies.md`:** what DEAD TIRED (the addon) is, that it's optional, how to
@@ -83,11 +91,21 @@ announcement draft. `run_all.sh` on the branch exits 0, and the zips' contents m
 6. **`docs/GUIDE_officers.md`:** officer-only things (`/dt recruit`, General channel, cooldown),
    the things officers will be asked about, and the Discord bot's commands from #dt-officers'
    pinned cheat-sheet (copy them from the pin's text in this brief's appendix).
-7. **`docs/ANNOUNCE_discord.md`:** a Discord post for #dt-announcements, at most 1,500
+7. **`docs/LAUNCH_NIGHT.md`:** Tim's running order for Wednesday night, one page, each step naming
+   the zip to install and the walk-sheet to follow, with its check count:
+   1. the probe (`docs/UAT_dt_probe.md`), including the no-guild route;
+   2. card 1 alone from the `-card1` zip (`docs/UAT_dt_foundation.md`, including G6b from fix
+      round 1); if it fails, stop there (ROADMAP rule 3);
+   3. swap to the `-rc1` zip; walk cards 3, 4, 5, 6, 7's sheets in order;
+   4. hand the probe's saved file to a session; note which cards passed for merging.
+   Say what needs a guildie online, what needs the guild to exist, and what needs a dungeon,
+   a battleground or an enemy player, so Tim can batch them. Name the Discord charter-signing
+   fallback only as "if the guild isn't formed yet, do steps 1 and the solo parts only".
+8. **`docs/ANNOUNCE_discord.md`:** a Discord post for #dt-announcements, at most 1,500
    characters: what it is, optional, the three best features, where to download, where the guide
    is. No @everyone.
-8. **Push** `release/0.1.0-rc1` (or the session branch, said at the top of the report).
-9. **Report** `docs/COWORK_REPORT_dt_release.md` on the release branch.
+9. **Push** `release/0.1.0-rc1` (or the session branch, said at the top of the report).
+10. **Report** `docs/COWORK_REPORT_dt_release.md` on the release branch.
 
 ## Explicitly out of scope
 
@@ -96,6 +114,8 @@ announcement draft. `run_all.sh` on the branch exits 0, and the zips' contents m
 - A CurseForge, Wago or GitHub Releases listing; an auto-updater.
 - Posting the announcement anywhere. It is a draft for Tim.
 - Card 2.
+- Claiming anything about connected realms or guilds spanning realms in the guides (audit AUD-06
+  is deferred until the probe).
 
 ## Stop conditions
 
