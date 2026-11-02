@@ -7,6 +7,8 @@
 -- (when opened) bank, for every character on the account that has run with sharing on. Nothing
 -- is sent except an answer to a guildie's search: matching items only, at most 4. A search term
 -- is matched as plain text, never as a Lua pattern. Switching sharing off deletes the list.
+-- Fix round 1: F8b, the search id is time() % 1000000, not a per-session counter; F6d, one
+-- search per asker per 30 s is answered.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -176,10 +178,19 @@ local function isQ(s) return type(s) == "string" and s:match("^%d%d?%d?%d?%d?%d?
 local function isKey(s) return type(s) == "string" and #s >= 1 and #s <= 64 and s:match("^.+%-[^%-]+$") ~= nil end
 local function isTerm(s) return type(s) == "string" and #s >= 3 and #s <= 32 end
 
+-- Fix round 1 (F6d): at most one search per asker per 30 s is answered (the asker's own window).
+local lastAsk = {}
+
 DT.on("STASHQ", function(from, f)
   local s = store()
   if not isQ(f.q) or not isTerm(f.term) then s.badStash = s.badStash + 1 return end
   if not s.share then return end                                                 -- guard: share gate on answering
+  local t = DT.now()
+  if lastAsk[from] and t - lastAsk[from] < SEARCH_WINDOW then                    -- guard: per-asker limit (F6d)
+    s.dropped = (s.dropped or 0) + 1
+    return
+  end
+  lastAsk[from] = t
   local key = from .. "#" .. f.q
   if answered[key] then return end                                               -- guard: one answer per search
   answered[key] = true
@@ -255,7 +266,10 @@ local function search(term)
     return DT.out("One search at a time. The crypt echoes.")
   end
   lastSearch = t
-  qid = qid + 1
+  -- Fix round 1 (F8b): the search id comes from the clock, so a /reload doesn't reuse ids the
+  -- guild has already answered. 1-6 digits as before; the 30 s window keeps it unique.
+  local now = clean(try(time))
+  if type(now) == "number" then qid = math.floor(now) % 1000000 else qid = qid + 1 end
   open = { q = qid, answers = {}, order = {} }
   DT.send("STASHQ", { q = tostring(qid), term = term })
   DT.out("Asking the guild. Answers in 10 seconds.")

@@ -303,3 +303,40 @@ of the send). The proof therefore reads the stamp through the test hook `DT._pla
 This is test-side only and is the check that goes red.
 
 Each restored; `run_all.sh` exits 0 (stash 74, played 47, events 26; all suites green).
+
+## Fix round 1 (F8b, F6d, F9)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes1.md` (audit AUD-03, AUD-07, AUD-09). Round
+report: `docs/COWORK_REPORT_dt_fixes1.md` on the session branch. `card/dt_foundation` (F1-F5) was
+merged in first: clean, card 1's files identical to its branch, all suites green before these
+fixes.
+
+- **F8b, `Stash.lua`:** a search's id is `time() % 1000000` (guarded; the old counter only if the
+  clock can't be read). Wire and validation unchanged.
+- **F6d, `Stash.lua`:** a received STASHQ, with sharing on, is answered at most once per asker per
+  30 s (memory only); the rest count in `stash.dropped`.
+- **F9, `Played.lua`:**
+  - `/dt slowest share off` removes this character's own entry, sends one `PLAYED {off=1}` via
+    `DT.send` (member-gated, queued, held while restricted), and prints the new line below.
+  - A received `PLAYED` with `off`: exactly `off~1` and no `lvl`/`h` deletes the sender's entry;
+    anything else with `off` counts in `badPlayed`.
+  - Every entry (own and received) stores `t = time()`. `prune()` drops entries older than 30
+    days, or with no numeric `t` (only possible for entries from before this round; no member has
+    any), at `ADDON_LOADED` and at the start of `/dt slowest`. If `time()` can't be read, nothing
+    is dropped.
+  - Guildies who are offline when you switch sharing off keep your entry until it ages out (30
+    days). The message isn't stored for them.
+- **Changed player-facing line** (share off), was *"not sharing your /played. Your pace is your
+  own."*, now: *"not sharing your /played. Your entry is being withdrawn from guildies' boards."*
+- **Tests:** stash: checks pinning `q~1` compute the id from the stub clock; STASHQ injections
+  that came from one asker within 30 s now come from one asker each. New F8b (3) and F6d (4).
+  played: *"/dt slowest share off: nothing sent"* became *"... no play time sent after it, only the
+  one withdrawal (F9)"*; new F9 (14 checks: the withdrawal message and line, delete online, the
+  award, malformed `off`, an offline guildie keeps it to 30 days, dropped after; at load: over 30
+  days, no `t`, recent kept, no clock). stash 81, played 61, events 26.
+- **Guard proofs:** F8b counter put back: 9 red, incl. *F8b: after the asker's /reload, the
+  search is answered*. F6d removed: 4 red. F9 delete removed: *F9: a guildie online deletes B's
+  entry on off~1*, *F9: and B is off A's award*. F9 30-day drop removed: *F9: past 30 days, /dt
+  slowest drops it before printing*, *F9: at load, an entry over 30 days old is dropped*, *F9: at
+  load, an entry with no time is dropped*.
+- The audit's `test_stash_reload.lua` passes unchanged.

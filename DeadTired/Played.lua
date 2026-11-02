@@ -8,6 +8,8 @@
 -- command itself is hooked (hooksecurefunc on SlashCmdList.PLAYED) to stamp when it was used; a
 -- TIME_PLAYED_MSG is sent only with that stamp under 10 s old, and the stamp is then cleared. A
 -- report anything else asked for is ignored. No hook at load: nothing is ever sent.
+-- Fix round 1 (F9): /dt slowest share off sends PLAYED {off=1}, and receivers delete the sender's
+-- entry; entries carry t = time() and are dropped after 30 days.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -32,6 +34,28 @@ local function board()
   return p[g]
 end
 DT.playedBoard = board
+
+-- Fix round 1 (F9): every entry carries t = time() when it was recorded. Entries older than 30
+-- days, or with no readable t (from before this round), are dropped at load and whenever the
+-- board prints. If the clock can't be read, nothing is dropped.
+local MAX_AGE = 30 * 86400
+local function epoch()
+  local t = clean(try(time))
+  return type(t) == "number" and t or nil
+end
+local function prune()
+  local now = epoch()
+  if not now then return end
+  local p = store()
+  for g, b in pairs(p) do
+    if type(b) == "table" then
+      for key, e in pairs(b) do
+        if type(e) ~= "table" or type(e.t) ~= "number" or now - e.t > MAX_AGE then b[key] = nil end   -- guard: 30-day drop (F9)
+      end
+    end
+  end
+end
+DT._playedPrune = prune
 
 local lastSend
 local hooked, typedAt = false, nil
@@ -61,7 +85,7 @@ local function onPlayed(total)
   lastSend = t
   local hours = math.floor(total / 360) / 10
   local me = DT.charKey()
-  if me then board()[me] = { lvl = lvl, hours = hours, at = DT.stamp() } end
+  if me then board()[me] = { lvl = lvl, hours = hours, at = DT.stamp(), t = epoch() } end
   DT.send("PLAYED", { lvl = tostring(lvl), h = string.format("%.1f", hours) })
 end
 
@@ -73,17 +97,28 @@ local function valid(f)
 end
 
 DT.on("PLAYED", function(from, f)
+  -- F9: a withdrawal is PLAYED {off=1} and nothing else; it deletes the sender's entry.
+  if f.off ~= nil then
+    if f.off == "1" and f.lvl == nil and f.h == nil then
+      board()[from] = nil                                              -- guard: delete on off~1 (F9)
+    else
+      local p = store()
+      p.badPlayed = p.badPlayed + 1
+    end
+    return
+  end
   if not valid(f) then                                                 -- guard: PLAYED validation
     local p = store()
     p.badPlayed = p.badPlayed + 1
     return
   end
-  board()[from] = { lvl = tonumber(f.lvl), hours = tonumber(f.h), at = DT.stamp() }
+  board()[from] = { lvl = tonumber(f.lvl), hours = tonumber(f.h), at = DT.stamp(), t = epoch() }
 end)
 
 local function h1(x) return string.format("%.1f", x) end
 
 function DT.slowest()
+  prune()
   local rows = {}
   for key, e in pairs(board()) do
     if type(e) == "table" and type(e.lvl) == "number" and type(e.hours) == "number" then
@@ -121,7 +156,11 @@ local function verb(msg)
     return DT.out("sharing your /played. Type /played to put yourself on the board.")
   elseif msg == "slowest share off" then
     p.share = false
-    return DT.out("not sharing your /played. Your pace is your own.")
+    -- F9: withdraw this character's entry from guildies' boards (one message, queued as usual)
+    local me = DT.charKey()
+    if me then board()[me] = nil end
+    DT.send("PLAYED", { off = "1" })
+    return DT.out("not sharing your /played. Your entry is being withdrawn from guildies' boards.")
   elseif msg == "slowest share" then
     return DT.out("sharing your /played is " .. (p.share and "on" or "off") .. ". /dt slowest share on/off")
   end
@@ -133,7 +172,7 @@ DT._played = { hooked = function() return hooked end, stamp = function() return 
 
 DT.module({
   id = "played",
-  init = function() store(); hookPlayed() end,
+  init = function() store(); prune(); hookPlayed() end,
   events = { TIME_PLAYED_MSG = onPlayed },
   ready = DT.errors,
   errorKey = "played", lastKey = "lastPlayed",

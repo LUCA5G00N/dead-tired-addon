@@ -192,14 +192,15 @@ do
   -- a's alt, same account, with more linen
   a:db().stash.chars["Classic Beta PvP-Ghoulalt"] = { bags = { [2589] = 50 }, bank = { [2589] = 10 } }
   tim:slash("stash Linen")
-  check("a search sends STASHQ with the term, and says so", sentKind(tim, "STASHQ")[1] == "1^STASHQ^q~1^term~Linen"
+  local q1 = tostring(tim.env.time() % 1000000)   -- F8b: the id is the clock, not a counter
+  check("a search sends STASHQ with the term, and says so", sentKind(tim, "STASHQ")[1] == "1^STASHQ^q~" .. q1 .. "^term~Linen"
     and tim.printed[1] == P .. "Asking the guild. Answers in 10 seconds.")
   w:advance(0.9)
   check("nobody answers before 1 s", #a.sent == 0)
   w:advance(0.2)
   local ans = sentKind(a, "STASH")[1]
   check("a sharing member answers once: the alt's items under the alt's name, largest first",
-    ans == "1^STASH^hits~2589:60:Ghoulalt,2589:20:Ghoul,2996:4:Ghoul^q~1^to~Classic Beta PvP-Stromham")
+    ans == "1^STASH^hits~2589:60:Ghoulalt,2589:20:Ghoul,2996:4:Ghoul^q~" .. q1 .. "^to~Classic Beta PvP-Stromham")
   check("a member with sharing off sends nothing and doesn't note the question", #b.sent == 0
     and next(b.DT._stash.answered()) == nil)
   tim.printed = {}
@@ -208,7 +209,7 @@ do
     and tim.printed[2] == P .. "Ghoul: Linen Cloth x20, Bolt of Linen Cloth x4" and tim.printed[3] == CLOSING)
   check("receivers print nothing", #a.printed == 1 and #b.printed == 0)  -- a's one line is its own share-on reply
   -- a duplicate STASHQ gets no second answer
-  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~1^term~Linen", "GUILD", "Stromham-ClassicBetaPvP")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~" .. q1 .. "^term~Linen", "GUILD", "Stromham-ClassicBetaPvP")
   w:advance(10)
   check("one answer per asker and search", #sentKind(a, "STASH") == 1)
   -- the 30 s window (21 s have passed)
@@ -226,13 +227,13 @@ do
   w:advance(31)
   local ok = pcall(function()
     a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~7^term~%a+", "GUILD", "Lich-ClassicBetaPvP")
-    a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~8^term~[[[", "GUILD", "Lich-ClassicBetaPvP")
+    a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~8^term~[[[", "GUILD", "Wraith-ClassicBetaPvP")   -- one asker each: F6d
     w:advance(10)
   end)
   check("a term like %a+ or [[[ matches literally and never errors", ok and #sentKind(a, "STASH") == 1)
   -- the 4-hit cap
   a:db().stash.chars["Classic Beta PvP-Ghoulalt"].bags = { [2589] = 1, [2592] = 2, [4306] = 3, [4338] = 4, [14047] = 5 }
-  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~9^term~cloth", "GUILD", "Lich-ClassicBetaPvP")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~9^term~cloth", "GUILD", "Banshee-ClassicBetaPvP")
   w:advance(10)
   local capped = sentKind(a, "STASH")[2] or ""
   local n = select(2, capped:gsub(":", ":")) / 2
@@ -241,17 +242,17 @@ do
   -- anything over 24 bytes (no real name is) is left out (the wire limit)
   local accented = "\195\133\195\164\195\182\195\169\195\168\195\170\195\173\195\172\195\174\195\179\195\178\195\180"
   a:db().stash.chars["Classic Beta PvP-" .. accented] = { bags = { [2770] = 7 }, bank = {} }
-  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~10^term~copper", "GUILD", "Lich-ClassicBetaPvP")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~10^term~copper", "GUILD", "Ghast-ClassicBetaPvP")
   w:advance(10)
   check("a 12-letter accented holder name (24 bytes) is answered", #accented == 24 and #sentKind(a, "STASH") == 3
     and sentKind(a, "STASH")[3]:find("hits~2770:7:" .. accented .. "^", 1, true) ~= nil)
   a:db().stash.chars["Classic Beta PvP-" .. accented] = nil
   a:db().stash.chars["Classic Beta PvP-" .. accented .. "x"] = { bags = { [2770] = 7 }, bank = {} }
-  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~12^term~copper", "GUILD", "Lich-ClassicBetaPvP")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~12^term~copper", "GUILD", "Shade-ClassicBetaPvP")
   w:advance(10)
   check("a holder name over 24 bytes is left out of answers", #sentKind(a, "STASH") == 3)
   -- sharing turned off between question and answer
-  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~11^term~linen", "GUILD", "Lich-ClassicBetaPvP")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~11^term~linen", "GUILD", "Revenant-ClassicBetaPvP")
   a:db().stash.share = false
   w:advance(10)
   check("sharing turned off before the delay ends: no answer", #sentKind(a, "STASH") == 3)
@@ -263,17 +264,18 @@ do
   local tim = client(w, { name = "Stromham" })
   local function inject(text, from) tim:fire("CHAT_MSG_ADDON", "DEADTIRED", text, "GUILD", (from or "Ghoul") .. "-ClassicBetaPvP") end
   tim:slash("stash linen")
-  inject("1^STASH^hits~2589:3:Ghoul^q~1^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^STASH^hits~2589:9:Ghoul^q~1^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^STASH^hits~2589:5:Wight^q~1^to~Classic Beta PvP-Someone", "Wight")
-  inject("1^STASH^hits~2589:6:Lich^q~2^to~Classic Beta PvP-Stromham", "Lich")
-  inject("1^STASH^hits~99999:2:Bones^q~1^to~Classic Beta PvP-Stromham", "Bones")
+  local Q = tostring(tim.env.time() % 1000000)   -- F8b
+  inject("1^STASH^hits~2589:3:Ghoul^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Ghoul")
+  inject("1^STASH^hits~2589:9:Ghoul^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Ghoul")
+  inject("1^STASH^hits~2589:5:Wight^q~" .. Q .. "^to~Classic Beta PvP-Someone", "Wight")
+  inject("1^STASH^hits~2589:6:Lich^q~" .. (Q + 1) % 1000000 .. "^to~Classic Beta PvP-Stromham", "Lich")
+  inject("1^STASH^hits~99999:2:Bones^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Bones")
   tim.printed = {}
   w:advance(10)
   check("once per sender; addressed elsewhere and other searches ignored", tim.printed[1] == P .. "Ghoul: Linen Cloth x3")
   check("an unloaded item shows as item <id>, and its load is requested", tim.printed[2] == P .. "Bones: item 99999 x2"
     and tim.requested[99999] == true)
-  inject("1^STASH^hits~2589:1:Late^q~1^to~Classic Beta PvP-Stromham", "Late")
+  inject("1^STASH^hits~2589:1:Late^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Late")
   check("an answer after the summary is ignored", #tim.printed == 3 and tim.DT._stash.open() == nil)
   local bad = { "1^STASH^hits~2589:3:Ghoul^q~x^to~R-N", "1^STASH^hits~2589:3:Ghoul^q~1^to~NoRealm",
     "1^STASH^hits~^q~1^to~R-N", "1^STASH^q~1^to~R-N", "1^STASH^hits~12345678:3:Ghoul^q~1^to~R-N",
@@ -292,7 +294,8 @@ do
   local tim = client(w, { name = "Stromham" })
   local holder = string.rep("\195\169", 12)   -- 12 accented letters, 24 bytes
   tim:slash("stash linen")
-  tim:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASH^hits~2589:3:" .. holder .. "^q~1^to~Classic Beta PvP-Stromham",
+  local Q = tostring(tim.env.time() % 1000000)   -- F8b
+  tim:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASH^hits~2589:3:" .. holder .. "^q~" .. Q .. "^to~Classic Beta PvP-Stromham",
     "GUILD", "Ghoul-ClassicBetaPvP")
   tim.printed = {}
   w:advance(10)
@@ -328,6 +331,53 @@ do
   tim:slash("stash linen"); w:advance(11)
   check("a search works end to end", tim:said("Ghoul: Linen Cloth x20") ~= nil)
   check("the non-member sends and prints nothing", #x.sent == 0 and #x.printed == 0)
+end
+
+-- ---------------------------------------------------------------- fix round 1 (F8b, F6d)
+do
+  local w = H.world()
+  local tim = client(w, { name = "Stromham" })
+  local a = client(w, { name = "Ghoul", random = function() return 0 end, bags = { [0] = { item(2589, 20) } } })
+  tim:login(); a:login()
+  w:advance(60)
+  a:slash("stash share on")
+  tim:slash("stash linen")
+  w:advance(11)
+  check("F8b baseline: Ghoul answers the first search", tim:said("Ghoul: ") ~= nil)
+  w:advance(120)
+  local tim2 = tim:reload()
+  w:advance(30)
+  tim2:slash("stash linen")
+  w:advance(11)
+  check("F8b: after the asker's /reload, the search is answered", tim2:said("Ghoul: ") ~= nil)
+  local tim3 = tim2:reboot(900)
+  w:advance(60)
+  tim3:slash("stash linen")
+  w:advance(11)
+  check("F8b: after a restart too", tim3:said("Ghoul: ") ~= nil)
+end
+
+do
+  local w = H.world()
+  local a = client(w, { name = "Ghoul", random = function() return 0 end, bags = { [0] = { item(2589, 20) } } })
+  a:login()
+  w:advance(5)
+  a:slash("stash share on")
+  local function ask(q, from)
+    a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~" .. q .. "^term~linen", "GUILD", (from or "Stromham") .. "-ClassicBetaPvP")
+  end
+  ask(1)
+  for i = 2, 10 do w:advance(1); ask(i) end
+  w:advance(10)
+  check("F6d: ten searches from one asker in 10 s, each with a new id: one answer", #sentKind(a, "STASH") == 1)
+  check("F6d: the rest are counted in stash.dropped", a:db().stash.dropped == 9)
+  ask(11, "Wight")
+  w:advance(10)
+  check("F6d: the limit is per asker: another asker is answered", #sentKind(a, "STASH") == 2)
+  w:advance(1)    -- 30 s after the first (t0 + 9 + 10 + 10 + 1)
+  ask(12)
+  w:advance(10)
+  check("F6d: 30 s later the same asker is answered again", #sentKind(a, "STASH") == 3)
 end
 
 H.finish("stash")

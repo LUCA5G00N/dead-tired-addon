@@ -7,6 +7,11 @@ No game client is available; everything is proved offline with stubbed tests, th
 in game. If the harness assigns you a different branch name, create that branch from
 `card/dt_foundation` and say so in the report.
 
+**Amended 2026-11-02 (fix round 1, F8b, F6d and F9 in `docs/COWORK_BRIEF_dt_fixes1.md`, audit
+AUD-03, AUD-07, AUD-09):** the search id comes from the clock; one search per asker per 30 s is
+answered; shared play time can be withdrawn and ages out after 30 days. Marked *(amended, fix
+round 1)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_stretch.md`.
@@ -164,7 +169,8 @@ have an entry.
 **Searching, `/dt stash <term>`:** `term` is the text after `stash`, trimmed, 3-32 bytes (else
 usage).
 - At most one search per **30 seconds** per client (*"One search at a time. The crypt echoes."*).
-- Sends `STASHQ {q=<n>, term=<term>}`, prints *"Asking the guild. Answers in 10 seconds."*, and
+- Sends `STASHQ {q=<n>, term=<term>}` (`n` is `time() % 1000000`, guarded; *amended, fix round
+  1: was a per-session counter*), prints *"Asking the guild. Answers in 10 seconds."*, and
   after 10 seconds prints the summary.
 - **The summary:**
   - one line per answer, in order of arrival: `<holder Name>: <item name> x<count>, …`, with
@@ -174,7 +180,9 @@ usage).
   - then always *"Only guildies running the addon with stash sharing on answer."*
 
 **Answering (receiving `STASHQ`):**
-- Only with `share` on, at most once per asker and `q`, after a random 1-5 s delay.
+- Only with `share` on, at most once per asker and `q`, after a random 1-5 s delay. At most one
+  search per asker per 30 s is answered; another is counted in `stash.dropped` *(amended, fix
+  round 1)*.
 - Match `term` against `C_Item.GetItemNameByID(id)` for every item in every character entry on
   the account, case-insensitive, **plain substring, never a Lua pattern** (`string.find` with
   `plain = true`). Items whose name isn't loaded don't match.
@@ -197,7 +205,9 @@ off. Nothing offered."*
 ### Played.lua: specification
 
 **Store.** `DeadTiredDB.played = { share = false, badPlayed = 0, [<guildKey>] = { [<Realm-Name>] =
-{ lvl, hours, at } } }`.
+{ lvl, hours, at, t } } }`, where `t` is `time()` when the entry was recorded *(amended, fix
+round 1)*. Entries older than 30 days, or with no `t`, are dropped at load and whenever
+`/dt slowest` prints (nothing is dropped if the clock can't be read).
 
 - **On `TIME_PLAYED_MSG(total, thisLevel)`**, with `share` on and a member: `lvl` is
   `clean(try(UnitLevel, "player"))`, an integer 1-100; `hours` is `floor(total / 360) / 10` (one
@@ -210,7 +220,12 @@ off. Nothing offered."*
 - **The addon never calls `RequestTimePlayed`.** The event fires only because the player typed
   `/played`.
 - **Receiving `PLAYED`:** validate `lvl` (1-100) and `h` (`^%d+%.?%d?$`, at most 100000). Invalid
-  counts in `badPlayed`. Valid entries are stored; nothing prints.
+  counts in `badPlayed`. Valid entries are stored; nothing prints. *(amended, fix round 1)* A
+  `PLAYED {off=1}` with no other field deletes the sender's entry; `off` with another value or
+  with other fields is invalid.
+- *(amended, fix round 1)* **`/dt slowest share off`** also removes your own entry from your board
+  and sends one `PLAYED {off=1}` (through card 1's queue: held if restricted, never forced). Its
+  line: *"not sharing your /played. Your entry is being withdrawn from guildies' boards."*
 - **`/dt slowest`:** rank every stored entry with `lvl >= 2` by `hours / lvl`, highest first,
   then name. Print at most 5:
   - first: *"The Crypt Keeper's Award for Glacial Progress goes to <Name>: <x.x> hours a level
