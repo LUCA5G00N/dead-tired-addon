@@ -48,11 +48,11 @@ do
   local w = H.world()
   local a = client(w, { name = "Stromham" })
   local cr = a:db().crypt
-  check("store: DeadTiredDB.crypt, notices on, share by default, no bedtime", type(cr) == "table"
+  check("store: DeadTiredDB.crypt, notices on, share unset, no bedtime", type(cr) == "table"
     and cr.rip == true and cr.share == nil and cr.bedtime == nil and cr.badDeath == 0)
   check("store: deaths per guild", type(list(a)) == "table" and cr["dead tired"].deaths == list(a))
   a:slash("rip")
-  check("/dt rip alone shows both settings, share as default", a:said("notices on; sharing your deaths default (hardcore only).") ~= nil)
+  check("/dt rip alone shows both settings, share unset shown as off (A2)", a:said("notices on; sharing your deaths off.") ~= nil)
   a:slash("rip off"); check("/dt rip off", cr.rip == false and a:said("notices off") ~= nil)
   a:slash("rip on"); check("/dt rip on", cr.rip == true and a:said("notices on") ~= nil)
   a:slash("rip share on"); check("/dt rip share on", cr.share == true)
@@ -101,17 +101,19 @@ do
   check("share off: a hardcore death is recorded but not sent", deathsSent(a) == 2 and list(a)[#list(a)].hc == true)
   a:db().crypt.share = nil
   w:advance(61); a:fire("PLAYER_DEAD")
-  check("by default: a hardcore death is sent", deathsSent(a) == 3)
+  check("A2: share unset, a hardcore death is recorded but not sent", deathsSent(a) == 2
+    and list(a)[#list(a)].hc == true)
+  a:db().crypt.share = true
   a.itype = "pvp"
   w:advance(61); a:fire("PLAYER_DEAD")
-  check("a battleground on a hardcore character counts as normal: not sent, not HC", deathsSent(a) == 3
-    and list(a)[#list(a)].hc == false)
+  check("a battleground on a hardcore character counts as normal: sent as hc 0, not HC", deathsSent(a) == 3
+    and lastSent(a):find("hc~0", 1, true) and list(a)[#list(a)].hc == false)
   a.itype = "arena"
   w:advance(61); a:fire("PLAYER_DEAD")
-  check("an arena likewise", deathsSent(a) == 3 and list(a)[#list(a)].hc == false)
+  check("an arena likewise", deathsSent(a) == 4 and lastSent(a):find("hc~0", 1, true) and list(a)[#list(a)].hc == false)
   a.itype = "party"
   w:advance(61); a:fire("PLAYER_DEAD")
-  check("a dungeon on a hardcore character still counts", deathsSent(a) == 4)
+  check("a dungeon on a hardcore character still counts", deathsSent(a) == 5 and lastSent(a):find("hc~1", 1, true))
   a.hc, a.itype = false, "none"
   a:db().crypt.share = true
   a.noLevel, a.noZone = true, true
@@ -151,6 +153,7 @@ do
   local a = client(w, { name = "Stromham" })
   local b = client(w, { name = "Graverobber" })
   a.hc = true
+  a:db().crypt.share = true
   a:fire("PLAYER_DEAD"); w:advance(0)
   check("hardcore notice, exactly", #b.printed == 1
     and b.printed[1] == "|cff7fa650Dead Tired|r Rest in Pieces: Stromham, level 23, Stranglethorn Vale. Hardcore. Gone for good.")
@@ -293,6 +296,81 @@ do
   setClock(w5, y, "01:00")
   y:login(); y.printed = {}; w5:advance(3600)
   check("no clock: the nag never fires, never errors", #y.printed == 0 and (y:db().errors.crypt or 0) == 0)
+end
+
+-- ---------------------------------------------------------------- A2: hardcore death opt-in, told once
+do
+  local HC = "|cff7fa650Dead Tired|r This one's hardcore. If it falls, the guild won't hear unless you /dt rip share on."
+  local function told(c) local n = 0 for _, m in ipairs(c.printed) do if m == HC then n = n + 1 end end return n end
+
+  -- A hardcore death with share unset sends nothing; the guildie hears nothing.
+  local w = H.world()
+  local a = client(w, { name = "Stromham" })
+  local b = client(w, { name = "Graverobber" })
+  a.hc = true
+  a:fire("PLAYER_DEAD"); w:advance(1)
+  check("A2: hardcore, share unset: nothing sent, the guildie hears and records nothing",
+    deathsSent(a) == 0 and #b.printed == 0 and #list(b) == 0)
+  a:slash("rip share on")
+  w:advance(61); a:fire("PLAYER_DEAD"); w:advance(1)
+  check("A2: hardcore, share on: sent, the guildie gets the Rest in Pieces line",
+    deathsSent(a) == 1 and b:said("Rest in Pieces: Stromham, level 23") ~= nil)
+
+  -- The line: a hardcore member's first login, once.
+  local w2 = H.world()
+  local db = {}
+  local h = client(w2, { name = "Mortis", db = db })
+  h.hc = true
+  h:login()
+  check("A2: first login of a hardcore member prints the line, once", told(h) == 1
+    and db.crypt.hcTold["Classic Beta PvP-Mortis"] == true)
+  check("A2: after card 1's welcome, and nothing else", #h.printed == 2 and h.printed[1]:find("Rest in Pieces, Mortis", 1, true))
+  h:fire("PLAYER_ENTERING_WORLD", false, false)          -- a zone change in the same session
+  h.DT.recheckGuild()
+  check("A2: not again in the same session", told(h) == 1)
+  h:logout()
+  local h2 = client(w2, { name = "Mortis", db = db }); h2.hc = true
+  h2:fire("PLAYER_ENTERING_WORLD", false, true)          -- /reload
+  check("A2: not after a /reload", told(h2) == 0)
+  h2:logout()
+  local h3 = client(w2, { name = "Mortis", db = db }); h3.hc = true
+  h3:login()
+  check("A2: not on the second login", told(h3) == 0 and #h3.printed == 1)
+  h3:logout()
+  local h4 = client(w2, { name = "Vesper", db = db }); h4.hc = true
+  h4:login()
+  check("A2: another hardcore character on the account gets its own line", told(h4) == 1
+    and db.crypt.hcTold["Classic Beta PvP-Vesper"] == true)
+
+  -- Not on a normal character, not for a non-member, not once share is set.
+  local w3 = H.world()
+  local n = client(w3, { name = "Ghoul" })
+  n:login()
+  check("A2: not on a normal character", told(n) == 0 and next(n:db().crypt.hcTold) == nil)
+  local x = client(w3, { name = "Spy", guild = "Alliance Spies" }); x.hc = true
+  x:login(); w3:advance(1)
+  check("A2: not for a non-member", told(x) == 0 and #x.printed == 0)
+  for _, v in ipairs({ true, false }) do
+    local s = client(w3, { name = "Lich" .. tostring(v), db = { crypt = { share = v } } }); s.hc = true
+    s:login()
+    check("A2: not once share has been set " .. (v and "on" or "off"), told(s) == 0)
+  end
+  local hcGone = client(w3, { name = "Wraith" })
+  hcGone.hc = true; hcGone.env.C_GameRules = nil
+  hcGone:login()
+  check("A2: C_GameRules absent: no line", told(hcGone) == 0)
+
+  -- Guild info late at login: the line comes when membership is known, still once.
+  local w4 = H.world()
+  local l = client(w4, { name = "Banshee" }); l.hc = true
+  l.guildError = true
+  l:login()
+  check("A2: guild info not there yet: no line", told(l) == 0)
+  l.guildError = false
+  l:fire("PLAYER_GUILD_UPDATE", "player")
+  check("A2: when membership arrives, the line, once", told(l) == 1)
+  l:fire("PLAYER_GUILD_UPDATE", "player")
+  check("A2: and not twice", told(l) == 1)
 end
 
 -- ---------------------------------------------------------------- byte budget

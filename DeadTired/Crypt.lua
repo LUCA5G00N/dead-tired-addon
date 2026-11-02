@@ -4,7 +4,8 @@
 -- No combat data: PLAYER_DEAD says only that you died. Level and zone are read from game state
 -- afterwards. Nothing names a killer, and nothing here reads the death recap.
 -- R1: guildies' death notices print unasked (one line each, /dt rip off silences them).
--- R2: your own hardcore death is shared by default; a normal death only after /dt rip share on.
+-- R2, amended 2026-11-02 (rulings round, A2): your own death, hardcore or not, is sent only
+-- after /dt rip share on. A hardcore member with share never set is told so once per character.
 -- R3: this file keeps its own store, DeadTiredDB.crypt; card 1's files are untouched.
 local ADDON, ns = ...
 local DT = ns.DT
@@ -23,6 +24,7 @@ local NAGS = {
   "Last call. Log off before the sun gets you.",
 }
 local CLOSING = "Only guildies running the addon, and only deaths seen while you were online."
+local HC_LINE = "This one's hardcore. If it falls, the guild won't hear unless you /dt rip share on."
 
 -- ---------------------------------------------------------------- the store
 
@@ -32,6 +34,7 @@ local function crypt()
   local c = db.crypt
   if c.rip == nil then c.rip = true end
   if type(c.badDeath) ~= "number" then c.badDeath = 0 end
+  if type(c.hcTold) ~= "table" then c.hcTold = {} end
   return c
 end
 
@@ -80,7 +83,7 @@ local function onDead()
   if itype == "pvp" or itype == "arena" then hc = false end            -- guard: battleground rule
   record({ who = DT.charKey() or "?", lvl = lvl, zone = z, hc = hc, at = DT.stamp(), mine = true })
   local c = crypt()
-  if c.share == true or (c.share == nil and hc) then                   -- guard: normal not sent by default
+  if c.share == true then                                              -- guard: sent only when share is on (A2)
     DT.send("DEATH", { lvl = tostring(lvl), zone = z, hc = hc and "1" or "0" })
   end
 end
@@ -138,7 +141,7 @@ local function rip(msg)
   elseif onoff == "on" then c.rip = true; return DT.out("notices on. You'll hear about every fall.")
   elseif onoff == "off" then c.rip = false; return DT.out("notices off. Let the dead bury the dead.")
   elseif msg == "rip" then
-    local s = c.share == nil and "default (hardcore only)" or (c.share and "on" or "off")
+    local s = c.share == true and "on" or "off"
     return DT.out("notices " .. (c.rip and "on" or "off") .. "; sharing your deaths " .. s .. ".")
   end
   return DT.out("/dt rip on/off, or /dt rip share on/off")
@@ -191,10 +194,26 @@ local function loop()
   DT.after(TICK, loop)
 end
 
+-- ---------------------------------------------------------------- the hardcore line (A2)
+
+-- Once per character, ever: a hardcore member whose share was never set is told how to share.
+local entered = false
+
+local function hcLine()
+  if not entered or not DT.isMember() then return end
+  local c = crypt()
+  if c.share ~= nil or not isHardcore() then return end
+  local me = DT.charKey()
+  if not me or c.hcTold[me] then return end                            -- guard: once per character
+  c.hcTold[me] = true
+  DT.out(HC_LINE)
+end
+
+DT.listen("member", function(isMember) if isMember then hcLine() end end)
+
 -- For the offline tests only.
 DT._crypt = { tick = tick, nags = function() return shown end }
 
-local entered = false
 DT.module({
   id = "crypt",
   init = function() crypt() end,
@@ -204,6 +223,7 @@ DT.module({
       if entered then return end
       entered = true
       DT.after(TICK, loop)
+      hcLine()
     end,
   },
   ready = DT.errors,

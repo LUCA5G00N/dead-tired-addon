@@ -165,3 +165,41 @@ ALL GREEN
 - Not provable offline: whether Forever has hardcore realms (G11); whether `PLAYER_DEAD` fires as
   on retail; whether `IsInInstance` reports `"pvp"` in battlegrounds on this client.
 - `docs/UAT_dt_crypt_results.md` was not written; that file is Tim's.
+
+## Rulings round (A2)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_rulings.md` (Task 2), on `card/dt_crypt` after merging
+`main` (which brought only `CLAUDE.md` and the rulings brief and walk-sheet; no card 1 file changed).
+
+**What changed in `Crypt.lua`:**
+- The send condition is `c.share == true`. `nil` (never set) now means off on any character.
+- New: the hardcore line. On the first `PLAYER_ENTERING_WORLD`, and on card 1's `member` signal
+  (so a login before the guild info arrives still gets it), a member on a hardcore character
+  with `share == nil` whose key is not in `crypt.hcTold` sees it once; the key is then stored.
+  No character key (UnitName not ready) → no line and nothing stored, so it waits for a later
+  signal.
+- `/dt rip` alone shows `share` as `off` while it is `nil` (was `default (hardcore only)`, which
+  would now be false). The line's wording is unchanged; only the value shown changed.
+
+**Player-facing lines, new or changed:**
+- New: `This one's hardcore. If it falls, the guild won't hear unless you /dt rip share on.`
+- Changed value: `/dt rip` → `notices on; sharing your deaths off.` while `share` was never set.
+
+**Tests (`test_crypt.lua`, 72 → 88 checks):** existing checks that encoded "hardcore sent by
+default" now expect nothing sent; the battleground, arena and dungeon checks run with `share`
+on and assert the `hc` flag on the wire instead. New block *A2*: a hardcore death with `share`
+unset sends nothing and the guildie records nothing; with `share` on it is sent; the line prints
+once on a hardcore member's first login (after the welcome); not again in the session, after a
+`/reload`, or on the second login; a second hardcore character on the account gets its own;
+not on a normal character, not for a non-member, not once `share` is on or off, not with
+`C_GameRules` absent; a late guild answer prints it when membership arrives, once.
+
+**Guard proofs:**
+
+| Guard removed | Checks that went red |
+|---|---|
+| A2 send condition (`if c.share == true` → `if true`) | 13, incl. *A2: hardcore, share unset: nothing sent…*, *a normal death is not sent by default* |
+| A2 send condition put back to the old R2 rule (`share == true or (share == nil and hc)`) | 6, incl. *A2: share unset, a hardcore death is recorded but not sent* |
+| A2 once-per-character store (`c.hcTold[me]` check removed) | *A2: not after a /reload*, *A2: not on the second login* |
+
+Each restored; `run_all.sh` exits 0 (crypt: 88 passed, 0 failed).

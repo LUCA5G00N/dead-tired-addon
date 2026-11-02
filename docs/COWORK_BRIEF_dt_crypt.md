@@ -6,6 +6,11 @@ game client is available; everything is proved offline with stubbed tests, then 
 game. If the harness assigns you a different branch name, create that branch from
 `card/dt_foundation` and say so in the report.
 
+**Amended 2026-11-02 (rulings round, A2 in `docs/COWORK_BRIEF_dt_rulings.md`):** your own death,
+hardcore or not, is sent only once `/dt rip share on` has been run; `share == nil` now means off.
+A hardcore member whose `share` was never set gets one line at login, once per character, ever.
+The places below that changed are marked *(amended)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_crypt.md`.
@@ -54,11 +59,11 @@ The round may not be built while any of these is `proposed`. All three are ratif
 - **R1 (ratified 2026-11-02, as proposed): guildies' death notices print unasked.** This is a widening of CLAUDE.md's
   "quiet by default"; see *The one deliberate widening*. Proposal: received notices print by
   default, one line each; `/dt rip off` silences them per account.
-- **R2 (ratified 2026-11-02, as proposed): your own hardcore death is shared by default.** CLAUDE.md says anything
-  personal is opt-in. Proposal: on a hardcore character, your death (name, level, zone) is sent
-  unless you've run `/dt rip share off`. The roadmap calls hardcore deaths "the point", and an
-  opt-in nobody turns on would leave the feature empty. On a normal character nothing is sent
-  until `/dt rip share on`, as the roadmap says.
+- **R2 (ratified 2026-11-02, as proposed; superseded by A2 in the rulings round):** ~~your own
+  hardcore death is shared by default.~~ *(amended)* **A2: your own death is opt-in on any
+  character.** It is sent only when `share == true`. On a hardcore character that is a member,
+  with `share` never set, one line prints at login, once per character, ever:
+  *"This one's hardcore. If it falls, the guild won't hear unless you /dt rip share on."*
 - **R3 (ratified 2026-11-02, as proposed): what this card may change in card 1's files.** Two lines, nothing else:
   `Crypt.lua` appended to `DeadTired.toc` after `Welcome.lua`, and `crypt:Crypt` appended to the
   module list in `tests/run_all.sh`. `DT.VERSION` and `## Version:` stay `0.1.0`; Tim sets the
@@ -78,7 +83,7 @@ The round may not be built while any of these is `proposed`. All three are ratif
 One new file, **`DeadTired/Crypt.lua`** (a module registered through `DT.module{}`), and
 **`DeadTired/tests/test_crypt.lua`**, plus the two lines from R3:
 
-- **Death notice.** On `PLAYER_DEAD`, a member records the death and, when R2 allows, sends
+- **Death notice.** On `PLAYER_DEAD`, a member records the death and, when `share` is on *(amended)*, sends
   `DEATH {lvl=<level>, zone=<zone>, hc="1"|"0"}` once. Every other member running the addon
   records it, and prints one line if `/dt rip` is on.
 - **Graveyard memorial.** `/dt graveyard` prints the newest 10 recorded deaths, then always the
@@ -95,8 +100,9 @@ character, level and zone, and `/dt graveyard` on both lists it.
 **Store.** `DeadTiredDB.crypt` is created by Crypt.lua itself (not by `DT.db()` in Core; R3):
 `crypt = { rip = true, share = nil, bedtime = nil, [<guildKey>] = { deaths = { ... } } }`.
 - `rip`: show received notices (default `true`, R1).
-- `share`: `nil` means "by default" (R2): hardcore on, normal off. `true` or `false` once set by
-  `/dt rip share on/off`; then it applies to both.
+- `share`: `nil` (never set) means off, hardcore or not *(amended)*. `true` or `false` once set by
+  `/dt rip share on/off`.
+- `hcTold`: `{ [<Realm-Name>] = true }`, the characters already shown the hardcore line *(amended)*.
 - `bedtime`: `nil` (off) or `"HH:MM"`, 24-hour, zero-padded.
 - A death record: `{ who = <Realm-Name>, lvl = <number>, zone = <string>, hc = <bool>,
   at = <DT.stamp()>, mine = <bool> }`. Newest is appended last. The list is capped at **100**;
@@ -114,7 +120,7 @@ Absent, erroring or secret means not hardcore.
 3. **At most one death per 60 seconds** (by `DT.now()`) is handled; another `PLAYER_DEAD` inside
    the window is ignored entirely.
 4. Record it locally with `mine = true`, whatever the sharing setting.
-5. Send `DEATH` when `share == true`, or `share == nil and hc`.
+5. Send `DEATH` only when `share == true` *(amended)*.
 
 **On receiving `DEATH`** (via `DT.on`, so card 1's member gate, own-message ignore and malformed
 handling already apply):
@@ -131,8 +137,12 @@ handling already apply):
 empty: *"The graveyard's empty. Give it time."* Then always the closing line above.
 
 **`/dt rip on`, `/dt rip off`:** set `rip`. **`/dt rip share on`, `/dt rip share off`:** set
-`share`. **`/dt rip`** alone: prints both settings in one line, with `share` shown as
-`default (hardcore only)` while it is `nil`.
+`share`. **`/dt rip`** alone: prints both settings in one line, with `share` shown as `off`
+while it is `nil` *(amended)*.
+
+**The hardcore line** *(amended)*. On the first `PLAYER_ENTERING_WORLD` of a session, and again
+when card 1 signals membership: if a member, `share == nil`, `isHardcore()`, and the character key
+is not in `hcTold`, print the line from A2 and add the key. Never again for that character.
 
 **Bedtime.**
 - `/dt bedtime HH:MM` accepts `H:MM` or `HH:MM`, 00:00 to 23:59, and stores it zero-padded.
@@ -171,7 +181,8 @@ longest, with a 48-byte zone, must be at most 250 bytes (see *Stop conditions*).
   `DT.display`. They are never used to call game functions.
 - **Two-client tests** for notices and the graveyard: card 1's harness, two members on one bus,
   plus a non-member client.
-- **Quiet otherwise.** Crypt prints nothing at login.
+- **Quiet otherwise.** Crypt prints nothing at login, except the A2 hardcore line once per
+  character *(amended)*.
 
 ## Tasks
 
@@ -184,7 +195,7 @@ longest, with a 48-byte zone, must be at most 250 bytes (see *Stop conditions*).
    `run_all.sh` green.
 3. **Own death:** the `PLAYER_DEAD` handler, steps 1-5, and its tests. Cover: a member records
    it; a non-member records nothing and sends nothing; normal deaths are not sent by default;
-   hardcore deaths are sent by default; `share` on and off override both; a battleground or arena
+   hardcore deaths are not sent by default either *(amended)*; `share` on sends both; a battleground or arena
    on a hardcore character counts as normal; a second death inside 60 s is ignored and one at
    61 s is not; missing `UnitLevel` / `GetRealZoneText` / `C_GameRules` fall back as specified.
    Green.
@@ -206,7 +217,7 @@ longest, with a 48-byte zone, must be at most 250 bytes (see *Stop conditions*).
    card 1's one line).
 9. **Guard proofs.** Remove once, confirm a check goes red, restore: the member check in the
    `PLAYER_DEAD` handler; the normal-realm "not sent by default" rule; the battleground/arena
-   rule; the 60-second death window; the `rip` print toggle; the DEATH field validation; the
+   rule *(amended: now "sent only when `share == true`")*; the 60-second death window; the `rip` print toggle; the DEATH field validation; the
    memorial cap; the bedtime 3-nag cap; the bedtime 6-hour window.
 10. Write the report and push the branch.
 
@@ -237,7 +248,7 @@ the bedtime default are what make this a ruled widening and not a drift. What st
 - one line per death, never repeated, never replied to;
 - `/dt rip off` silences notices for the whole account;
 - the nag is off until the player sets a time, and stops at 3 lines a night;
-- nothing prints at login;
+- nothing prints at login, except the A2 hardcore line once per character *(amended)*;
 - nothing goes outside the guild's addon channel.
 
 ## Stop conditions
@@ -273,7 +284,8 @@ Extracted verbatim to `docs/UAT_dt_crypt.md`.
 - [ ] `[G]` G5: the report gives the byte length of the longest DEATH, and it is at most 250.
 
 **In game (Tim, with one guildie, both on this branch):**
-- [ ] `[G]` G6: `/reload` shows no Lua error, and the only line printed is card 1's welcome.
+- [ ] `[G]` G6 *(amended)*: `/reload` on a normal character shows no Lua error, and the only line is card 1's
+  welcome.
 - [ ] `[G]` G7: on a normal realm, Tim dies with `share` never set: the guildie sees no notice.
   Tim runs `/dt rip share on` and dies again: the guildie sees exactly one line naming Tim's
   character, level and zone.
@@ -284,9 +296,11 @@ Extracted verbatim to `docs/UAT_dt_crypt.md`.
   but their `/dt graveyard` has it.
 - [ ] `[G]` G10: Tim runs `/dt bedtime` set to 2 minutes from now: one line at that minute, no
   second line inside 30 minutes. `/dt bedtime off` and `/reload`: no line.
-- [ ] `[G]` G11: *only if Forever has a hardcore realm:* a hardcore character in the guild dies
-  with `share` never set: the guildie sees the "Rest in Pieces … Hardcore. Gone for good." line.
-  If there is no hardcore realm, write "not walkable" in the results.
+- [ ] `[G]` G11 *(amended)*: *only if Forever has a hardcore realm:* a new hardcore character in the guild logs
+  in: one line pointing at `/dt rip share on`. `/reload`: the line does not come back. It dies with
+  `share` unset: the guildie sees nothing. After `/dt rip share on`, its next death shows the
+  guildie the "Rest in Pieces … Hardcore. Gone for good." line. No hardcore realm: write
+  "not walkable" in the results.
 - [ ] `[H]` H1: **after a raid night, did the notices feel like part of the guild, or like noise
   you'd turn off?**
 
