@@ -1,0 +1,30 @@
+## Interface: 16001
+## Title: Wizardry Ledger
+## Notes: Forever line. Records quests as the client shows them: who offers each one and where, who gave it to you, where its objectives ticked, and what the turn-in actually paid. /ledger quests
+## Author: WoWWizardry
+## Version: 0.38.1
+## SavedVariables: WizardryLedgerDB
+## X-Wizardry-Toc: camelot
+
+# Forever (interface 16001) loads this file set only. WizardryLedger.toc is the TBC 2.5.6
+# line and shares no code with this one (docs/COWORK_BRIEF_forever_quest_recorder.md).
+# No SVRestore.lua line: build 70009 fixed the loader, and 0017 cancelled brief Task 7.
+Forever\Core.lua
+Forever\Dock.lua
+Forever\Cohorts.lua
+Forever\QuestRecorder.lua
+Forever\ProfessionRecorder.lua
+Forever\LevelRecorder.lua
+Forever\XPRecorder.lua
+Forever\LootRecorder.lua
+Forever\LogRecorder.lua
+Forever\TrainerRecorder.lua
+Forever\GearRecorder.lua
+Forever\MoneyRecorder.lua
+Forever\RepRecorder.lua
+Forever\MarkRecorder.lua
+Forever\SkillsView.lua
+Forever\QuestsView.lua
+Forever\Panes.lua
+Forever\ProfessionsView.lua
+Forever\Hub.lua
