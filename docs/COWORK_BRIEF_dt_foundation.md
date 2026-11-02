@@ -4,6 +4,12 @@
 **`card/dt_foundation`**, created from `main`. No game client is available; everything is proved
 offline with stubbed tests, then Tim walks it in game.
 
+**Amended 2026-11-02 (fix round 1, `docs/COWORK_BRIEF_dt_fixes1.md`, F1-F5 from the audit):**
+HELLO carries a per-session token `s` and replies are once per sender *session* (F1); one pending
+reply covers every HELLO before it (F2); the harness gains `reload`/`reboot` (F3); a failing
+module `init` is recorded and its events still register (F4); chunk ids start from the clock (F5).
+Changed lines are marked *(amended)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_foundation.md`.
@@ -78,7 +84,8 @@ shows the other's main and alts.
   byte below 32 become `%XX` (upper-case hex). Decoding reverses it.
 - **Chunking:** an encoded message longer than **250 bytes** is sent as chunks
   `<PROTOCOL>^+^<msgid>^<i>^<n>^<slice>`, where `slice` is the next part of the full encoded
-  message (at most 200 bytes), `msgid` a per-session counter, `i` 1-based. The receiver
+  message (at most 200 bytes), `msgid` a per-session counter starting at `time() % 100000`
+  *(amended, F5)*, `i` 1-based. The receiver
   reassembles per sender and `msgid` and discards an incomplete set after 30 seconds.
 - **Throttle:** a token bucket, capacity 5, refilling 1 token per second. Sends beyond it wait in
   a FIFO queue.
@@ -96,10 +103,14 @@ shows the other's main and alts.
 ### Roster.lua
 
 - 10 seconds after the first `PLAYER_ENTERING_WORLD` of a login, a member sends
-  `HELLO {v=<version>, main=<main charKey or "">}` once.
-- On receiving a HELLO from a sender not yet heard this session, reply with one HELLO after a
-  random 2-8 second delay. **At most one reply per sender per session**, so two clients settle
-  after one exchange.
+  `HELLO {v=<version>, main=<main charKey or "">, s=<session token>}` once. *(amended, F1)* The
+  token is picked at load, `math.random(1, 999999)` (guarded; else `time() % 999999 + 1`), and
+  sent in every HELLO; on receipt it must be 1-6 digits, and a HELLO without one is token `0`.
+- On receiving a HELLO from a sender *session* (sender plus `s`) not yet answered, reply with one
+  HELLO after a random 2-8 second delay. **At most one reply per sender session**, so two clients
+  settle after one exchange, and a guildie who reloads or relogs is answered again. *(amended, F1)*
+- While a reply is pending, a further HELLO needing a reply schedules nothing: the pending reply
+  is a broadcast and covers it. Saved replies count in `comms.repliesSaved`. *(amended, F2)*
 - Store `DeadTiredDB.roster[<guild>][<senderKey>] = { v, main, seen = <stamp()> }`.
 - `/dt who` lists everyone heard **this session**, then "seen before" names from the store, and
   always ends with: *"Only guildies running the addon show up here."*

@@ -72,7 +72,13 @@ end
 local queue = {}
 local tokens, lastRefill = BUCKET, nil
 local pending = false
+-- Fix round 1 (F5): chunk ids start from the clock, so a /reload doesn't reuse the ids of the
+-- session before it (receivers keep partial sets for 30 s, keyed sender#msgid).
 local msgid = 0
+do
+  local t = clean(try(time))
+  if type(t) == "number" then msgid = math.floor(t) % 100000 end
+end
 local partial = {}        -- [senderKey .. "#" .. msgid] = { n, got = {}, count, t }
 local handlers = {}
 

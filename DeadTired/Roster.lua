@@ -1,9 +1,11 @@
 -- Dead Tired: who runs the addon. The HELLO handshake and /dt who.
 --
--- 10 s after the first PLAYER_ENTERING_WORLD of a login, a member sends HELLO {v, main} once.
--- A HELLO from someone not yet answered this session gets one HELLO back after 2-8 s, marked
--- r=1; a reply is never replied to, and nobody gets a second reply in a session, so two clients
--- settle after one exchange (HELLO, then one reply). The login HELLO is always a plain one, even
+-- 10 s after the first PLAYER_ENTERING_WORLD of a login, a member sends HELLO {v, main, s} once.
+-- A HELLO from a sender session (sender plus its token s, fix round 1 F1) not yet answered gets
+-- one HELLO back after 2-8 s, marked r=1; a reply is never replied to, and no sender session
+-- gets a second reply, so two clients settle after one exchange (HELLO, then one reply). A
+-- guildie who reloads or relogs has a new token and is answered again. While a reply is pending,
+-- further HELLOs are covered by it (F2): the reply is a broadcast, so one is enough. The login HELLO is always a plain one, even
 -- if a reply already went out, so a third client that only heard the reply still answers it. Everyone heard is kept in DeadTiredDB.roster[<guild>][<Realm-Name>].
 -- Only guildies running the addon can ever show up: the list says so every time.
 local ADDON, ns = ...
@@ -13,8 +15,23 @@ local HELLO_DELAY = 10
 local REPLY_MIN, REPLY_SPREAD = 2, 6
 
 local heard = {}          -- this session: [key] = DT.now() of the latest HELLO
-local answered = {}       -- this session: [key] = true once a reply to them is scheduled
+local answered = {}       -- this session: [key .. "#" .. token] = true once a reply covers them
 local loggedIn, loginSent, wantHello = false, false, false
+local replyPending = false   -- fix round 1 (F2): one scheduled reply covers every HELLO before it
+
+-- Fix round 1 (F1): a token for this Lua session, sent as `s` in every HELLO. A guildie's reload
+-- or relog brings a new token, so it is answered again (once), as a new sender would be.
+local TOKEN
+do
+  local r = DT.try(math.random, 1, 999999)
+  if type(r) == "number" and r >= 1 and r <= 999999 and r == math.floor(r) then
+    TOKEN = r
+  else
+    local t = DT.clean(DT.try(time))
+    TOKEN = (type(t) == "number" and math.floor(t) % 999999 or 0) + 1
+  end
+end
+DT.sessionToken = TOKEN
 
 local function store()
   local db = DT.db()
@@ -41,16 +58,19 @@ function DT.hello(reply)
   local main = DT.db().account.main or ""
   local me = DT.charKey()
   if me then store()[me] = { v = DT.VERSION, main = main, seen = DT.stamp(), mine = true } end
-  local fields = { v = DT.VERSION, main = main }
+  local fields = { v = DT.VERSION, main = main, s = tostring(TOKEN) }
   if reply then fields.r = "1" end
   return DT.send("HELLO", fields)
 end
 
 local function validKey(s) return s == "" or (#s <= 80 and s:match("^.+%-[^%-]+$") ~= nil) end
 
+local function validToken(s) return s == nil or (type(s) == "string" and s:match("^%d%d?%d?%d?%d?%d?$") ~= nil) end
+
 DT.on("HELLO", function(from, f)
   local v, main = f.v, f.main or ""
-  if type(v) ~= "string" or v == "" or #v > 16 or not validKey(main) then
+  if type(v) ~= "string" or v == "" or #v > 16 or not validKey(main)
+     or not validToken(f.s) then                                          -- guard: token validation (F1)
     local c = DT.db().comms
     c.badHello = (c.badHello or 0) + 1
     return
@@ -58,9 +78,16 @@ DT.on("HELLO", function(from, f)
   store()[from] = { v = v, main = main, seen = DT.stamp() }
   heard[from] = DT.now()
   if f.r == "1" then return end                 -- a reply is never replied to
-  if answered[from] then return end             -- guard: reply-once
-  answered[from] = true
-  DT.after(REPLY_MIN + math.random() * REPLY_SPREAD, function() DT.hello(true) end)
+  local who = from .. "#" .. (f.s or "0")       -- F1: the sender's session, not just the sender
+  if answered[who] then return end              -- guard: reply-once per sender session
+  answered[who] = true
+  if replyPending then                          -- guard: one pending reply (F2)
+    local c = DT.db().comms
+    c.repliesSaved = (c.repliesSaved or 0) + 1
+    return
+  end
+  replyPending = true
+  DT.after(REPLY_MIN + math.random() * REPLY_SPREAD, function() replyPending = false; DT.hello(true) end)
 end)
 
 DT.listen("member", function(isMember)
@@ -111,7 +138,8 @@ function DT.who()
 end
 
 -- For the offline tests only.
-DT._roster = { heard = function() return heard end, answered = function() return answered end }
+DT._roster = { heard = function() return heard end, answered = function() return answered end,
+  pending = function() return replyPending end }
 
 DT.module({
   id = "roster",

@@ -105,8 +105,9 @@ end
 
 -- def = { id, events = { EVENT = fn }, init = fn, ready = fn -> store or nil,
 --         errorKey = "comms", lastKey = "lastComms", slash = { verb = fn } }
--- init runs at this addon's ADDON_LOADED; events are then registered under pcall (an event the
--- client lacks is skipped). A handler runs only when ready() answers; a failure is counted in
+-- init runs at this addon's ADDON_LOADED, under pcall (fix round 1, F4: a failure is counted
+-- under errorKey like a handler's, the events are still registered, then the error is
+-- re-raised); events are registered under pcall (an event the client lacks is skipped). A handler runs only when ready() answers; a failure is counted in
 -- the store under errorKey, its text kept under lastKey, and re-raised. With no errorKey the
 -- failure is swallowed. Returns the module's frame.
 DT.modules = {}
@@ -119,9 +120,20 @@ function DT.module(def)
     if ev == "ADDON_LOADED" then
       if ... ~= ADDON or def.loaded then return end
       def.loaded = true
-      if def.init then def.init() end
+      -- Fix round 1 (F4): a failing init is recorded like a handler failure, and the module's
+      -- events are registered anyway; then the error is re-raised.
+      local okInit, initErr = true, nil
+      if def.init then okInit, initErr = pcall(def.init) end                -- guard: init pcall (F4)
       for name in pairs(def.events or {}) do pcall(f.RegisterEvent, f, name) end
       f:UnregisterEvent("ADDON_LOADED")
+      if not okInit then
+        local store = def.ready and def.ready()
+        if def.errorKey and type(store) == "table" then
+          store[def.errorKey] = (store[def.errorKey] or 0) + 1
+          store[def.lastKey or ("last" .. def.errorKey)] = "init: " .. tostring(initErr)
+        end
+        if def.errorKey then error(initErr, 0) end
+      end
       return
     end
     local h = def.events and def.events[ev]

@@ -81,6 +81,18 @@ c:fire("ADDON_LOADED", "DeadTired")
 check("with no errorKey a failure is swallowed", pcall(c.fire, c, "BOOM") and silent == 1)
 check("a module with no ready always runs", fB.events.BOOM == true)
 
+-- Fix round 1, F4: a failing init is recorded and re-raised, and the events still register.
+local cStore, cRan = {}, 0
+local fC = DT.module({ id = "c", events = { PLAYER_MONEY = function() cRan = cRan + 1 end },
+  init = function() error("bad store") end, ready = function() return cStore end,
+  errorKey = "cErrors", lastKey = "lastCError" })
+local okC, errC = pcall(c.fire, c, "ADDON_LOADED", "DeadTired")
+check("F4: a failing init is re-raised", not okC and tostring(errC):find("bad store", 1, true) ~= nil)
+check("F4: and counted under the module's own key", cStore.cErrors == 1
+  and tostring(cStore.lastCError):find("init: ", 1, true) == 1)
+check("F4: its events are registered anyway, and run", fC.events.PLAYER_MONEY == true
+  and not fC.events.ADDON_LOADED and (c:fire("PLAYER_MONEY") or true) and cRan == 1)
+
 -- ---------------------------------------------------------------- signals
 local got
 DT.listen("x", function(a) got = a end)
