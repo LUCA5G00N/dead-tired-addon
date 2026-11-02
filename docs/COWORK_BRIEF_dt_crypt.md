@@ -14,7 +14,7 @@ game. If the harness assigns you a different branch name, create that branch fro
    (the code and test patterns to build on).
 5. `reference/SPEC_forever_namespaces.md`: search it, don't read it top to bottom.
 
-**Draft-status:** **proposed, not ratified.** Written 2026-11-02, after card 1 was reported (card 1
+**Draft-status:** **ratified by Tim 2026-11-02 (R1-R3 as proposed).** Written 2026-11-02, after card 1 was reported (card 1
 head `61fe2d3` on `claude/loving-meitner-yzdxtn`) and **before card 1 has been walked in game**.
 Every "already exists" claim below is about that commit, and Task 1 re-verifies each against the
 branch you actually start from. Card 1 may get fixes on launch night (4 Nov). If
@@ -49,17 +49,17 @@ from Tim's `WoWWizardry` repo, and they carry over unchanged:
 
 ## Ratify before code
 
-The round may not be built while any of these is `proposed`.
+The round may not be built while any of these is `proposed`. All three are ratified.
 
-- **R1 (proposed): guildies' death notices print unasked.** This is a widening of CLAUDE.md's
+- **R1 (ratified 2026-11-02, as proposed): guildies' death notices print unasked.** This is a widening of CLAUDE.md's
   "quiet by default"; see *The one deliberate widening*. Proposal: received notices print by
   default, one line each; `/dt rip off` silences them per account.
-- **R2 (proposed): your own hardcore death is shared by default.** CLAUDE.md says anything
+- **R2 (ratified 2026-11-02, as proposed): your own hardcore death is shared by default.** CLAUDE.md says anything
   personal is opt-in. Proposal: on a hardcore character, your death (name, level, zone) is sent
   unless you've run `/dt rip share off`. The roadmap calls hardcore deaths "the point", and an
   opt-in nobody turns on would leave the feature empty. On a normal character nothing is sent
   until `/dt rip share on`, as the roadmap says.
-- **R3 (proposed): what this card may change in card 1's files.** Two lines, nothing else:
+- **R3 (ratified 2026-11-02, as proposed): what this card may change in card 1's files.** Two lines, nothing else:
   `Crypt.lua` appended to `DeadTired.toc` after `Welcome.lua`, and `crypt:Crypt` appended to the
   module list in `tests/run_all.sh`. `DT.VERSION` and `## Version:` stay `0.1.0`; Tim sets the
   version when he merges. Anything more in a card 1 file is ROADMAP rule 5, and it stops the round.
