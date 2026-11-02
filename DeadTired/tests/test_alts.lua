@@ -27,7 +27,7 @@ strom:slash("main")
 check("/dt main sets the account's main", timDB.account.main == "Classic Beta PvP-Stromham"
   and strom:said("Stromham is now your main") ~= nil)
 check("/dt main sends a fresh HELLO carrying the main", #strom.sent == n0 + 1
-  and lastHello(strom).text == "1^HELLO^main~Classic Beta PvP-Stromham^v~0.1.0")
+  and lastHello(strom).text == "1^HELLO^main~Classic Beta PvP-Stromham^s~" .. strom.DT.sessionToken .. "^v~0.1.0")
 w:advance(30)
 check("the guildie stores Stromham's main", pal.DT.roster()["Classic Beta PvP-Stromham"].main == "Classic Beta PvP-Stromham")
 check("and does not reply to a HELLO from someone already answered", #pal.sent == 2)
@@ -59,7 +59,7 @@ check("someone with no main is alone in the dark", pal:said("Graverobber hasn't 
 -- Clear.
 alt:slash("main clear")
 check("/dt main clear removes the main", timDB.account.main == nil and alt:said("main cleared") ~= nil)
-check("and sends a fresh HELLO with no main", lastHello(alt).text == "1^HELLO^main~^v~0.1.0")
+check("and sends a fresh HELLO with no main", lastHello(alt).text == "1^HELLO^main~^s~" .. alt.DT.sessionToken .. "^v~0.1.0")
 w:advance(30)
 pal:slash("alts bonechill")
 check("the other side sees the main gone", pal:said("Bonechill hasn't named a main.") ~= nil)
