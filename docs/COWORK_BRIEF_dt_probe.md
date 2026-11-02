@@ -269,3 +269,42 @@ In `docs/UAT_dt_probe.md`: 5 offline `[G]` checks, then Tim's launch-night run.
   answer (so the results doc can be written from the saved file in one pass).
 
 Never write `docs/UAT_dt_probe_results.md` or `docs/PROBE_launch_results.md`.
+
+## Amendment 2 (2026-11-02, Tim): self-found fix, logging and instances
+
+Ratified. Build on `card/dt_probe` after the first build (`9177f02`), as its own commit(s).
+Merge `main` into `card/dt_probe` first to bring this amendment in.
+
+- **B1: self-found, corrected.** The brief named `C_GameRules.IsSelfFoundActive`, which the
+  reference doesn't have. Record instead `C_GameRules.IsSelfFoundAllowed()` (line 1363) and
+  `C_PlayerInfo.IsSelfFoundActive()` (under `C_PlayerInfo`), both through `ask`, in `build`.
+- **B2: new section `logging`** (automatic at `PLAYER_ENTERING_WORLD` + 15 s, plus
+  `/dtprobe logging`; for the combat-log prompt card):
+  - reads `C_ChatInfo.IsLoggingCombat()`, `C_ChatInfo.IsLoggingChat()`, and whether the globals
+    `LoggingCombat` and `LoggingChat` are functions. **Never calls either global with an
+    argument** in this form: with one, they switch logging.
+  - `/dtprobe logging try`: only if `IsLoggingCombat()` reads false, calls `LoggingCombat(true)`
+    through `pcall` (the one switching call in the probe), then records: the call's results or
+    error, whether the client blocked it (any "blocked" / "forbidden" / protected-action error
+    text, or `ADDON_ACTION_BLOCKED` / `ADDON_ACTION_FORBIDDEN` firing for this addon within 1 s,
+    recorded via a registered event), and `IsLoggingCombat()` 1 s later. It prints one line
+    saying whether logging is now on, so Tim knows it may have been switched. If logging was
+    already on, it records that and calls nothing. Up to 3 attempts.
+- **B3: new section `instances`** (automatic; for the same card): on every
+  `PLAYER_ENTERING_WORLD` (up to 10), its two arguments (`isLogin`, `isReload`),
+  `IsInInstance()` (both returns), `GetInstanceInfo()` (all returns), `GetRealZoneText()`,
+  `InCombatLockdown()` and `C_ChatInfo.IsLoggingCombat()`. Also `ZONE_CHANGED_NEW_AREA` (up to
+  10) with `IsInInstance()` and the zone.
+- **Tests:** B1-B3 under every-function-absent and every-function-throwing as before; `try`
+  calls `LoggingCombat` exactly once when logging is off and never when on or absent; the
+  automatic `logging` read never calls `LoggingCombat` / `LoggingChat` at all (stub counter
+  over the whole scripted session); caps hold (3 attempts, 10 + 10 instance records); a blocked
+  event is recorded.
+- **Guard proofs (add):** the "only if off" check on `try`; the attempt cap; the instance cap.
+- **Greps:** G3's grep is unchanged and still finds nothing. Add to the report:
+  `grep -n "LoggingCombat\|LoggingChat" DeadTiredProbe/Probe.lua`, which shows the calls are
+  confined to the `try` path and reads of their type.
+- **Report:** append *Amendment 2* to `docs/COWORK_REPORT_dt_probe.md` (lookups, guards, new
+  lines verbatim, where to read each answer).
+- **Out of scope:** the combat-log prompt itself (its own card); calling `LoggingChat` to
+  switch; any change to `DeadTired/`.
