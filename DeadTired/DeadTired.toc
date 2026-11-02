@@ -1,0 +1,16 @@
+## Interface: 16001
+## Title: Dead Tired
+## Notes: The guild addon for <DEAD TIRED>. Optional, quiet, guild-only. /dt
+## Author: DEAD TIRED
+## Version: 0.1.0
+## SavedVariables: DeadTiredDB
+
+# WoW Forever (interface 16001, the beta's number). If the live client reports another number
+# (/dump select(4, GetBuildInfo())), change the Interface line above and nothing else.
+Config.lua
+Core.lua
+Guild.lua
+Comms.lua
+Roster.lua
+Alts.lua
+Welcome.lua

@@ -1,0 +1,131 @@
+-- Offline checks for Core.lua (and Config.lua, DeadTired.toc).
+--   lua5.1 DeadTired/tests/test_core.lua      (from the repo root)
+local dir = (arg and arg[0] or ""):match("^(.*)[/\\][^/\\]+$") or "."
+local H = dofile(dir .. "/harness.lua")
+local check = H.check
+
+local w = H.world()
+local c = w:client({ files = { "Config.lua", "Core.lua" }, load = false })
+local DT, S = c.DT, c
+
+check("Core exports ns.DT at 0.1.0 and creates no frame of its own",
+  type(DT) == "table" and DT.VERSION == "0.1.0" and #c.frames == 0)
+check("Config: guild, prefix, protocol", c.ns.Config.GUILD_NAME == "DEAD TIRED"
+  and c.ns.Config.PREFIX == "DEADTIRED" and c.ns.Config.PROTOCOL == 1)
+
+-- ---------------------------------------------------------------- helpers
+check("try returns the call's results", select(2, DT.try(function() return 1, 2 end)) == 2)
+check("try answers nothing for an absent function or an error",
+  DT.try(nil) == nil and DT.try(function() error("x") end) == nil)
+local secretV = {}
+S.secrets[secretV] = true
+check("try answers nothing for a secret first value", DT.try(function() return secretV end) == nil)
+check("clean drops secrets and keeps values", DT.clean(secretV) == nil and DT.clean(5) == 5)
+check("now is GetTime", DT.now() == 1000)
+check("stamp is the date", DT.stamp() == "2026-11-04 23:00:00")
+S.noDate = true
+check("stamp falls back to time() when date fails", DT.stamp() == "1793833200")
+S.noDate = false
+check("build", DT.build() == "1.60.1-70245")
+check("charKey is Realm-Name", DT.charKey() == "Classic Beta PvP-Stromham")
+S.name = "Unknown"
+check("charKey refuses 'Unknown'", DT.charKey() == nil)
+S.name = "Stromham"
+local fired = false
+check("after uses C_Timer", DT.after(0.5, function() fired = true end) == true)
+w:advance(0.4); check("after: not yet", not fired)
+w:advance(0.2); check("after: fired", fired)
+DT.out("hello")
+check("out prints with the Dead Tired prefix", c:said("|cff7fa650Dead Tired|r hello") ~= nil)
+check("safe escapes UI codes and strips control bytes", DT.safe("a|Tx\1b") == "a||Txb")
+check("safe bounds length", #DT.safe(string.rep("x", 100), 10) == 13)
+check("nameOf strips the realm, even one with a hyphen", DT.nameOf("Azjol-Nerub-Bob") == "Bob"
+  and DT.nameOf("Classic Beta PvP-Stromham") == "Stromham")
+local db = DT.db()
+check("db creates DeadTiredDB with defaults", c:db() == db and db.welcome == true
+  and db.comms.dropped == 0 and db.comms.malformed == 0 and db.comms.unknownVersion == 0
+  and type(db.roster) == "table" and type(db.account) == "table" and type(db.errors) == "table")
+db.welcome = false
+check("db keeps saved values", DT.db().welcome == false)
+
+-- ---------------------------------------------------------------- modules
+local store, calls = nil, { init = 0, ev = 0 }
+local fA = DT.module({
+  id = "a", events = { PLAYER_MONEY = function() calls.ev = calls.ev + 1 end,
+    BOOM = function() error("kaboom") end },
+  init = function() calls.init = calls.init + 1; store = {} end,
+  ready = function() return store end,
+  errorKey = "aErrors", lastKey = "lastAError",
+  slash = { alpha = function(m) S.got = "alpha:" .. m end },
+})
+check("module returns its own frame", fA == c.frames[1] and fA.events.ADDON_LOADED)
+check("nothing registered before ADDON_LOADED", fA.events.PLAYER_MONEY == nil)
+c:fire("ADDON_LOADED", "SomeOtherAddon")
+check("another addon's ADDON_LOADED is ignored", calls.init == 0)
+c:fire("ADDON_LOADED", "DeadTired")
+check("init runs once, events registered, ADDON_LOADED dropped", calls.init == 1
+  and fA.events.PLAYER_MONEY and fA.events.BOOM and not fA.events.ADDON_LOADED)
+c:fire("ADDON_LOADED", "DeadTired")
+check("a second ADDON_LOADED does not re-init", calls.init == 1)
+c:fire("PLAYER_MONEY")
+check("a handler runs when ready", calls.ev == 1)
+local ok, err = pcall(c.fire, c, "BOOM")
+check("a failure is re-raised", not ok and tostring(err):find("kaboom", 1, true) ~= nil)
+check("and counted under the module's own key", store.aErrors == 1 and store.lastAError:find("BOOM: ", 1, true) == 1)
+store = nil
+c:fire("PLAYER_MONEY")
+check("a handler does not run while ready answers nothing", calls.ev == 1)
+local silent = 0
+local fB = DT.module({ id = "b", events = { BOOM = function() silent = silent + 1; error("quiet") end } })
+c:fire("ADDON_LOADED", "DeadTired")
+check("with no errorKey a failure is swallowed", pcall(c.fire, c, "BOOM") and silent == 1)
+check("a module with no ready always runs", fB.events.BOOM == true)
+
+-- ---------------------------------------------------------------- signals
+local got
+DT.listen("x", function(a) got = a end)
+DT.signal("x", 7)
+check("signal reaches its listener", got == 7)
+
+-- ---------------------------------------------------------------- the router
+DT.verb("main", function(m) S.got = "main:" .. m end, "main [clear]")
+DT.verb("mainland", function(m) S.got = "mainland:" .. m end)
+c:slash("  Main Clear ")
+check("a verb takes its arguments, the message lower-cased and trimmed", S.got == "main:main clear")
+check("the raw text keeps case", DT.raw == "Main Clear")
+c:slash("mainland")
+check("the longest verb wins", S.got == "mainland:mainland")
+S.got = nil
+c:slash("mainx")
+check("a verb must be a whole word", S.got == nil and c:said("/dt") ~= nil)
+c:slash("alpha")
+check("a module's slash table registers its verbs", S.got == "alpha:alpha")
+S.got = nil
+c:slash("")
+check("/dt alone lists the verbs, with usage and version", S.got == nil and c:said("/dt ") and c:said("alpha")
+  and c:said("main [clear]") and c:said(DT.VERSION))
+check("/dt and /deadtired are declared on one router", c.env.SLASH_DEADTIRED1 == "/dt"
+  and c.env.SLASH_DEADTIRED2 == "/deadtired" and type(c.env.SlashCmdList.DEADTIRED) == "function")
+DT.isMember = function() return false end
+S.got = nil
+c:slash("alpha")
+check("outside the guild the router runs nothing and says one line", S.got == nil and #c.printed == 1
+  and c:said("only stirs inside <DEAD TIRED>"))
+
+-- ---------------------------------------------------------------- files
+local function read(p) local f = io.open(p, "rb"); if not f then return nil end local s = f:read("*a"); f:close(); return s end
+local toc = read(H.addonDir .. "/DeadTired.toc") or ""
+check("toc: interface 16001, title, SavedVariables, version", toc:find("## Interface: 16001\n", 1, true)
+  and toc:find("## Title: Dead Tired\n", 1, true) and toc:find("## SavedVariables: DeadTiredDB\n", 1, true)
+  and toc:find("## Version: " .. DT.VERSION .. "\n", 1, true))
+check("toc: files in order", toc:find("\nConfig.lua\nCore.lua\nGuild.lua\nComms.lua\nRoster.lua\nAlts.lua\nWelcome.lua\n", 1, true) ~= nil)
+local strays = {}
+for _, f in ipairs(H.FILES) do
+  local t = read(H.addonDir .. "/" .. f) or ""
+  if f ~= "Core.lua" and (t:find("SlashCmdList") or t:find("SLASH_")) then strays[#strays + 1] = f .. ":slash" end
+  if t:find("COMBAT_LOG") or t:find("CombatLog") or t:find("SendChatMessage") then strays[#strays + 1] = f .. ":combat/chat" end
+  if t:find("reference/", 1, true) then strays[#strays + 1] = f .. ":reference" end
+end
+check("no file but Core declares a slash command; no combat, chat or reference/ (" .. table.concat(strays, ",") .. ")", #strays == 0)
+
+H.finish("core")
