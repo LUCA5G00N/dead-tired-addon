@@ -9,7 +9,7 @@ Read first, in order:
 4. `reference/wizardry/LogPrompt/` (Tim's beta reminder): the pattern this card copies.
 5. `reference/SPEC_forever_namespaces.md`: search it, don't read it top to bottom.
 
-**Draft-status: proposed, not ratified.** Written 2026-11-02, before launch and before any card
+**Draft-status: ratified by Tim 2026-11-02 (R1, R4-R6 as proposed; R2-R3 as amended by Tim).** Written 2026-11-02, before launch and before any card
 has been walked. Card 1 is at `61fe2d3`; Task 1 re-verifies every name below against
 `card/dt_foundation` as it stands when you start. Two things only the live client can answer,
 and the launch-night probe (`dt_probe`, amendment 2) records both: whether addon code may switch
@@ -37,31 +37,34 @@ asking off.
 
 ## Ratify before code
 
-The round may not be built while any of these is `proposed`.
+The round may not be built while any of these is `proposed`. All six are ratified.
 
-- **R1 (proposed): ask on entering a dungeon or raid, on by default.** When a member enters an
+- **R1 (ratified 2026-11-02, as proposed): ask on entering a dungeon or raid, on by default.** When a member enters an
   instance whose type is `"party"` or `"raid"`, and the combat log is **off**, a small dialog asks
   whether to switch it on: **Log it** / **Not now**. On for every member by default, because the
   point is that nobody has to remember. `/dt logs off` stops the asking for the whole account;
   `/dt logs on` brings it back. Battlegrounds and arenas (`"pvp"`, `"arena"`) never ask.
-- **R2 (proposed): the login prompt is opt-in.** The beta addon asked at every login, which suits
-  Tim's research but would be noise for the guild (logs outside instances are clutter). Proposal:
-  off by default; `/dt logs login on` asks at login too (once per login, not on zone changes),
-  `/dt logs login off` stops it. Tim switches it on for himself.
-- **R3 (proposed): combat log only.** The chat log, which the beta addon also offered, is not
-  offered. It was a research need, not a guild one.
-- **R4 (proposed): switched by the player's click, through the client's own command.** The
+- **R2 (ratified 2026-11-02, amended by Tim): the login prompt is opt-in, and covers both logs.**
+  The beta addon asked at every login, which suits Tim's research but would be noise for the guild.
+  Off by default; `/dt logs login on` asks at login (once per login or `/reload`, not on loading
+  screens), `/dt logs login off` stops it. **The login prompt offers the combat log and the chat
+  log**, as the beta addon did: buttons `Combat log`, `Chat log`, `Both`, `Neither`, each armed
+  only for a log that is off. If both are on, nothing shows.
+- **R3 (ratified 2026-11-02, amended by Tim): the dungeon and raid prompt is combat log only.**
+  The chat log is offered only by the opt-in login prompt (R2).
+- **R4 (ratified 2026-11-02, as proposed): switched by the player's click, through the client's own command.** The
   **Log it** button is a secure button running `/combatlog` as macro text, as `LogPrompt.lua`
   does. That works whether or not addon code may call `LoggingCombat` on this client, and it means
-  every switch is a human click. The button is armed only while the log is off, because
-  `/combatlog` toggles. The addon never calls `LoggingCombat` or `LoggingChat` itself, never reads
+  every switch is a human click. The chat log is switched the same way, with `/chatlog` (R2).
+  A button is armed only while its log is off, because both commands toggle. The addon never
+  calls `LoggingCombat` or `LoggingChat` with an argument (no-argument reads are allowed), never reads
   the log file, and never switches logging **off**.
-- **R5 (proposed): ask once per visit.** **Not now** means no more asking until you leave that
+- **R5 (ratified 2026-11-02, as proposed): ask once per visit.** **Not now** means no more asking until you leave that
   instance and enter one again (a corpse run back in, a `/reload` or a loading screen inside the
   same instance doesn't ask again). If logging is already on, nothing shows. In combat, the dialog
   waits until combat ends (secure buttons can't be set up in combat), and is dropped if you've left
   the instance by then.
-- **R6 (proposed): what this card may change in card 1's files.** Two lines, nothing else:
+- **R6 (ratified 2026-11-02, as proposed): what this card may change in card 1's files.** Two lines, nothing else:
   `Logs.lua` appended to `DeadTired.toc` after `Welcome.lua`, and `logs:Logs` appended to the
   module list in `tests/run_all.sh`. `DT.VERSION` stays `0.1.0`. Merging with cards 3-6 conflicts
   on these lines as theirs do; at merge keep all, in card order, this card last.
@@ -82,15 +85,20 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
 
 ### Logs.lua: specification
 
-- **State:** `C_ChatInfo.IsLoggingCombat()` through `DT.try`/`DT.clean`; if absent, the global
-  `LoggingCombat` **called with no argument** (a read). Unknown is treated as off, and the dialog
+- **State:** `C_ChatInfo.IsLoggingCombat()` and `C_ChatInfo.IsLoggingChat()` through
+  `DT.try`/`DT.clean`; if absent, the globals `LoggingCombat` / `LoggingChat` **called with no
+  argument** (a read). Unknown is treated as off, and the dialog
   shows `?` for it, as `LogPrompt.lua` does.
 - **Instance:** `IsInInstance()` (both returns) on `PLAYER_ENTERING_WORLD` and
   `ZONE_CHANGED_NEW_AREA`. A visit starts when the type becomes `"party"` or `"raid"` from
   anything else, and ends when it becomes anything else. The visit key is the instance type plus
   `GetInstanceInfo()`'s instance ID (8th return) when readable, else the zone text.
-- **Dialog:** copy `LogPrompt.lua`'s frame, secure button, `clickRan` and combat deferral, with two
-  buttons. Title: `Log this one?`. Line under it: `Combat log is off. Warcraft Logs needs it on.`
+- **Login dialog (R2):** `LogPrompt.lua`'s four-button dialog, near enough as it is. Title:
+  `The dead keep records. Turn them on?`. Status line as the beta's (`combat log ON/OFF/?    chat
+  log ON/OFF/?`). Buttons `Combat log`, `Chat log`, `Both`, `Neither`. After a click, the beta's
+  re-read and one line: `combat log <state>, chat log <state>.`
+- **Instance dialog (R1, R3):** copy `LogPrompt.lua`'s frame, secure button, `clickRan` and combat
+  deferral, with two buttons. Title: `Log this one?`. Line under it: `Combat log is off. Warcraft Logs needs it on.`
   Buttons `Log it` and `Not now`. After a click on **Log it**, re-read the state 0.5 s later and
   print one line: `Logging. Try not to die on the record.` if on, or
   `The log didn't start. Type /combatlog yourself.` if not.
@@ -99,8 +107,8 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
     on;
   - `/dt logs on` / `off`: dungeon and raid asking (R1);
   - `/dt logs login on` / `off` (R2);
-  - `/dt logs now`: shows the dialog now if the log is off, wherever you are (a manual way in;
-    prints `Already logging.` if on).
+  - `/dt logs now`: shows the login dialog now if either log is off, wherever you are (a manual
+    way in; prints `Already logging both.` if both are on).
 - **Member gate:** nothing shows and nothing is stored for a non-member (`DT.isMember()` false).
   `/dt` outside the guild behaves as card 1 already does.
 
@@ -129,10 +137,13 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
    - `/dt logs off`: never; `/dt logs on`: back; the setting survives a reload (it's in
      `DeadTiredDB`);
    - login asking off by default; `/dt logs login on` asks once at login, not on zone changes;
+   - the login dialog arms `/combatlog`, `/chatlog` and both only for logs that are off, and
+     doesn't show when both are on;
+   - the instance dialog never offers the chat log;
    - **Log it** is armed with `/combatlog` only while the log is off;
    - non-member: no dialog, nothing stored;
    - over a scripted session of logins, zones, instances, combat and clicks, a stub counter shows
-     **zero** calls to `LoggingCombat` with an argument, to `LoggingChat`, and no combat event
+     **zero** calls to `LoggingCombat` or `LoggingChat` with an argument, and no combat event
      registered;
    - the after-click line matches the state read 0.5 s later.
 4. **Card 1 lines** per R6.
@@ -151,7 +162,7 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
 ## Explicitly out of scope
 
 - Switching logging **off**, ever, including on leaving an instance.
-- The chat log (R3).
+- The chat log anywhere but the opt-in login prompt (R2, R3).
 - Reading, parsing, uploading, archiving or deleting log files. The Archon app does archiving;
   Tim's F: backup does the rest.
 - Asking in battlegrounds or arenas, or any per-instance list of which dungeons to ask in.
@@ -167,7 +178,7 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
 - the switch is the player's click on the client's own command; the addon itself never switches
   anything.
 
-When ratified, this joins `CLAUDE.md`'s *Ruled exceptions* (Tim's step, on `main`).
+This is listed in `CLAUDE.md`'s *Ruled exceptions*.
 
 ## Stop conditions
 

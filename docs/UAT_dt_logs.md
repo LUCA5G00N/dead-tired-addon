@@ -8,9 +8,9 @@ or nags is the guild's call).
   roster, alts, welcome, logs).
 - [ ] `[G]` G2: the report lists all seven Task 6 guard removals, each with the check that went
   red.
-- [ ] `[G]` G3: `grep -rnE "LoggingChat|COMBAT_LOG|CombatLog|SendChatMessage" DeadTired/ --include=*.lua | grep -v "/tests/"`
-  finds nothing, and `grep -rn "LoggingCombat(" DeadTired/ --include=*.lua | grep -v "/tests/"`
-  finds only a call with no argument.
+- [ ] `[G]` G3: `grep -rnE "COMBAT_LOG|CombatLog|SendChatMessage|Logging(Combat|Chat)\([^)]" DeadTired/ --include=*.lua | grep -v "/tests/"`
+  finds nothing (no combat events, no public chat, and the logging functions are only ever
+  called with no argument, as reads).
 - [ ] `[G]` G4: `git diff card/dt_foundation --stat -- DeadTired/` lists only `Logs.lua`,
   `tests/test_logs.lua`, `DeadTired.toc` (1 line added) and `tests/run_all.sh` (1 line changed).
 
@@ -22,7 +22,9 @@ or nags is the guild's call).
   inside: no dialog. Leave and re-enter: dialog again.
 - [ ] `[G]` G8: `/dt logs off`, leave and re-enter: no dialog. `/dt logs on` restores it. In a
   battleground: never a dialog.
-- [ ] `[G]` G9: `/dt logs login on`, `/reload`: the dialog shows at login. `/dt logs login off`:
-  it doesn't.
+- [ ] `[G]` G9: with both logs off, `/dt logs login on`, `/reload`: the four-button login dialog
+  shows. **Chat log**: the line says chat log ON, and `WoWChatLog.txt` starts growing. `/reload`
+  again: the dialog shows with only the combat log offered. `/dt logs login off`, `/reload`: no
+  dialog. Entering a dungeon never offers the chat log.
 - [ ] `[H]` H1: **after a week of dungeons and a raid night: did the prompt mean the logs got
   taken, or did people just click it away?**
