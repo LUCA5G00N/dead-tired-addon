@@ -1,7 +1,7 @@
 # UAT walk-sheet: dt_foundation
 
 Brief: `docs/COWORK_BRIEF_dt_foundation.md`. Extracted from its acceptance section.
-**Checks: 10. `[H]` count: 1** (tone is Tim's call).
+**Checks: 11. `[H]` count: 1** (tone is Tim's call). *(amended, fix round 1: G6b added)*
 Results go to `docs/UAT_dt_foundation_results.md`, written by Tim after walking.
 
 **Offline (the build session runs these):**
@@ -16,6 +16,9 @@ Results go to `docs/UAT_dt_foundation_results.md`, written by Tim after walking.
 - [ ] `[G]` G5: `/reload` shows no Lua error, and exactly one welcome line.
 - [ ] `[G]` G6: within 30 seconds of both being online, `/dt who` on each lists the other under
   "this session", and ends with "Only guildies running the addon show up here."
+- [ ] `[G]` G6b *(added, fix round 1, `docs/UAT_dt_fixes1.md` G7)*: with Tim and the guildie both
+  online and listing each other, Tim `/reload`s: within 20 seconds `/dt who` on Tim lists the
+  guildie again. Then Tim logs out and back in: the same.
 - [ ] `[G]` G7: Tim runs `/dt main` on Stromham, then logs an alt. The guildie's
   `/dt alts <alt name>` prints Stromham as main and the alt in the group.
 - [ ] `[G]` G8: a character not in the guild logs in with the addon enabled: no welcome, and the
