@@ -20,7 +20,8 @@ do
   a:login()
   w:advance(60)   -- a has been online a while; its login HELLO went to nobody
   check("login HELLO goes out once, 10 s after entering the world", hellos(a) == 1 and a.sent[1].t == 1010)
-  check("HELLO carries version and an empty main", a.sent[1].text == "1^HELLO^main~^v~0.1.0")
+  check("HELLO carries version, an empty main and the session token",
+    a.sent[1].text == "1^HELLO^main~^s~" .. a.DT.sessionToken .. "^v~0.1.0")
   local b = w:client({ name = "Graverobber", guild = G, files = FILES, random = half })
   b:login()
   b:fire("PLAYER_ENTERING_WORLD", false, false)  -- a zone change is not a login
@@ -126,6 +127,102 @@ do
   late.guild = G; late:fire("PLAYER_GUILD_UPDATE", "player")
   w2:advance(30)
   check("and only once", hellos(late) == 1)
+end
+
+
+-- ---------------------------------------------------------------- fix round 1 (F1, F2, F3)
+local function replies(c)
+  local n = 0
+  for _, s in ipairs(c.sent) do if s.text:find("^1%^HELLO") and s.text:find("r~1", 1, true) then n = n + 1 end end
+  return n
+end
+local ALL = { "Config.lua", "Core.lua", "Guild.lua", "Comms.lua", "Roster.lua", "Alts.lua", "Welcome.lua" }
+
+-- F1: a reload, a relog and a second reload each get exactly one reply.
+do
+  local w = H.world()
+  local a = w:client({ name = "Stromham", guild = G, files = ALL, random = half })
+  a:login()
+  w:advance(60)
+  local b = w:client({ name = "Graverobber", guild = G, files = ALL, random = half })
+  b:login()
+  w:advance(60)
+  check("F1 baseline: A answered B once", replies(a) == 1)
+  local b2 = b:reload()
+  w:advance(30)
+  check("F1: after B reloads, A replies once more", replies(a) == 2)
+  b2:slash("who")
+  check("F1: after the reload, B's /dt who lists A", b2:said("this session (1): Stromham") ~= nil)
+  local b3 = b2:reload()
+  w:advance(30)
+  check("F1: a second reload gets one more reply, not zero and not two", replies(a) == 3)
+  b3:slash("who")
+  check("F1: and B lists A again", b3:said("this session (1): Stromham") ~= nil)
+  -- a relog: the old session leaves, the same character logs in on the same SavedVariables
+  local db = b3:db()
+  b3:logout()
+  w:advance(120)
+  local b4 = w:client({ name = "Graverobber", guild = G, files = ALL, random = half, db = db })
+  b4:login()
+  w:advance(30)
+  check("F1: after a relog, A replies once more", replies(a) == 4)
+  b4:slash("who")
+  check("F1: after the relog, B's /dt who lists A", b4:said("this session (1): Stromham") ~= nil)
+  -- the same session saying HELLO again (e.g. /dt main) still gets no second reply
+  b4.DT.hello()
+  w:advance(30)
+  check("F1: the same session's second HELLO gets no reply", replies(a) == 4)
+end
+
+-- F1: the token is validated; no token counts as token 0.
+do
+  local w = H.world()
+  local a = w:client({ name = "Stromham", guild = G, files = ALL, random = half })
+  a:login()
+  w:advance(60)
+  local function inject(text, sender) a:fire("CHAT_MSG_ADDON", "DEADTIRED", text, "GUILD", sender) end
+  inject("1^HELLO^main~^s~12ab^v~0.1.0", "Ghoul-ClassicBetaPvP")
+  inject("1^HELLO^main~^s~1234567^v~0.1.0", "Wight-ClassicBetaPvP")
+  w:advance(30)
+  check("F1: a token that isn't 1-6 digits is refused and counted", a:db().comms.badHello == 2
+    and replies(a) == 0 and a.DT._roster.heard()["Classic Beta PvP-Ghoul"] == nil)
+  inject("1^HELLO^main~^v~0.1.0", "Ghoul-ClassicBetaPvP")
+  w:advance(30)
+  check("F1: a HELLO with no token is answered (token 0)", replies(a) == 1
+    and a.DT._roster.answered()["Classic Beta PvP-Ghoul#0"] == true)
+  inject("1^HELLO^main~^s~0^v~0.1.0", "Ghoul-ClassicBetaPvP")
+  w:advance(30)
+  check("F1: ... and is the same session as an explicit s~0", replies(a) == 1)
+  check("F1: the session token is 1-6 digits", type(a.DT.sessionToken) == "number"
+    and a.DT.sessionToken >= 1 and a.DT.sessionToken <= 999999)
+end
+
+-- F2: a wave of 5 logins within 1 s: each client sends at most 2 replies, all list each other.
+do
+  local w = H.world()
+  local cs, rnd = {}, 0
+  local function spread() rnd = (rnd * 7 + 3) % 10; return rnd / 10 end
+  for i = 1, 5 do
+    w:schedule(i * 0.2, function()
+      cs[i] = w:client({ name = "Wave" .. string.char(64 + i), guild = G, files = ALL, random = spread })
+      cs[i]:login()
+    end)
+  end
+  w:advance(120)
+  local most, saved, total = 0, 0, 0
+  for i = 1, 5 do
+    most = math.max(most, replies(cs[i]))
+    total = total + #cs[i].sent
+    saved = saved + (cs[i]:db().comms.repliesSaved or 0)
+  end
+  check("F2: in a wave of 5, each client sends at most 2 replies (most " .. most .. ")", most <= 2)
+  check("F2: replies saved are counted (" .. saved .. ")", saved > 0)
+  local all = true
+  for i = 1, 5 do
+    cs[i]:slash("who")
+    if not cs[i]:said("this session (4)") then all = false end
+  end
+  check("F2: every client lists every other (" .. total .. " messages in all)", all)
 end
 
 H.finish("roster")

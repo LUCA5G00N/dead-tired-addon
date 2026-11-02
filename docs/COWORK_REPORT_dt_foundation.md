@@ -209,3 +209,54 @@ sh DeadTired/tests/run_all.sh
   handled); whether `PLAYER_GUILD_UPDATE` fires when guild info arrives late on a login (if it
   doesn't, that character's HELLO and welcome wait until the next zone change or `/reload`).
 - `docs/UAT_dt_foundation_results.md` was not written; that file is Tim's.
+
+## Fix round 1 (F1-F5)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes1.md` (audit `docs/AUDIT_2026-11-02.md` on
+`audit/2026-11-02`, findings AUD-01, 05, 12, 15, 16). The round report is
+`docs/COWORK_REPORT_dt_fixes1.md` on the session branch.
+
+- **F1 (AUD-01), `Roster.lua`:** a session token, `math.random(1, 999999)` through `DT.try`
+  (falling back to `time() % 999999 + 1` when that doesn't give an integer in range), exposed as
+  `DT.sessionToken` and sent as `s` in every HELLO. `answered` is keyed `<sender>#<s>`; a HELLO
+  with no `s` is token `0`. On receipt `s` must be 1-6 digits, else the HELLO is refused and
+  counted in `comms.badHello`. `PROTOCOL` stays 1.
+- **F2 (AUD-05), `Roster.lua`:** while a reply is scheduled, a further HELLO that needs one is
+  marked answered and counted in `comms.repliesSaved`; nothing more is scheduled. The pending
+  reply goes out once and covers it.
+- **F3 (AUD-12), `tests/harness.lua`:** `client:reload()` (Lua state dropped, a new instance on
+  the same SavedVariables, `PLAYER_ENTERING_WORLD(false, true)`) and `client:reboot(uptime)`
+  (as reload, `GetTime()` restarting at `uptime`, default 600, then a login). `time()` now moves
+  with the world clock (`1793833200` at the start, +1 per world second) instead of being frozen,
+  which `reboot` needs and which a clock-based id needs to be testable. `opts.setup(c)` runs
+  before `ADDON_LOADED` and is kept across reload/reboot.
+- **F4 (AUD-15), `Core.lua`:** `pcall(def.init)`; a failure is counted under `errorKey`, its text
+  under `lastKey` as `init: <error>`, the events are registered anyway, then the error is
+  re-raised (as a handler failure is).
+- **F5 (AUD-16), `Comms.lua`:** `msgid` starts at `time() % 100000` (guarded; 0 if the clock
+  can't be read), so the first chunked message is `time() % 100000 + 1`.
+
+Wire, as built now:
+
+```
+1^HELLO^main~Classic Beta PvP-Stromham^s~123456^v~0.1.0        login HELLO, 55 bytes
+1^HELLO^main~Classic Beta PvP-Stromham^r~1^s~123456^v~0.1.0    reply, 59 bytes
+```
+
+Longest HELLO: `34 + len(main)` bytes, 74 with a 40-character main.
+
+New checks: core +3 (F4), comms +1 (F5; two chunk checks no longer pin `msgid` to 1), roster +15
+(F1 reload, second reload, relog, same-session HELLO; token validation and token 0; F2 wave of 5).
+Two HELLO text checks (roster, alts x2) now include `s~<token>`. Suites: core 47, guild 13,
+comms 54, roster 41, alts 21, welcome 17.
+
+Guard proofs (removed once, suite red, restored):
+
+| Guard | Removed as | Red |
+|---|---|---|
+| F1 token in the `answered` key | `local who = from` | 8 roster checks, incl. *F1: after B reloads, A replies once more*, *F1: after the relog, B's /dt who lists A* |
+| F1 token validation | `or not validToken(f.s)` dropped | *F1: a token that isn't 1-6 digits is refused and counted*, *F1: a HELLO with no token is answered (token 0)*, *F1: ... and is the same session as an explicit s~0* |
+| F2 one pending reply | `if replyPending` → `if false` | *F2: in a wave of 5, each client sends at most 2 replies (most 4)*, *F2: replies saved are counted (0)* |
+| F4 `pcall` around `init` | `def.init()` called directly | *F4: and counted under the module's own key*, *F4: its events are registered anyway, and run* |
+
+No player-facing line changed.

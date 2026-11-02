@@ -81,14 +81,16 @@ Client.__index = Client
 function World:client(opts)
   local c = setmetatable({ world = self, name = opts.name or "Stromham", realm = opts.realm or "Classic Beta PvP",
     guild = opts.guild, printed = {}, sent = {}, frames = {}, registered = {}, secrets = {},
-    restricted = false, sendError = false, ns = {} }, Client)
+    restricted = false, sendError = false, ns = {}, opts = opts, uptimeOffset = opts.uptimeOffset or 0 }, Client)
   local env = setmetatable({}, { __index = _G })
   c.env = env
   env._G = env
   env.DeadTiredDB = opts.db
-  env.GetTime = function() return self.t end
+  -- GetTime is this machine's uptime (the world clock, less any reboot offset); time() is the
+  -- epoch, moving with the world clock and never reset (fix round 1, F3).
+  env.GetTime = function() return self.t - c.uptimeOffset end
   env.date = function(fmt) if c.noDate then error("no date") end return "2026-11-04 23:00:00" end
-  env.time = function() return 1793833200 end
+  env.time = function() return 1793833200 + math.floor(self.t - 1000) end
   env.GetBuildInfo = function() return "1.60.1", "70245", "Nov 1 2026", 16001 end
   env.GetRealmName = function() return c.realm end
   env.UnitName = function(u) if u == "player" then return c.name end end
@@ -129,8 +131,36 @@ function World:client(opts)
   end
   c.DT = c.ns.DT
   table.insert(self.clients, c)
+  -- opts.setup(c): stubs a test needs in place before ADDON_LOADED (kept for reload and reboot).
+  if opts.setup then opts.setup(c) end
   if opts.load ~= false then c:fire("ADDON_LOADED", "DeadTired") end
   return c
+end
+
+-- Fix round 1 (F3): the harness learns to forget.
+local function again(c, extra)
+  local o = {}
+  for k, v in pairs(c.opts) do o[k] = v end
+  for k, v in pairs(extra or {}) do o[k] = v end
+  o.name, o.realm, o.guild, o.db, o.load = c.name, c.realm, c.guild, c:db(), nil
+  c:logout()
+  return c.world:client(o)
+end
+
+-- /reload: this client's Lua state is dropped and a new instance loads on the same
+-- SavedVariables, then PLAYER_ENTERING_WORLD(false, true). Returns the new client.
+function Client:reload()
+  local n = again(self)
+  n:fire("PLAYER_ENTERING_WORLD", false, true)
+  return n
+end
+
+-- A restart of the machine: as reload, but GetTime() starts again at `uptime` (default 600)
+-- while time() carries on, and the next PLAYER_ENTERING_WORLD is a login. Returns the new client.
+function Client:reboot(uptime)
+  local n = again(self, { uptimeOffset = self.world.t - (uptime or 600) })
+  n:login()
+  return n
 end
 
 -- Log out: the client leaves the world (its SavedVariables table stays with the test).
