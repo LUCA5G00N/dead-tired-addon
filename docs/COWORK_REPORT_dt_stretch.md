@@ -236,3 +236,70 @@ excepted once it is on `main`. This card adds no new exception.
   request, a full-inventory send, public chat or combat data; every message is at most 250 bytes;
   every guard removal went red.
 - `docs/UAT_dt_stretch_results.md` was not written; that file is Tim's.
+
+## Rulings round (A3, A4)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_rulings.md` (Task 4), on `card/dt_stretch` after merging
+`main` (which brought only `CLAUDE.md` and the rulings brief and walk-sheet; no card 1 file changed).
+
+**A3, `Played.lua`:**
+- At `ADDON_LOADED` (the module's `init`): if `SlashCmdList.PLAYED` is a function and
+  `hooksecurefunc` exists, `pcall(hooksecurefunc, SlashCmdList, "PLAYED", stamp)`; `stamp` records
+  `DT.now()`. Otherwise, or if the hook errors, no stamp is ever made.
+- On `TIME_PLAYED_MSG`: the stamp is read and **cleared on every event**, then the report is used
+  only if the stamp existed and is under 10 s old; then the existing share gate, member check,
+  readable level/total and 60 s window apply. No hook means no stamp, so nothing is ever sent.
+  (I first also checked a `hooked` flag there; it could not be proved red, being redundant with
+  the stamp, so I removed it.)
+- `/dt slowest share on` with no hook prints one line saying nothing will be sent (below).
+- `RequestTimePlayed` is still never called: R5's grep over `DeadTired/` (tests excluded) finds
+  nothing.
+- **In-game risk, not provable offline:** the chat system can cache slash handlers
+  (`hash_SlashCmdList`). If Forever's client cached `/played` before our hook was placed, the hook
+  never fires and nothing is sent even when typed. That fails safe; G11 will show it.
+
+**A4, `Stash.lua`:**
+- A slot is listed only if `clean(info.isBound) == false`, or, when that is `nil`,
+  `C_Item.IsBound(loc) == false` where `loc = ItemLocation:CreateFromBagAndSlot(bag, slot)`.
+  On retail `C_Item.IsBound` takes an item location, not a bag and slot, so the location is built
+  through the client's `ItemLocation` global (guarded: absent or erroring means unknown). Any
+  other answer (true, nil, an error, a secret, a non-boolean) means not listed. Bags and bank use
+  the same `scan`.
+- The share-on line now says answers name the holding character (below).
+
+**Player-facing lines, new or changed:**
+- Changed (A4): `stash sharing on. Guildies' searches see your tradeable items, four at a time, and which character holds them.`
+  (was `stash sharing on. Guildies' searches can see your tradeable items, four at a time.`)
+- New (A3): `sharing your /played, but this client hides when you type it. Nothing will be sent.`
+
+**Tests:** `test_played.lua` 23 → 47; `test_stash.lua` 48 → 74.
+- Played: the client stub now provides the game's `SlashCmdList.PLAYED` and `hooksecurefunc`
+  before `ADDON_LOADED`; existing checks type `/played` before each report. New block *A3*:
+  hook placed; event with no typed `/played` → nothing; typing still runs the game's command; typed
+  then the event at 9.5 s → sent; stamp cleared after the send; a second event → nothing; the
+  event 11 s after → nothing; a report another addon asked for → ignored; the addon's own request
+  count stays 0 (the one call is the test playing the other addon); hook absent, no
+  `hooksecurefunc`, or `hooksecurefunc` erroring → not placed, share-on says so in one line,
+  nothing ever sent; a `/played` command appearing after load is not hooked → nothing sent.
+- Stash: `C_Item.IsBound` and `ItemLocation.CreateFromBagAndSlot` stubbed per slot. For a bag, the
+  bank, and a bank bag: `isBound` false listed, true skipped; nil with `IsBound` false listed, true,
+  nil, erroring or non-boolean skipped. With `C_Item.IsBound` absent, `ItemLocation` absent,
+  `CreateFromBagAndSlot` erroring, or the answer secret: `isBound == false` still listed, unknown
+  skipped. The share-on line checked exactly.
+
+**Guard proofs:**
+
+| Guard removed | Checks that went red |
+|---|---|
+| A3 typed-`/played` window (whole condition → `if false`) | 10, incl. *the event with no typed /played sends nothing*, *a report someone else asked for: ignored*, *hook absent: nothing is ever sent* |
+| A3 window age only (`DT.now() - at >= 10` dropped) | *the event 11 s after the typed /played: nothing* and 3 more |
+| A3 stamp cleared (`typedAt = nil` removed) | *the stamp is cleared after the send*, *and that stale stamp is gone too* |
+| A4 unknown → not listed (put back to `isBound ~= true`) | 13, incl. *isBound nil, C_Item.IsBound nil: skipped* (bags, bank, bank bag), *a secret IsBound answer* |
+| A4 IsBound result ignored (`nil` treated as listed) | the same 13 |
+
+**Note on the stamp-clear proof:** behaviourally the stamp clear is shadowed by the existing 60 s
+send window (a stamp lives 10 s, so any second report it could let through is already inside 60 s
+of the send). The proof therefore reads the stamp through the test hook `DT._played.stamp()`.
+This is test-side only and is the check that goes red.
+
+Each restored; `run_all.sh` exits 0 (stash 74, played 47, events 26; all suites green).

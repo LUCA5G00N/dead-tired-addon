@@ -1,8 +1,10 @@
 # UAT walk-sheet: dt_stretch
 
 Brief: `docs/COWORK_BRIEF_dt_stretch.md`. Extracted from its acceptance section.
-**Checks: 11. `[H]` count: 1** (whether the slowest-leveller award lands as a joke).
+**Checks: 13 *(amended; was 11)*. `[H]` count: 1** (whether the slowest-leveller award lands as a joke).
 Results go to `docs/UAT_dt_stretch_results.md`, written by Tim after walking.
+**Amended 2026-11-02 (rulings round, A3 and A4):** G11 and G12 added; see
+`docs/COWORK_BRIEF_dt_rulings.md`.
 
 **Offline (the build session runs these):**
 - [ ] `[G]` G1: `DeadTired/tests/run_all.sh` exits 0 and runs nine suites (core, guild, comms,
@@ -31,6 +33,11 @@ Results go to `docs/UAT_dt_stretch_results.md`, written by Tim after walking.
 - [ ] `[G]` G10: `/dt events remind on` with an event 35 minutes away (edit `EventsList.lua`
   locally to make one): one line 30 minutes before, one at the start, nothing else. Then
   `/dt events remind off`: nothing.
+- [ ] `[G]` G11 *(amended: new, A3)*: with `/dt slowest share on`, Tim types `/played`: the guildie's board
+  gets Tim's line. Then `/script RequestTimePlayed()`: nothing new is sent (the guildie's board is
+  unchanged).
+- [ ] `[G]` G12 *(amended: new, A4)*: with stash sharing on and a soulbound item in Tim's bags, the guildie
+  searches for it: no answer names it.
 - [ ] `[H]` H1: **would the slowest leveller laugh at the award, or feel singled out?**
 
 **`[H]` count: 1.** Whether a joke award lands on the person it names is the guild's call, and

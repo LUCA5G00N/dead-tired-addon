@@ -4,11 +4,16 @@
 -- R3: play time is shared only when the player types /played themselves (TIME_PLAYED_MSG), with
 -- /dt slowest share on. This file never asks the game for play time: asking prints the played
 -- lines to the player's chat unasked.
+-- A3 (rulings round, 2026-11-02): "typed /played" is proved, not assumed. The /played slash
+-- command itself is hooked (hooksecurefunc on SlashCmdList.PLAYED) to stamp when it was used; a
+-- TIME_PLAYED_MSG is sent only with that stamp under 10 s old, and the stamp is then cleared. A
+-- report anything else asked for is ignored. No hook at load: nothing is ever sent.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
 
 local SEND_WINDOW = 60
+local TYPED_WINDOW = 10      -- seconds from a typed /played to its TIME_PLAYED_MSG (A3)
 local SHOW = 5
 local CLOSING = "Only guildies running the addon who share their /played. Type /played to update yours."
 
@@ -29,8 +34,21 @@ end
 DT.playedBoard = board
 
 local lastSend
+local hooked, typedAt = false, nil
+
+-- A3: at load, hook the /played command. Guarded: SlashCmdList.PLAYED must be a function and
+-- hooksecurefunc must place the hook without error, or hooked stays false for the session.
+local function hookPlayed()
+  local list = SlashCmdList
+  if type(list) ~= "table" or type(list.PLAYED) ~= "function" or type(hooksecurefunc) ~= "function" then return end
+  hooked = pcall(hooksecurefunc, list, "PLAYED", function() typedAt = DT.now() end) and true or false
+end
 
 local function onPlayed(total)
+  local at = typedAt
+  typedAt = nil                                                        -- guard: stamp cleared (A3)
+  -- Only the hook sets a stamp, so no hook means nothing is ever sent.
+  if not at or DT.now() - at >= TYPED_WINDOW then return end           -- guard: typed /played window (A3)
   local p = store()
   if not p.share then return end                                       -- guard: share gate on sending
   if not DT.isMember() then return end
@@ -97,6 +115,9 @@ local function verb(msg)
   if msg == "slowest" then return DT.slowest()
   elseif msg == "slowest share on" then
     p.share = true
+    if not hooked then
+      return DT.out("sharing your /played, but this client hides when you type it. Nothing will be sent.")
+    end
     return DT.out("sharing your /played. Type /played to put yourself on the board.")
   elseif msg == "slowest share off" then
     p.share = false
@@ -107,9 +128,12 @@ local function verb(msg)
   return DT.out("/dt slowest, or /dt slowest share on/off")
 end
 
+-- For the offline tests only.
+DT._played = { hooked = function() return hooked end, stamp = function() return typedAt end }
+
 DT.module({
   id = "played",
-  init = function() store() end,
+  init = function() store(); hookPlayed() end,
   events = { TIME_PLAYED_MSG = onPlayed },
   ready = DT.errors,
   errorKey = "played", lastKey = "lastPlayed",

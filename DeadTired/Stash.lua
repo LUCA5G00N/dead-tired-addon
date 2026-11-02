@@ -1,6 +1,8 @@
 -- Dead Tired: guild stash search. "Who has linen?" answered by guildies who opted in.
 -- docs/COWORK_BRIEF_dt_stretch.md (card 6; R1-R6 ratified 2026-11-02).
 --
+-- A4 (rulings round, 2026-11-02): an item is listed only when it is known not to be bound:
+-- isBound == false, or isBound nil and C_Item.IsBound for the slot false. Unknown: not listed.
 -- R2: off until /dt stash share on. Tradeable items only (bound items never listed), bags and
 -- (when opened) bank, for every character on the account that has run with sharing on. Nothing
 -- is sent except an answer to a guildie's search: matching items only, at most 4. A search term
@@ -49,6 +51,18 @@ local function bankIDs()
   return t
 end
 
+-- A4: C_Item.IsBound takes an item location, built from the bag and slot through the client's
+-- ItemLocation (a global, guarded). Returns true, false, or nil when it can't be told.
+local function slotBound(bag, slot)
+  local L = ItemLocation
+  if type(L) ~= "table" then return nil end
+  local loc = clean(try(L.CreateFromBagAndSlot, L, bag, slot))
+  if loc == nil then return nil end
+  local b = clean((try(C_Item and C_Item.IsBound, loc)))
+  if type(b) ~= "boolean" then return nil end
+  return b
+end
+
 local function scan(ids)
   local items, C = {}, C_Container
   for _, bag in ipairs(ids) do
@@ -58,7 +72,9 @@ local function scan(ids)
         local info = clean(try(C.GetContainerItemInfo, bag, slot))
         if type(info) == "table" and type(info.itemID) == "number" and type(info.stackCount) == "number"
            and info.stackCount >= 1 then
-          if info.isBound ~= true then                                           -- guard: bound skip
+          local bound = clean(info.isBound)
+          if bound == nil then bound = slotBound(bag, slot) end
+          if bound == false then                                                 -- guard: bound unknown, not listed (A4)
             items[info.itemID] = (items[info.itemID] or 0) + info.stackCount
           end
         end
@@ -270,7 +286,7 @@ local function verb(msg)
   if low == "share on" then
     s.share = true
     scanBags()
-    return DT.out("stash sharing on. Guildies' searches can see your tradeable items, four at a time.")
+    return DT.out("stash sharing on. Guildies' searches see your tradeable items, four at a time, and which character holds them.")
   elseif low == "share off" then
     s.share = false
     s.chars = {}

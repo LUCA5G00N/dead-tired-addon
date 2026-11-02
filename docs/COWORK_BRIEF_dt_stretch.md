@@ -19,6 +19,11 @@ in game. If the harness assigns you a different branch name, create that branch 
 holder name may be **up to 24 bytes** (was 12), so a 12-letter accented name fits. Longest STASH:
 245 bytes. The places below that changed are marked *(amended)*.
 
+**Amended 2026-11-02 (rulings round, A3 and A4 in `docs/COWORK_BRIEF_dt_rulings.md`):** play time is
+sent only after a **typed** `/played`, proved by hooking the `/played` command (A3); the stash lists
+an item only when it is **known not to be bound** (A4), and the share-on line says answers name the
+character holding the item. The places below that changed are marked *(amended)*.
+
 **Draft-status:** **ratified by Tim 2026-11-02 (R1-R6 as proposed; R6: build now).** Written 2026-11-02, after cards 1, 3, 4 and 5 were
 built and **before any of them has been walked in game**. Card 1 is at `61fe2d3` on
 `card/dt_foundation`; Task 1 re-verifies every "already exists" claim against the branch you
@@ -63,8 +68,8 @@ The round may not be built while any of these is `proposed`. All six are ratifie
   against card 2's code. Card 6 is the other three features.
 - **R2 (ratified 2026-11-02, as proposed): stash sharing is opt-in, answers searches only, and covers the whole
   account.**
-  - With `/dt stash share on`, your client keeps a local list of your **tradeable** items (bound
-    items are never listed): bags at every login and bag change, the bank whenever you open it.
+  - With `/dt stash share on`, your client keeps a local list of your **tradeable** items (an item
+    is listed only when it is known not to be bound *(amended, A4)*): bags at every login and bag change, the bank whenever you open it.
   - The list covers every character on the account that has run with sharing on. A guildie's
     search can therefore be answered by whichever of your characters is online, naming the
     character that holds the item.
@@ -76,7 +81,10 @@ The round may not be built while any of these is `proposed`. All six are ratifie
 - **R3 (ratified 2026-11-02, as proposed): play time is shared only when you type `/played`.** With
   `/dt slowest share on`, each time *you* run `/played` your level and total hours played are
   sent to the guild. The addon **never calls `RequestTimePlayed` itself**, because that prints
-  the played lines to your chat unasked. Off by default.
+  the played lines to your chat unasked. Off by default. *(amended, A3)* "You typed it" is proved:
+  `SlashCmdList.PLAYED` is hooked (`hooksecurefunc`, guarded) to stamp when `/played` ran, and a
+  play-time report is sent only within 10 s of that stamp. A report anything else asked for is
+  ignored. No hook at load: nothing is ever sent, and `/dt slowest share on` says so.
 - **R4 (ratified 2026-11-02, as proposed): events are data, with opt-in reminders.** The event list ships as
   `EventsList.lua`, holding one event, *"Stranglethorn Fishing Extravaganza, Sunday 14:00-16:00
   server time"*, the classic schedule as remembered. Tim confirms Forever's schedule at G9 and
@@ -145,8 +153,12 @@ have an entry.
 - A bag scan replaces this character's `bags` and `at`; a bank scan replaces `bank` and
   `bankAt`.
 - Per slot: `info = clean(try(C_Container.GetContainerItemInfo, bag, slot))`, a table. Skip it
-  unless `info.itemID` is a number, `info.stackCount` is a number of 1 or more, and
-  `info.isBound` is not true.
+  unless `info.itemID` is a number, `info.stackCount` is a number of 1 or more, and the item is
+  known not to be bound *(amended, A4)*: `info.isBound == false`, or, when `info.isBound` is
+  `nil`, `C_Item.IsBound(ItemLocation:CreateFromBagAndSlot(bag, slot))` returns `false` (each call
+  guarded). Unknown (absent, erroring, secret, not a boolean) means not listed. The share-on line:
+  *"stash sharing on. Guildies' searches see your tradeable items, four at a time, and which
+  character holds them."* *(amended)*
 - Turning `share` off deletes this character's entry. `/dt stash share off` says so.
 
 **Searching, `/dt stash <term>`:** `term` is the text after `stash`, trimmed, 3-32 bytes (else
@@ -190,7 +202,11 @@ off. Nothing offered."*
 - **On `TIME_PLAYED_MSG(total, thisLevel)`**, with `share` on and a member: `lvl` is
   `clean(try(UnitLevel, "player"))`, an integer 1-100; `hours` is `floor(total / 360) / 10` (one
   decimal place). Record your own entry, and send `PLAYED {lvl, h=<hours>}`. If `lvl` or `total`
-  is unreadable, nothing. At most one send per 60 s.
+  is unreadable, nothing. At most one send per 60 s. *(amended, A3)* And only when the `/played`
+  stamp is under 10 s old; every `TIME_PLAYED_MSG` clears the stamp.
+- **The `/played` hook** *(amended, A3)*: at `ADDON_LOADED`, if `SlashCmdList.PLAYED` is a function,
+  `pcall(hooksecurefunc, SlashCmdList, "PLAYED", stamp)`. Not placed: `/dt slowest share on`
+  prints *"sharing your /played, but this client hides when you type it. Nothing will be sent."*
 - **The addon never calls `RequestTimePlayed`.** The event fires only because the player typed
   `/played`.
 - **Receiving `PLAYED`:** validate `lvl` (1-100) and `h` (`^%d+%.?%d?$`, at most 100000). Invalid
@@ -253,7 +269,7 @@ ns.EventsList = {
 2. Apply R5. Create the data file and the three modules with their stores and verbs (usage
    strings, no bars). Add the three suites, covering store creation. `run_all.sh` green.
 3. **Stash scanning** and its tests: bags at login and on `BAG_UPDATE_DELAYED` with the 5 s
-   window; bound items skipped; bad slot info skipped; the bank on `BANKFRAME_OPENED`; the bank
+   window; bound items skipped, and bound status unknown skipped *(amended, A4)*; bad slot info skipped; the bank on `BANKFRAME_OPENED`; the bank
    never read when `Enum.BagIndex.Bank` is absent; bags and bank summed; sharing off means no
    scan; turning it off deletes the entry; an alt on the same account adds its own entry. Green.
 4. **Stash search and answers**, three clients (sharing, sharing off, asker). Cover:
@@ -266,7 +282,8 @@ ns.EventsList = {
    - each invalid field counts in `badStash`; nothing prints on receipt;
    - `/dt stash` alone, in each state. Green.
 5. **Played** and its tests: `TIME_PLAYED_MSG` with sharing on records and sends; sharing off
-   sends nothing; the 60 s window; unreadable level or total; validation; ranking and its
+   sends nothing; the 60 s window; only after a typed `/played`, inside 10 s *(amended, A3)*;
+   unreadable level or total; validation; ranking and its
    tie-break; level 1 excluded; the award line and the list lines exactly; the empty text; the
    closing line. A test asserts `RequestTimePlayed` is never called (stub it to count calls,
    then run a full login and a day of ticks). Green.
@@ -371,6 +388,11 @@ Extracted verbatim to `docs/UAT_dt_stretch.md`.
 - [ ] `[G]` G10: `/dt events remind on` with an event 35 minutes away (edit `EventsList.lua`
   locally to make one): one line 30 minutes before, one at the start, nothing else. Then
   `/dt events remind off`: nothing.
+- [ ] `[G]` G11 *(amended: new, A3)*: with `/dt slowest share on`, Tim types `/played`: the guildie's board
+  gets Tim's line. Then `/script RequestTimePlayed()`: nothing new is sent (the guildie's board is
+  unchanged).
+- [ ] `[G]` G12 *(amended: new, A4)*: with stash sharing on and a soulbound item in Tim's bags, the guildie
+  searches for it: no answer names it.
 - [ ] `[H]` H1: **would the slowest leveller laugh at the award, or feel singled out?**
 
 **`[H]` count: 1.** Whether a joke award lands on the person it names is the guild's call, and

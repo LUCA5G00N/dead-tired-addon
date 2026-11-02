@@ -2,7 +2,8 @@
 --   lua5.1 DeadTired/tests/test_stash.lua  (from the repo root)
 -- Stubs added here, per client, on client.env (card 1's harness is not changed): Enum.BagIndex,
 -- C_Container (GetContainerNumSlots, GetContainerItemInfo), C_Item (GetItemNameByID,
--- RequestLoadItemDataByID). c.bags[bag][slot] = { itemID, stackCount, isBound }.
+-- RequestLoadItemDataByID, and (A4) IsBound over c.slotBound["bag:slot"]), and ItemLocation's
+-- CreateFromBagAndSlot. c.bags[bag][slot] = { itemID, stackCount, isBound }.
 local dir = (arg and arg[0] or ""):match("^(.*)[/\\][^/\\]+$") or "."
 local H = dofile(dir .. "/harness.lua")
 local check = H.check
@@ -29,10 +30,17 @@ local function client(w, opts)
     GetContainerNumSlots = function(b) if b == 0 then c.scans = c.scans + 1 end return c.bags[b] and 16 or 0 end,
     GetContainerItemInfo = function(b, s) return c.bags[b] and c.bags[b][s] end,
   }
+  c.slotBound = {}
   c.env.C_Item = {
     GetItemNameByID = function(id) return c.names[id] end,
     RequestLoadItemDataByID = function(id) c.requested[id] = true end,
+    IsBound = function(loc)
+      local v = c.slotBound[loc.bag .. ":" .. loc.slot]
+      if v == "error" then error("no item there") end
+      return v
+    end,
   }
+  c.env.ItemLocation = { CreateFromBagAndSlot = function(self, b, sl) return { bag = b, slot = sl } end }
   return c
 end
 local function item(id, n, bound) return { itemID = id, stackCount = n, isBound = bound or false } end
@@ -56,6 +64,9 @@ do
   a:slash("stash share"); check("/dt stash share shows the setting", a:said("stash sharing is off.") ~= nil)
   a:slash("stash ab"); check("a 2-letter term is refused", a:said("/dt stash <item, 3-32 letters>") ~= nil and #a.sent == 0)
   a:slash("stash " .. string.rep("x", 33)); check("a 33-letter term is refused", #a.sent == 0)
+  a:slash("stash share on")
+  check("A4: the share-on line says answers name the holder", #a.printed == 1 and a.printed[1]
+    == P .. "stash sharing on. Guildies' searches see your tradeable items, four at a time, and which character holds them.")
 end
 
 -- ---------------------------------------------------------------- scanning
@@ -113,6 +124,62 @@ do
   n.bags[3] = { item(2770, 2) }
   n.DT._stash.scanBags()
   check("Enum absent: bags 0-4 are still read", mine(n).bags[2770] == 2)
+end
+
+-- ---------------------------------------------------------------- A4: listed only when known not bound
+do
+  local function nb(id) return { itemID = id, stackCount = 1 } end    -- isBound nil: the client didn't say
+  local function bagsFor(bag)
+    -- slot: 1 isBound false, 2 true, 3 nil + IsBound false, 4 nil + true, 5 nil + nil,
+    --       6 nil + erroring, 7 nil + not a boolean
+    return { [bag] = { item(101, 1, false), item(102, 1, true), nb(103), nb(104), nb(105), nb(106), nb(107) } }
+  end
+  local function setSlots(c, bag)
+    c.slotBound[bag .. ":3"], c.slotBound[bag .. ":4"] = false, true
+    c.slotBound[bag .. ":6"], c.slotBound[bag .. ":7"] = "error", "yes"
+  end
+  local function cases(where, bag, list)
+    check("A4 " .. where .. ": isBound false is listed", list[101] == 1)
+    check("A4 " .. where .. ": isBound true is skipped", list[102] == nil)
+    check("A4 " .. where .. ": isBound nil, C_Item.IsBound false: listed", list[103] == 1)
+    check("A4 " .. where .. ": isBound nil, C_Item.IsBound true: skipped", list[104] == nil)
+    check("A4 " .. where .. ": isBound nil, C_Item.IsBound nil: skipped", list[105] == nil)
+    check("A4 " .. where .. ": isBound nil, C_Item.IsBound erroring: skipped", list[106] == nil)
+    check("A4 " .. where .. ": isBound nil, C_Item.IsBound not a boolean: skipped", list[107] == nil)
+  end
+  local w = H.world()
+  local a = client(w, { name = "Stromham", bags = bagsFor(0) })
+  setSlots(a, 0)
+  a:slash("stash share on")
+  cases("bags", 0, mine(a).bags)
+  local k = client(w, { name = "Banker", bags = bagsFor(-1) })
+  setSlots(k, -1)
+  k:slash("stash share on"); k:fire("BANKFRAME_OPENED")
+  cases("bank", -1, mine(k).bank)
+  local kb = client(w, { name = "Bankbag", bags = bagsFor(6) })
+  setSlots(kb, 6)
+  kb:slash("stash share on"); kb:fire("BANKFRAME_OPENED")
+  cases("bank bag", 6, mine(kb).bank)
+  -- the bound read unavailable: only isBound == false is listed
+  for _, how in ipairs({ "C_Item.IsBound absent", "ItemLocation absent", "CreateFromBagAndSlot erroring",
+      "a secret IsBound answer" }) do
+    local c = client(w, { name = "Unknown" .. #how, bags = { [0] = { item(101, 1, false), nb(103) }, [-1] = { nb(108) } } })
+    c.slotBound["0:1"], c.slotBound["0:2"], c.slotBound["-1:1"] = false, false, false
+    if how == "C_Item.IsBound absent" then c.env.C_Item.IsBound = nil
+    elseif how == "ItemLocation absent" then c.env.ItemLocation = nil
+    elseif how == "CreateFromBagAndSlot erroring" then c.env.ItemLocation.CreateFromBagAndSlot = function() error("no") end
+    else
+      c.env.issecretvalue = function(v) return v == false end   -- every false is secret here
+    end
+    c:slash("stash share on"); c:fire("BANKFRAME_OPENED")
+    local e = mine(c)
+    if how == "a secret IsBound answer" then
+      check("A4: " .. how .. ": unknown, nothing listed", next(e.bags) == nil and next(e.bank) == nil)
+    else
+      check("A4: " .. how .. ": isBound false still listed, unknown skipped, bags and bank",
+        e.bags[101] == 1 and e.bags[103] == nil and e.bank[108] == nil)
+    end
+  end
 end
 
 -- ---------------------------------------------------------------- searching and answering
