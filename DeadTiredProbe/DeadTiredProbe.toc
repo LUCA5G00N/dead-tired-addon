@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: Dead Tired Probe
+## Notes: Launch-night probe for <DEAD TIRED>. Records what the live client answers. Tim's tool; delete after use.
+## Author: Stromham
+## Version: 0.1.0
+## SavedVariables: DeadTiredProbeDB
+
+Probe.lua
