@@ -16,3 +16,7 @@ Alts.lua
 Welcome.lua
 Crypt.lua
 Gank.lua
+PrepList.lua
+Prep.lua
+RecruitLines.lua
+Recruit.lua
