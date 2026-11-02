@@ -6,8 +6,9 @@ to walk.
 
 **Result:** the four files are built, all eight suites are green (249 checks: 42 prep, 33
 recruit), all twelve guards were proved red on the first run (plus a thirteenth, see Task 10), and
-**no stop condition tripped**. **One thing for Tim to rule on before walking:** the recruitment
-lines were written for channel 1 (General), but R2 ratified `LookingForGroup` (see *P3*).
+**no stop condition tripped**. **Ruled 2026-11-02:** the lines were written for channel 1
+(General), but R2 ratified `LookingForGroup` (see *P3*). Tim: **keep `LookingForGroup`.** No code
+change.
 
 ## Branch and start
 
@@ -30,10 +31,11 @@ every line. It was dropped, and the rest of each line is byte-for-byte Tim's. Th
 channel itself (R2).
 
 **The channel question this raises:** `/1` is General. The lines were written to go there, while
-R2 ratified `LookingForGroup`. The build follows the ratified R2. If Tim wants General, it's one
+R2 ratified `LookingForGroup`. The build follows the ratified R2, and **Tim confirmed it on
+2026-11-02: keep `LookingForGroup`.** (Kept for the record: if General were ever wanted, it's one
 value in `RecruitLines.lua` (`RECRUIT_CHANNEL`), changed before the walk. Note that General is
 per-zone and is named after the zone ("General - Orgrimmar"), so `GetChannelName("General")` may
-not find it on this client. That would need a probe, so it's not a blind swap.
+not find it on this client. That would need a probe, so it's not a blind swap.)
 
 | Line | Bytes | Begins |
 |---|---|---|
