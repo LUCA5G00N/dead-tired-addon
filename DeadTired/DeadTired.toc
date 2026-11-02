@@ -20,3 +20,7 @@ PrepList.lua
 Prep.lua
 RecruitLines.lua
 Recruit.lua
+Stash.lua
+Played.lua
+EventsList.lua
+Events.lua
