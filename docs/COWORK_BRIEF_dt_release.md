@@ -54,7 +54,7 @@ it does.
 ## Deliverable
 
 `release/0.1.0-rc1` holds every card merged, a new cross-card suite that passes alongside every
-card's own suite, the two zips, and three docs: the guildie guide, the officer guide and a Discord
+card's own suite, the three zips, and four docs: the guildie guide, the officer guide and a Discord
 announcement draft. `run_all.sh` on the branch exits 0, and the zips' contents match the branch.
 
 ## Working rules
