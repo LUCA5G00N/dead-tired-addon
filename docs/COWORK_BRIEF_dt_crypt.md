@@ -11,6 +11,10 @@ hardcore or not, is sent only once `/dt rip share on` has been run; `share == ni
 A hardcore member whose `share` was never set gets one line at login, once per character, ever.
 The places below that changed are marked *(amended)*.
 
+**Amended 2026-11-02 (fix round 1, F6a in `docs/COWORK_BRIEF_dt_fixes1.md`, audit AUD-07):** a
+received DEATH is kept at most once per sender per 60 s; the rest are counted, silently. Marked
+*(amended, fix round 1)* below.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_crypt.md`.
@@ -126,6 +130,9 @@ Absent, erroring or secret means not hardcore.
 handling already apply):
 - Validate: `lvl` is a decimal integer 1-100; `zone` is 1-48 bytes; `hc` is `"0"` or `"1"`.
   Anything else is ignored and counted in `DeadTiredDB.crypt.badDeath`.
+- *(amended, fix round 1)* At most one valid DEATH per sender per 60 s (by `DT.now()`, in memory):
+  another inside the window is not recorded and not printed, and is counted in
+  `DeadTiredDB.crypt.dropped`.
 - Record it (`mine = false`). If `rip` is on, print one line:
   - hardcore: *"Rest in Pieces: <Name>, level <lvl>, <zone>. Hardcore. Gone for good."*
   - normal: *"<Name> died at level <lvl> in <zone>. Again."*

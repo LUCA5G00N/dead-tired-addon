@@ -169,9 +169,9 @@ do
   end
   inject("1^DEATH^hc~0^lvl~7^zone~Durotar")
   check("normal notice, exactly", b.printed[1] == "|cff7fa650Dead Tired|r Ghoul died at level 7 in Durotar. Again.")
-  inject("1^DEATH^hc~0^lvl~0^zone~somewhere")
-  check("level 0 (unknown at the sender) prints as ??", b.printed[2] == "|cff7fa650Dead Tired|r Ghoul died at level ?? in somewhere. Again.")
-  inject("1^DEATH^hc~0^lvl~9^zone~The %7CTInterface%7Ct Crypt")
+  inject("1^DEATH^hc~0^lvl~0^zone~somewhere", "Wight")   -- one sender per notice: F6a's limit
+  check("level 0 (unknown at the sender) prints as ??", b.printed[2] == "|cff7fa650Dead Tired|r Wight died at level ?? in somewhere. Again.")
+  inject("1^DEATH^hc~0^lvl~9^zone~The %7CTInterface%7Ct Crypt", "Lich")
   check("a bar in a zone is printed safely", b.printed[3]:find("The ||TInterface||t Crypt", 1, true) ~= nil)
   local n = #list(b)
   local bad = { "1^DEATH^hc~0^lvl~101^zone~Z", "1^DEATH^hc~0^lvl~-1^zone~Z", "1^DEATH^hc~0^lvl~ab^zone~Z",
@@ -182,7 +182,7 @@ do
   check("each invalid DEATH is counted in badDeath, not recorded, not printed", b:db().crypt.badDeath == #bad
     and #list(b) == n and #b.printed == 0)
   b:slash("rip off"); b.printed = {}
-  inject("1^DEATH^hc~1^lvl~60^zone~Naxxramas")
+  inject("1^DEATH^hc~1^lvl~60^zone~Naxxramas", "Banshee")
   check("rip off: recorded, nothing printed", #b.printed == 0 and #list(b) == n + 1 and list(b)[n + 1].zone == "Naxxramas")
 end
 
@@ -206,7 +206,7 @@ do
   a:slash("graveyard")
   check("at most 10 lines, then the closing line", #a.printed == 11 and a.printed[1]:find("ZombieT 20 Zone20", 1, true)
     and a.printed[10]:find("ZombieK 11 Zone11", 1, true) and a.printed[11]:find(CLOSING, 1, true))
-  for i = 1, 100 do inject("Lich", 5, "Cap" .. i, 0, "2026-11-04") end
+  for i = 1, 100 do w:advance(61); inject("Lich", 5, "Cap" .. i, 0, "2026-11-04") end   -- 61 s apart: F6a
   check("the memorial is capped at 100, oldest dropped first", #list(a) == 100 and list(a)[1].zone == "Cap1"
     and list(a)[100].zone == "Cap100")
   -- the account's own deaths show too
@@ -397,6 +397,33 @@ do
   a:fire("PLAYER_DEAD"); w:advance(1)
   check("a death on one prints exactly one line on the other", #b.printed == 1 and b:said("Stromham died at level 23") ~= nil)
   check("and nothing on the sender or the non-member", #a.printed == 0 and #x.printed == 0 and #list(x) == 0)
+end
+
+-- ---------------------------------------------------------------- fix round 1 (F6a)
+do
+  local w = H.world()
+  local a = client(w, { name = "Stromham" })
+  local function inject(from, z)
+    a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^DEATH^hc~0^lvl~30^zone~" .. z, "GUILD", from .. "-ClassicBetaPvP")
+  end
+  a.printed = {}
+  inject("Ghoul", "Durotar")
+  for i = 1, 9 do w:advance(1); inject("Ghoul", "Spam" .. i) end
+  check("F6a: one sender's 10 DEATHs in 10 s: one notice, one record", #a.printed == 1 and #list(a) == 1
+    and list(a)[1].zone == "Durotar")
+  check("F6a: the rest are counted in crypt.dropped, silently", a:db().crypt.dropped == 9)
+  inject("Wight", "Barrens")
+  check("F6a: the limit is per sender: another guildie's death still prints", #a.printed == 2 and #list(a) == 2)
+  w:advance(51)    -- 60 s after Ghoul's first
+  inject("Ghoul", "Tirisfal")
+  check("F6a: 60 s after the last one kept, the same sender is heard again", #a.printed == 3
+    and list(a)[3].zone == "Tirisfal")
+  -- an invalid DEATH doesn't use up the window
+  w:advance(61)
+  inject("Lich", string.rep("z", 49))
+  inject("Lich", "Silithus")
+  check("F6a: an invalid DEATH is counted bad and doesn't start the window", a:db().crypt.badDeath == 1
+    and #a.printed == 4)
 end
 
 H.finish("crypt")

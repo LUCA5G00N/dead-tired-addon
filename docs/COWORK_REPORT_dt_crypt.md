@@ -203,3 +203,21 @@ not on a normal character, not for a non-member, not once `share` is on or off, 
 | A2 once-per-character store (`c.hcTold[me]` check removed) | *A2: not after a /reload*, *A2: not on the second login* |
 
 Each restored; `run_all.sh` exits 0 (crypt: 88 passed, 0 failed).
+
+## Fix round 1 (F6a)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes1.md` (audit AUD-07). Round report:
+`docs/COWORK_REPORT_dt_fixes1.md` on the session branch. `card/dt_foundation` (F1-F5) was merged
+in first: clean, card 1's files identical to its branch, all suites green before this fix.
+
+- **F6a, `Crypt.lua`:** received DEATH: after validation, a per-sender table `lastFrom[sender] =
+  DT.now()` (memory only) lets at most one through per 60 s. Over the limit: `crypt.dropped + 1`,
+  not recorded, nothing printed. An invalid DEATH is counted in `badDeath` and doesn't start the
+  window.
+- **Tests:** a new block (5 checks: ten DEATHs in ten seconds keep one; `dropped` counts 9; the
+  limit is per sender; heard again at 60 s; an invalid one doesn't start the window). Existing
+  checks that injected several DEATHs from one sender back to back now use one sender each, and
+  the 100-cap loop spaces its injections 61 s apart. crypt: 93 checks.
+- **Guard proof:** the limit removed (`if false then`): 5 checks red, incl. *F6a: one sender's 10
+  DEATHs in 10 s: one notice, one record*.
+- The audit's `test_death_flood.lua` passes unchanged. No player-facing line changed.

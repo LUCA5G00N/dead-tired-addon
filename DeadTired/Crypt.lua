@@ -99,9 +99,19 @@ local function valid(f)
     and (f.hc == "0" or f.hc == "1")
 end
 
+-- Fix round 1 (F6a): at most one received DEATH per sender per 60 s, whatever the sender's
+-- client does. Over the limit: counted in crypt.dropped, not recorded, not printed.
+local lastFrom = {}
+
 DT.on("DEATH", function(from, f)
   local c = crypt()
   if not valid(f) then c.badDeath = c.badDeath + 1 return end          -- guard: field validation
+  local t = DT.now()
+  if lastFrom[from] and t - lastFrom[from] < DEATH_WINDOW then          -- guard: per-sender limit (F6a)
+    c.dropped = (c.dropped or 0) + 1
+    return
+  end
+  lastFrom[from] = t
   local lvl, hc = tonumber(f.lvl), f.hc == "1"
   record({ who = from, lvl = lvl, zone = f.zone, hc = hc, at = DT.stamp(), mine = false })
   if not c.rip then return end                                         -- guard: rip toggle
