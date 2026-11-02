@@ -5,7 +5,7 @@ local ADDON, ns = ...
 ns = ns or {}
 
 ns.Recruit = {
-  RECRUIT_CHANNEL = "LookingForGroup",
+  RECRUIT_CHANNEL = "General",
   COOLDOWN = 900,   -- seconds, per account (alts share it)
   LINES = {
     [=[Adventurers, hear my call! ...is what we'd shout if we had the energy. <DEAD TIRED> is recruiting Horde of all classes for PvP and raids. We're already dead, so we don't fear death. Only bedtime. /w for inv]=],

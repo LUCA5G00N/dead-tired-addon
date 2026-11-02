@@ -215,3 +215,51 @@ order:
   has one site; the longest PREP is 97 bytes; every guard removal went red; nothing needs combat
   data, another player's bags, the bank or automatic posting.
 - `docs/UAT_dt_prep_results.md` was not written; that file is Tim's.
+
+## Rulings round (A1)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_rulings.md` (Task 3), on `card/dt_prep` after merging
+`main` (which brought only `CLAUDE.md` and the rulings brief and walk-sheet; no card 1 file changed).
+This supersedes the *keep `LookingForGroup`* ruling above.
+
+**What changed:**
+- `RecruitLines.lua`: `RECRUIT_CHANNEL = "General"`. That is the only changed line; the five
+  lines are untouched and still byte-identical to `docs/RECRUIT_lines.md` (G5's test passes).
+- `Recruit.lua`:
+  - **Officer gate**, first in `post()`: `try(C_GuildInfo and C_GuildInfo.IsGuildOfficer) == true`.
+    `try` drops errors, absence and secret values; anything but `true` refuses.
+  - **General lookup**: `findChannel()` scans `GetChannelList()`'s id/name/disabled triples, then
+    `GetChannelName(n)` for n = 1 to `MAX_WOW_CHAT_CHANNELS` (or 20). The first id above 0 whose
+    name is exactly `General` or begins `General - ` is used. Both globals guarded; either may be
+    absent or error.
+  - The one chat call site is unchanged: `grep -rn "SendChatMessage" DeadTired/ --include=*.lua | grep -v "/tests/"`
+    → one line, `DeadTired/Recruit.lua:101`.
+- `/dt recruit next` is not gated: it posts nothing and tells a non-officer only which line is
+  next. (The brief gates posting; I read that as the post, not the peek.)
+
+**Player-facing lines, new or changed:**
+- New: `Officers only. The rest of us just haunt the place.`
+- Changed by the channel value only (wording unchanged): `Posted line <i> of 5 to General.` and
+  `You're not in General. /join General first.`
+
+**Tests (`test_recruit.lua`, 33 → 55 checks):** the client stub now has a joined-channel list
+(`General - Orgrimmar`, `Trade - City`, `LookingForGroup`), `GetChannelList`, `GetChannelName` by
+number or name, and `C_GuildInfo.IsGuildOfficer` (true by default). New: refused, nothing posted
+and the cooldown unmoved when `IsGuildOfficer` is false, nil, a non-boolean, erroring, secret,
+or `C_GuildInfo` / the function is absent; an officer posts; `General - Durotar` matched by its
+own number; `Generalists` refused; `General-Orgrimmar`, `general - orgrimmar`, `GeneralChat` not
+matched; bare `General` matched; nothing joined, or id 0, refused; either lookup function absent or
+erroring falls back to the other; both gone refused; a secret name not matched. The cooldown,
+rotation, alt-sharing and 24-hour no-automatic-post checks all still pass.
+
+**Guard proofs:**
+
+| Guard removed | Checks that went red |
+|---|---|
+| A1 officer gate (`if not isOfficer()` → `if false`) | all 7 *A1: IsGuildOfficer … refused* checks |
+| A1 officer gate loosened to truthy (`== true` dropped) | *A1: IsGuildOfficer a string, not true* |
+| A1 name match: prefix without ` - ` | *General - <zone> is matched*, *Generalists is not General*, *no near misses*, *the match rule* |
+| A1 name match removed (any channel) | 7, incl. *not in General: refused*, *Generalists is not General* |
+| A1 name match exact only (no ` - ` prefix) | 6 incl. *a post: line 1 … General - Orgrimmar's number*, then the suite errors out (non-zero) |
+
+Each restored; `run_all.sh` exits 0 (recruit: 55 passed, 0 failed).

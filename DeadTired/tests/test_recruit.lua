@@ -1,7 +1,8 @@
 -- Offline checks for RecruitLines.lua and Recruit.lua (card 5: the recruitment rotator).
 --   lua5.1 DeadTired/tests/test_recruit.lua  (from the repo root)
 -- Stubs added here, per client, on client.env (card 1's harness is not changed): time,
--- GetChannelName, and C_ChatInfo's InChatMessagingLockdown and chat send (recorded in c.posts).
+-- GetChannelList / GetChannelName (over c.chans, the joined channels), C_GuildInfo.IsGuildOfficer
+-- (c.officer), and C_ChatInfo's InChatMessagingLockdown and chat send (recorded in c.posts).
 local dir = (arg and arg[0] or ""):match("^(.*)[/\\][^/\\]+$") or "."
 local H = dofile(dir .. "/harness.lua")
 local check = H.check
@@ -16,10 +17,27 @@ local function client(w, opts)
   opts.files = opts.files or ALL
   if opts.guild == nil and not opts.outside then opts.guild = G end
   local c = w:client(opts)
-  c.now, c.posts, c.lockdown = 1793833200, {}, false
-  c.channels = { LookingForGroup = 4 }
+  c.now, c.posts, c.lockdown, c.officer = 1793833200, {}, false, true
+  -- The joined channels, in order: { id, name }. General carries the zone, as on the live client.
+  c.chans = { { 1, "General - Orgrimmar" }, { 2, "Trade - City" }, { 4, "LookingForGroup" } }
   c.env.time = function() if c.noClock then error("no clock") end return c.now end
-  c.env.GetChannelName = function(name) return c.channels[name] or 0, name end
+  c.env.GetChannelList = function()
+    if c.listError then error("no list") end
+    local out = {}
+    for _, ch in ipairs(c.chans) do out[#out + 1] = ch[1]; out[#out + 1] = ch[2]; out[#out + 1] = false end
+    return unpack(out)
+  end
+  c.env.GetChannelName = function(x)
+    if c.nameError then error("no name") end
+    for _, ch in ipairs(c.chans) do
+      if ch[1] == x or ch[2] == x then return ch[1], ch[2], 0 end
+    end
+    return 0, nil, 0
+  end
+  c.env.C_GuildInfo = { IsGuildOfficer = function()
+    if c.officer == "error" then error("not yet") end
+    return c.officer
+  end }
   c.env.C_ChatInfo.InChatMessagingLockdown = function() return c.lockdown end
   c.env.C_ChatInfo[SEND] = function(...)
     if c.postFail then error("rejected") end
@@ -45,7 +63,7 @@ do
   check("RecruitLines.lua holds docs/RECRUIT_lines.md's five lines, byte-identical", same and doc[5] ~= nil)
   for i = 1, 5 do print(string.format("recruit: line %d is %d bytes", i, #L[i])) end
   check("the lines pass the lines check", a.DT._recruit.valid() == true)
-  check("channel and cooldown as ratified", a.ns.Recruit.RECRUIT_CHANNEL == "LookingForGroup" and a.ns.Recruit.COOLDOWN == 900)
+  check("channel and cooldown as ratified (A1: General)", a.ns.Recruit.RECRUIT_CHANNEL == "General" and a.ns.Recruit.COOLDOWN == 900)
   local V = a.DT._recruit.linesValid
   local five = { "a", "b", "c", "d", "e" }
   check("lines check: five plain lines pass", V(five))
@@ -74,9 +92,9 @@ do
   a:slash("recruit next")
   check("/dt recruit next before any post", a.printed[1] == P .. "Next up: line 1 of 5. Cooldown: ready." and #a.posts == 0)
   a:slash("recruit")
-  check("a post: line 1, to CHANNEL, the channel's number", #a.posts == 1 and a.posts[1][1] == L[1]
-    and a.posts[1][2] == "CHANNEL" and a.posts[1][3] == nil and a.posts[1][4] == 4)
-  check("and says so", a.printed[1] == P .. "Posted line 1 of 5 to LookingForGroup.")
+  check("a post: line 1, to CHANNEL, General - Orgrimmar's number", #a.posts == 1 and a.posts[1][1] == L[1]
+    and a.posts[1][2] == "CHANNEL" and a.posts[1][3] == nil and a.posts[1][4] == 1)
+  check("and says so", a.printed[1] == P .. "Posted line 1 of 5 to General.")
   check("the cooldown and rotation are stored", a:db().prep.recruitAt == a.now and a:db().prep.recruitNext == 2)
   check("no addon message is sent for a post", #a.sent == 0)
   a.now = a.now + 60
@@ -105,11 +123,12 @@ do
   a:slash("recruit")
   check("chat lockdown: refused", a.printed[1] == P .. "Chat's locked right now (an encounter?). Try after." and #a.posts == 6)
   a.lockdown = false
-  a.channels.LookingForGroup = nil
+  local joined = a.chans
+  a.chans = { { 2, "Trade - City" }, { 4, "LookingForGroup" } }
   a:slash("recruit")
-  check("not in the channel: refused", a.printed[1] == P .. "You're not in LookingForGroup. /join LookingForGroup first."
+  check("not in General: refused", a.printed[1] == P .. "You're not in General. /join General first."
     and #a.posts == 6)
-  a.channels.LookingForGroup = 4
+  a.chans = joined
   local at, nxt = a:db().prep.recruitAt, a:db().prep.recruitNext
   a.postFail = true
   a:slash("recruit")
@@ -126,6 +145,81 @@ do
   local x = client(w, { name = "Spy", guild = "Alliance Spies" })
   x:slash("recruit")
   check("a non-member: the router's line, nothing posted", x:said("only stirs inside") ~= nil and #x.posts == 0)
+end
+
+-- ---------------------------------------------------------------- A1: officers only
+do
+  local w = H.world()
+  local function refused(c) return c.printed[1] == P .. "Officers only. The rest of us just haunt the place." and #c.posts == 0
+    and c:db().prep.recruitAt == nil end
+  local cases = {
+    { "false", function(c) c.officer = false end },
+    { "nil", function(c) c.officer = nil end },
+    { "a string, not true", function(c) c.officer = "yes" end },
+    { "erroring", function(c) c.officer = "error" end },
+    { "C_GuildInfo absent", function(c) c.env.C_GuildInfo = nil end },
+    { "IsGuildOfficer absent", function(c) c.env.C_GuildInfo = {} end },
+    { "secret", function(c) local t = {}; c.secrets[t] = true; c.officer = t end },
+  }
+  for i, case in ipairs(cases) do
+    local c = client(w, { name = "Grunt" .. string.char(64 + i) })
+    case[2](c)
+    c:slash("recruit")
+    check("A1: IsGuildOfficer " .. case[1] .. ": refused, nothing posted, cooldown unmoved", refused(c))
+  end
+  local o = client(w, { name = "Stromham" })
+  o:slash("recruit")
+  check("A1: an officer posts", #o.posts == 1)
+  local n = client(w, { name = "Peon" }); n.officer = false
+  n.now = o.now + 3600
+  n:slash("recruit next")
+  check("A1: /dt recruit next still answers a non-officer, posts nothing", n.printed[1]:find("Next up: line", 1, true) ~= nil
+    and #n.posts == 0)
+end
+
+-- ---------------------------------------------------------------- A1: finding General
+do
+  local w = H.world()
+  local function try(chans, setup)
+    local c = client(w, { name = "Stromham" })
+    c.chans = chans
+    if setup then setup(c) end
+    c:slash("recruit")
+    return c
+  end
+  local c = try({ { 3, "Generalists" }, { 5, "General - Durotar" } })
+  check("A1: General - <zone> is matched, by its own number", #c.posts == 1 and c.posts[1][4] == 5)
+  c = try({ { 3, "Generalists" } })
+  check("A1: Generalists is not General: refused, nothing posted", #c.posts == 0
+    and c.printed[1] == P .. "You're not in General. /join General first.")
+  c = try({ { 3, "General-Orgrimmar" }, { 6, "general - orgrimmar" }, { 7, "GeneralChat" } })
+  check("A1: no near misses (no space, lower case, longer name)", #c.posts == 0)
+  c = try({ { 7, "General" } })
+  check("A1: a bare General is matched", #c.posts == 1 and c.posts[1][4] == 7)
+  c = try({})
+  check("A1: no channels joined: refused", #c.posts == 0 and c:said("/join General first") ~= nil)
+  c = try({ { 0, "General - Orgrimmar" } })
+  check("A1: a channel number of 0 is not joined", #c.posts == 0)
+  c = try({ { 2, "General - Orgrimmar" } }, function(x) x.env.GetChannelList = nil end)
+  check("A1: GetChannelList absent: GetChannelName by number finds it", #c.posts == 1 and c.posts[1][4] == 2)
+  c = try({ { 2, "General - Orgrimmar" } }, function(x) x.listError = true end)
+  check("A1: GetChannelList erroring: GetChannelName finds it", #c.posts == 1 and c.posts[1][4] == 2)
+  c = try({ { 2, "General - Orgrimmar" } }, function(x) x.env.GetChannelName = nil end)
+  check("A1: GetChannelName absent: GetChannelList finds it", #c.posts == 1 and c.posts[1][4] == 2)
+  c = try({ { 2, "General - Orgrimmar" } }, function(x) x.env.GetChannelList = nil; x.env.GetChannelName = nil end)
+  check("A1: both absent: refused, nothing posted", #c.posts == 0 and c:said("/join General first") ~= nil)
+  c = try({ { 2, "General - Orgrimmar" } }, function(x) x.listError = true; x.nameError = true end)
+  check("A1: both erroring: refused, nothing posted", #c.posts == 0 and c:said("/join General first") ~= nil)
+  c = try({ { 2, "General - Orgrimmar" } }, function(x)
+    local list = x.env.GetChannelList
+    x.env.GetChannelList = function() local id, name = list(); x.secrets[name] = true; return id, name, false end
+    x.env.GetChannelName = nil
+    x.secrets["General - Orgrimmar"] = true
+  end)
+  check("A1: a secret channel name is not matched", #c.posts == 0)
+  local M = c.DT._recruit.matches
+  check("A1: the match rule", M("General") and M("General - Orgrimmar") and not M("Generalists")
+    and not M("General -") and not M("Trade - City") and not M(nil) and not M(4))
 end
 
 -- ---------------------------------------------------------------- one account, two characters

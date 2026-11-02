@@ -1,8 +1,10 @@
 # UAT walk-sheet: dt_prep
 
 Brief: `docs/COWORK_BRIEF_dt_prep.md`. Extracted from its acceptance section.
-**Checks: 12. `[H]` count: 1** (how the public posts land on strangers).
+**Checks: 13 *(amended; was 12)*. `[H]` count: 1** (how the public posts land on strangers).
 Results go to `docs/UAT_dt_prep_results.md`, written by Tim after walking.
+**Amended 2026-11-02 (rulings round, A1):** G10 and G11 rewritten, G12 added; see
+`docs/COWORK_BRIEF_dt_rulings.md`.
 
 **Offline (the build session runs these):**
 - [ ] `[G]` G1: `DeadTired/tests/run_all.sh` exits 0 and runs eight suites (core, guild, comms,
@@ -26,10 +28,11 @@ Results go to `docs/UAT_dt_prep_results.md`, written by Tim after walking.
   the right counts.
 - [ ] `[G]` G9: guildie A runs `/dt prep share on`, guildie B leaves it off. Tim's
   `/dt prep check`: after 10 s, A is listed (ready or short) and B is not anywhere.
-- [ ] `[G]` G10: Tim joins the channel and presses `/dt recruit`: line 1 appears in the channel
-  once. A second press within 15 minutes is refused with the minutes left. After 15 minutes, a
-  press posts line 2. An alt on the same account inside the 15 minutes is refused too.
-- [ ] `[G]` G11: Tim leaves the channel and presses: refused with "/join … first", nothing posted.
+- [ ] `[G]` G10 *(amended)*: Tim, an officer, in a city with General joined, presses `/dt recruit`: line 1
+  appears in General, once. A second press inside 15 minutes is refused.
+- [ ] `[G]` G11 *(amended)*: Tim leaves General and presses: refused, nothing posted.
+- [ ] `[G]` G12 *(amended: new)*: a guildie who is not an officer presses `/dt recruit`: refused, nothing
+  posted.
 - [ ] `[H]` H1: **reading the posts in the channel as a stranger would: do they read as a guild
   you'd want to join, or as an addon spamming?**
 

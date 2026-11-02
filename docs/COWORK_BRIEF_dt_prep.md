@@ -7,6 +7,11 @@ available; everything is proved offline with stubbed tests, then Tim walks it in
 harness assigns you a different branch name, create that branch from `card/dt_foundation` and say
 so in the report.
 
+**Amended 2026-11-02 (rulings round, A1 in `docs/COWORK_BRIEF_dt_rulings.md`):** `/dt recruit` is
+for guild officers only (`C_GuildInfo.IsGuildOfficer() == true`, nothing else), and the channel is
+**General**, found by scanning the joined channels for one named `General` or beginning
+`General - `. One chat call site, still. The places below that changed are marked *(amended)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_prep.md`.
@@ -57,10 +62,11 @@ The round may not be built while any of these is `proposed`. All five are ratifi
   far has banned `SendChatMessage`, and the earlier walk-sheets grep for it. Proposal: exactly
   one call site, in `Recruit.lua`, reached only from the `/dt recruit` slash handler, synchronously.
   It is never called from a timer, a queue, an event, a received message, or a retry. One typed
-  command or macro click, one line. **Any member** may post (not officers only); the cooldown in
-  R2 is the brake.
+  command or macro click, one line. ~~**Any member** may post (not officers only); the cooldown in
+  R2 is the brake.~~ *(amended, A1)* **Guild officers only**: `C_GuildInfo.IsGuildOfficer()`
+  must return `true`; false, nil, absent, secret or an error refuses. The cooldown still applies.
 - **R2 (ratified 2026-11-02, as proposed): channel and cooldown.** The channel is set in `Recruit.lua`'s data block,
-  `RECRUIT_CHANNEL = "LookingForGroup"` (Tim may name another before ratifying). The cooldown is
+  `RECRUIT_CHANNEL = "General"` *(amended, A1; was `"LookingForGroup"`)*. The cooldown is
   **15 minutes per account** (`DeadTiredDB.prep.recruitAt`, an epoch time, so it survives a
   relog and covers alts). Tim may change either number before ratifying.
 - **R3 (ratified 2026-11-02, as proposed): the prep list ships as a starter, IDs unverified.** `PrepList.lua` holds the
@@ -89,7 +95,8 @@ for extra stubs, `:slash()`, `:said()`, `:fire()`, `world:advance()`).
 API lookups this card relies on, found in `reference/SPEC_forever_namespaces.md` at drafting
 (Task 1 re-checks): `C_Item.GetItemCount`, `C_Item.GetItemNameByID`,
 `C_Item.RequestLoadItemDataByID`, `C_ChatInfo.SendChatMessage`,
-`C_ChatInfo.InChatMessagingLockdown`. Globals (not in the reference, guarded): `GetChannelName`,
+`C_ChatInfo.InChatMessagingLockdown`, `C_GuildInfo.IsGuildOfficer` *(amended)*. Globals (not in
+the reference, guarded): `GetChannelList` *(amended)*, `GetChannelName`,
 `UnitClass`, `time`.
 
 ## Deliverable
@@ -181,7 +188,7 @@ is the only output.
 
 ```lua
 ns.Recruit = {
-  RECRUIT_CHANNEL = "LookingForGroup",
+  RECRUIT_CHANNEL = "General",   -- (amended, A1)
   COOLDOWN = 900,   -- seconds, per account
   LINES = {
     -- Tim's five lines from docs/RECRUIT_lines.md, verbatim, in order.
@@ -193,6 +200,8 @@ ns.Recruit = {
 
 **`/dt recruit`** (members only; the router refuses others). In this order, each failure printing
 its line and sending nothing:
+0. **Officer** *(amended, A1)*: `try(C_GuildInfo.IsGuildOfficer) == true`. Otherwise:
+   *"Officers only. The rest of us just haunt the place."*
 1. **Lines present:** exactly 5 non-empty strings, each at most 255 bytes, containing no `|` and
    no byte below 32 (checked once at load). Otherwise: *"No recruitment lines loaded. Tell an
    officer."*
@@ -201,8 +210,11 @@ its line and sending nothing:
    themselves."* (`m` rounded up). If `time` is unreadable: *"Can't read the clock. Not posting."*
 3. **Lockdown:** if `try(C_ChatInfo.InChatMessagingLockdown) == true`: *"Chat's locked right now
    (an encounter?). Try after."*
-4. **Channel:** `id = clean(try(GetChannelName, RECRUIT_CHANNEL))`. If not a number above 0:
-   *"You're not in <channel>. /join <channel> first."*
+4. **Channel** *(amended, A1)*: scan the joined channels (`GetChannelList`'s id/name/disabled
+   triples, then `GetChannelName(n)` for n = 1 to `MAX_WOW_CHAT_CHANNELS` or 20; each guarded)
+   for an id above 0 whose name is exactly `RECRUIT_CHANNEL` or begins `RECRUIT_CHANNEL .. " - "`
+   (`General - Orgrimmar` yes, `Generalists` no). None: *"You're not in <channel>. /join <channel>
+   first."*
 5. **Post:** `ok = pcall(C_ChatInfo.SendChatMessage, LINES[i], "CHANNEL", nil, id)` with
    `i = prep.recruitNext or 1`. On success: `recruitAt = now`, `recruitNext = i % 5 + 1`, and
    print *"Posted line <i> of 5 to <channel>."* On failure: *"The channel didn't take it. Nothing
@@ -296,7 +308,7 @@ R1 and R2 rule it. What still bounds it:
 - 15 minutes between posts per account, alts included;
 - only Tim's five lines, verbatim, checked for chat escapes and length;
 - refused in chat lockdown and when not in the channel;
-- members only.
+- officers only *(amended, A1; was members only)*.
 
 (The prep check's sharing is also new, but it is the opt-in verdict CLAUDE.md already allows:
 "what they choose to send".)
@@ -346,10 +358,11 @@ Extracted verbatim to `docs/UAT_dt_prep.md`.
   the right counts.
 - [ ] `[G]` G9: guildie A runs `/dt prep share on`, guildie B leaves it off. Tim's
   `/dt prep check`: after 10 s, A is listed (ready or short) and B is not anywhere.
-- [ ] `[G]` G10: Tim joins the channel and presses `/dt recruit`: line 1 appears in the channel
-  once. A second press within 15 minutes is refused with the minutes left. After 15 minutes, a
-  press posts line 2. An alt on the same account inside the 15 minutes is refused too.
-- [ ] `[G]` G11: Tim leaves the channel and presses: refused with "/join … first", nothing posted.
+- [ ] `[G]` G10 *(amended)*: Tim, an officer, in a city with General joined, presses `/dt recruit`: line 1
+  appears in General, once. A second press inside 15 minutes is refused.
+- [ ] `[G]` G11 *(amended)*: Tim leaves General and presses: refused, nothing posted.
+- [ ] `[G]` G12 *(amended: new)*: a guildie who is not an officer presses `/dt recruit`: refused, nothing
+  posted.
 - [ ] `[H]` H1: **reading the posts in the channel as a stranger would: do they read as a guild
   you'd want to join, or as an addon spamming?**
 
