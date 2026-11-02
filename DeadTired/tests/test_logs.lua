@@ -435,7 +435,8 @@ do
   u.env.LoggingCombat, u.env.LoggingChat = nil, nil
   counter(u)
   u:login(); go(u, RFC)
-  check("unknown state is treated as off: the dialog", u.instShows == 1)
+  check("F10: unknown state: no dialog, the line instead (fix round 1; was: treated as off)", u.instShows == 0
+    and u:said("Can't tell if the combat log is on. Type /combatlog if it isn't.") ~= nil)
   u:slash("logs")
   check("unknown state shows ?", u:said("|cffaaaaaa?|r") ~= nil)
 end
@@ -512,6 +513,102 @@ do
   end
   check("no combat event registered by any frame", not combatEvents)
   check("no handler errors recorded", (s:db().errors.logs or 0) == 0)
+end
+
+-- ------------------------------------------------------------ fix round 1 (F10, F11)
+local UNK_C = "Can't tell if the combat log is on. Type /combatlog if it isn't."
+local UNK_H = "Can't tell if the chat log is on. Type /chatlog if it isn't."
+local function lines(c, needle)
+  local n = 0
+  for _, m in ipairs(c.printed) do if m:find(needle, 1, true) then n = n + 1 end end
+  return n
+end
+local function unknown(c, which)        -- make a log's state unreadable (no reader answers)
+  c.env.C_ChatInfo["IsLogging" .. which] = nil
+  c.env["Logging" .. which] = nil
+end
+
+-- F10, the instance dialog: once per visit, never after /dt logs off
+do
+  local u = newClient(w, { guild = G, db = {} })
+  counter(u)
+  unknown(u, "Combat")
+  u:login(); go(u, RFC)
+  check("F10: entering with the combat log unknown: no dialog, nothing armed", u.instShows == 0 and inst(u) == nil)
+  check("F10: one line", lines(u, UNK_C) == 1)
+  go(u, RFC, true); go(u, RFC)
+  check("F10: a zone change or loading screen in the same visit: no second line", lines(u, UNK_C) == 1)
+  go(u, WORLD); go(u, WC)
+  check("F10: a new visit: the line once more", lines(u, UNK_C) == 2)
+  go(u, WORLD)
+  u:slash("logs off")
+  go(u, MC)
+  check("F10: after /dt logs off: no line", lines(u, UNK_C) == 0 and u.instShows == 0)
+end
+
+-- F10, the login dialog: an unknown log's button and Both are never armed
+do
+  local u = newClient(w, { guild = G, db = { logs = { login = true } } })
+  counter(u)
+  unknown(u, "Combat")                  -- combat unknown, chat off
+  u:login()
+  local b = function(k) return u.named["DeadTiredLogsButton_" .. k] end
+  check("F10: combat unknown, chat off: the login dialog shows", u.loginShows == 1 and loginShown(u))
+  check("F10: ... the combat button is not armed", b("Combat").attrs.macrotext == nil and not b("Combat").enabled)
+  check("F10: ... Both is not armed", b("Both").attrs.macrotext == nil and not b("Both").enabled)
+  check("F10: ... the chat button is", b("Chat").attrs.macrotext == "/chatlog" and b("Chat").enabled)
+  check("F10: ... and the status shows ? for combat", login(u).status.text:find("|cffaaaaaa?|r", 1, true) ~= nil)
+  click(u, "DeadTiredLogsButton_Combat")
+  check("F10: clicking the unarmed combat button switches nothing", u.combatLog == false and u.chatLog == false)
+
+  local v = newClient(w, { guild = G, db = { logs = { login = true } }, chatLog = true })
+  counter(v)
+  unknown(v, "Combat")                  -- combat unknown, chat on: nothing can be armed
+  v:login()
+  check("F10: nothing armable: no login dialog, the combat line instead", v.loginShows == 0 and lines(v, UNK_C) == 1)
+
+  local x = newClient(w, { guild = G, db = { logs = { login = true } }, combatLog = true })
+  counter(x)
+  unknown(x, "Chat")                    -- combat on, chat unknown
+  x:login()
+  check("F10: chat unknown, combat on: the line names /chatlog", x.loginShows == 0 and lines(x, UNK_H) == 1
+    and lines(x, UNK_C) == 0)
+
+  local y = newClient(w, { guild = G, db = { logs = { login = true } }, where = RFC })
+  counter(y)
+  unknown(y, "Combat"); unknown(y, "Chat")
+  y:login()
+  check("F10: both unknown, logging in inside a dungeon: one line each, no dialog, no second combat line",
+    y.loginShows == 0 and y.instShows == 0 and lines(y, UNK_C) == 1 and lines(y, UNK_H) == 1)
+  y:slash("logs now")
+  check("F10: /dt logs now with both unknown: the two lines, no dialog", y.loginShows == 0
+    and lines(y, UNK_C) == 1 and lines(y, UNK_H) == 1 and #y.printed == 2)
+end
+
+-- F11: the instance dialog leaves with you
+do
+  local a = newClient(w, { guild = G, db = {} })
+  counter(a)
+  a:login(); go(a, RFC)
+  check("F11 baseline: the dialog shows in the dungeon", instShown(a))
+  go(a, WORLD)
+  check("F11: leaving the instance hides it", not instShown(a))
+  go(a, WC)
+  check("F11: a new visit shows it again", instShown(a) and a.instShows == 2)
+  a.combat = true
+  local ok = pcall(go, a, WORLD)
+  check("F11: leaving in combat: no error, and it stays until combat ends", ok and instShown(a)
+    and (a:db().errors.logs or 0) == 0)
+  a.combat = false
+  a:fire("PLAYER_REGEN_ENABLED")
+  check("F11: combat over: hidden", not instShown(a))
+  -- left in combat, but back inside before combat ends (a corpse run): the dialog isn't hidden
+  go(a, MC)
+  a.combat = true
+  go(a, WORLD); go(a, MC)
+  a.combat = false
+  a:fire("PLAYER_REGEN_ENABLED")
+  check("F11: back inside before combat ends: not hidden", instShown(a))
 end
 
 H.finish("logs")

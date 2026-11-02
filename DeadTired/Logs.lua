@@ -18,6 +18,9 @@
 --   * R2: at login or /reload, only after /dt logs login on: the four-button dialog offering
 --     both logs. Never on a loading screen.
 --   * In combat a dialog waits until combat ends; an instance dialog is dropped if you have left.
+--   * Fix round 1: F10, a log whose state can't be read is never armed (both commands toggle);
+--     with nothing to arm, one line says so instead of a dialog. F11, leaving the instance hides
+--     its dialog (after combat, if in combat).
 --
 -- STORED (members only): DeadTiredDB.logs = { ask, login, visit }. ask/login: nil means the
 -- default (ask on, login off). visit: the key of the instance visit in progress, so a /reload
@@ -67,11 +70,12 @@ local function word(on)
 end
 L.word = word
 
--- What each choice runs, given the current state. Only logs that are OFF get a command; a log in
--- an unknown state is treated as off (the dialog shows "?" for it).
+-- What each choice runs, given the current state. Only logs known to be OFF get a command. Fix
+-- round 1 (F10): a log in an unknown state is NOT armed (both commands toggle, so arming one could
+-- switch a running log off); the dialog shows "?" for it.
 function L.plan(combatOn, chatOn)
-  local c = (combatOn ~= true) and "/combatlog" or nil
-  local h = (chatOn ~= true) and "/chatlog" or nil
+  local c = (combatOn == false) and "/combatlog" or nil                     -- guard: unknown not armed (F10)
+  local h = (chatOn == false) and "/chatlog" or nil
   local both
   if c and h then both = c .. "\n" .. h end
   return { combat = c, chat = h, both = both }
@@ -100,6 +104,13 @@ end
 
 local dialogs = {}                    -- login, instance
 local pendingShow, pendingHide
+local pendingHideInstance             -- F11: the visit ended in combat; hide when it's over
+
+-- F10: what is printed instead of arming a button for a log whose state can't be read.
+local UNKNOWN = {
+  combat = "Can't tell if the combat log is on. Type /combatlog if it isn't.",
+  chat = "Can't tell if the chat log is on. Type /chatlog if it isn't.",
+}
 
 local function finish(dlg, report)
   if inCombat() then
@@ -204,7 +215,8 @@ local function arm(b, macro)
 end
 
 -- The login dialog (R2). force: show even with both logs on (unused by the commands; kept as
--- the beta had it). Returns "shown", "deferred" or "both on".
+-- the beta had it). Returns "shown", "deferred", "both on" or "unknown" (F10: nothing could be
+-- armed because a log's state can't be read; a line was printed for each such log instead).
 function L.showLogin(force)
   if inCombat() then
     pendingShow = { kind = "login", force = force or false }   -- secure attributes can't change in combat
@@ -212,8 +224,13 @@ function L.showLogin(force)
   end
   local c, h = L.state()
   if c == true and h == true and not force then return "both on" end
-  local dlg = buildLogin()
   local p = L.plan(c, h)
+  if not p.combat and not p.chat and not force then                         -- F10: nothing to arm
+    if c == nil then DT.out(UNKNOWN.combat) end
+    if h == nil then DT.out(UNKNOWN.chat) end
+    return "unknown"
+  end
+  local dlg = buildLogin()
   arm(dlg.buttons.combat, p.combat)
   arm(dlg.buttons.chat, p.chat)
   arm(dlg.buttons.both, p.both)
@@ -222,11 +239,20 @@ function L.showLogin(force)
   return "shown"
 end
 
--- The instance dialog (R1, R3): combat log only. Returns "shown", "deferred", "on" or "quiet".
+-- The instance dialog (R1, R3): combat log only. Returns "shown", "deferred", "on", "quiet" or
+-- "unknown" (F10: the state can't be read, so no dialog; one line, once per visit).
+local toldUnknown                     -- the visit key the F10 line was printed for
 function L.askInstance(key)
   if not L.asking() then return "quiet" end
   local c = L.state()
   if c == true then return "on" end
+  if c == nil then                                                          -- guard: unknown, no dialog (F10)
+    if toldUnknown ~= key then
+      toldUnknown = key
+      DT.out(UNKNOWN.combat)
+    end
+    return "unknown"
+  end
   if inCombat() then
     pendingShow = { kind = "instance", key = key }
     return "deferred"
@@ -235,6 +261,14 @@ function L.askInstance(key)
   arm(dlg.buttons.logit, L.plan(c, true).combat)
   dlg:Show()
   return "shown"
+end
+
+-- F11: when the visit ends, the instance dialog goes too. A frame holding secure buttons can't be
+-- hidden in combat, so then it waits for combat to end (and stays only if a visit began again).
+function L.hideInstance()
+  local d = dialogs.instance
+  if not d then return end
+  if inCombat() then pendingHideInstance = true else d:Hide() end          -- guard: hide on visit end (F11)
 end
 
 -- ---------------------------------------------------------------- visits (R5)
@@ -254,6 +288,7 @@ local function zoneCheck()
     if visit then
       if dead() then held = visit end            -- released inside: the corpse run comes back
       visit = nil
+      L.hideInstance()                           -- F11: the dialog leaves with you
       if type(settings().visit) == "string" then store().visit = nil end
     end
     return
@@ -273,7 +308,8 @@ local function loginCheck()
   loginDone = true
   if not L.loginAsking() then return end
   local r = L.showLogin(false)
-  coveredByLogin = (r == "shown" or r == "deferred")   -- it already offers the combat log
+  -- it already offers the combat log, or (F10) already said it can't tell
+  coveredByLogin = (r == "shown" or r == "deferred" or r == "unknown")
 end
 
 local function onWorld(isLogin, isReload)
@@ -297,6 +333,10 @@ local function regen()
   if pendingHide then
     pendingHide = nil
     for _, d in pairs(dialogs) do d:Hide() end
+  end
+  if pendingHideInstance then
+    pendingHideInstance = nil
+    if visit == nil and dialogs.instance then dialogs.instance:Hide() end
   end
   if pendingShow then
     local p = pendingShow
@@ -328,6 +368,7 @@ local function logs(msg)
     local r = L.showLogin(false)
     if r == "both on" then return DT.out("Already logging both.") end
     if r == "deferred" then return DT.out("In combat. The prompt waits until it's over.") end
+    if r == "unknown" then return end           -- F10: its line is already printed
     return
   elseif rest == "" then
     local c, h = L.state()

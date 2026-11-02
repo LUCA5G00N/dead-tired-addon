@@ -1,5 +1,9 @@
 # Cowork brief: DEAD TIRED logs (ask to switch the combat log on in dungeons and raids)
 
+**Amended 2026-11-02 (fix round 1, F10 and F11 in `docs/COWORK_BRIEF_dt_fixes1.md`, audit AUD-11
+and AUD-14):** a log whose state can't be read is never armed; the instance dialog hides when the
+visit ends. Marked *(amended, fix round 1)*.
+
 Read first, in order:
 1. `CLAUDE.md`.
 2. This brief and its walk-sheet, `docs/UAT_dt_logs.md`.
@@ -87,11 +91,19 @@ code path calls `LoggingCombat`, `LoggingChat` or reads a combat event.
 
 - **State:** `C_ChatInfo.IsLoggingCombat()` and `C_ChatInfo.IsLoggingChat()` through
   `DT.try`/`DT.clean`; if absent, the globals `LoggingCombat` / `LoggingChat` **called with no
-  argument** (a read). Unknown is treated as off, and the dialog
-  shows `?` for it, as `LogPrompt.lua` does.
+  argument** (a read). ~~Unknown is treated as off~~ *(amended, fix round 1, F10)* Unknown is
+  **never armed** (both commands toggle, so arming one could switch a running log off), and the
+  dialog shows `?` for it, as `LogPrompt.lua` does.
+  - Instance dialog, combat log unknown: no dialog; one line, once per visit (none after
+    `/dt logs off`): `Can't tell if the combat log is on. Type /combatlog if it isn't.`
+  - Login dialog: the unknown log's button and **Both** are not armed. If no button can be armed,
+    the dialog doesn't show and the line prints instead, for each unknown log (the chat log's:
+    `Can't tell if the chat log is on. Type /chatlog if it isn't.`).
 - **Instance:** `IsInInstance()` (both returns) on `PLAYER_ENTERING_WORLD` and
   `ZONE_CHANGED_NEW_AREA`. A visit starts when the type becomes `"party"` or `"raid"` from
-  anything else, and ends when it becomes anything else. The visit key is the instance type plus
+  anything else, and ends when it becomes anything else. *(amended, fix round 1, F11)* When the
+  visit ends, the instance dialog hides (after combat ends, if in combat, and only if no visit has
+  begun again by then). Escape is not added. The visit key is the instance type plus
   `GetInstanceInfo()`'s instance ID (8th return) when readable, else the zone text.
 - **Login dialog (R2):** `LogPrompt.lua`'s four-button dialog, near enough as it is. Title:
   `The dead keep records. Turn them on?`. Status line as the beta's (`combat log ON/OFF/?    chat

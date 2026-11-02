@@ -248,3 +248,33 @@ The two client facts flagged in the brief are untested offline:
   line will say so.
 
 The `dt_probe` amendment 2 records both.
+
+## Fix round 1 (F10, F11)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes1.md` (audit AUD-11, AUD-14). Round report:
+`docs/COWORK_REPORT_dt_fixes1.md` on the session branch. `card/dt_foundation` (F1-F5) was merged
+in first: clean, card 1's files identical to its branch, all suites green before these fixes.
+
+- **F10, `Logs.lua`:** `L.plan` arms `/combatlog` / `/chatlog` only for a log that reads exactly
+  `false`, and **Both** only when both do. `L.askInstance`: with the combat log unknown, no
+  dialog; one line per visit key (none when asking is off), returning `"unknown"`.
+  `L.showLogin`: if nothing can be armed (and not both on), no dialog; one line per unknown log,
+  returning `"unknown"`. A login that printed the line counts as covering the visit, so logging
+  in inside a dungeon with the combat log unknown prints the combat line once, not twice.
+  `/dt logs now` prints the lines and nothing more.
+- **F11, `Logs.lua`:** `L.hideInstance()` runs when a visit ends (including a release inside,
+  whose corpse run then resumes the visit without asking, as before). In combat it sets a
+  separate pending flag; at `PLAYER_REGEN_ENABLED` the dialog is hidden only if no visit is in
+  progress by then. Escape not added (brief).
+- **New player-facing lines:**
+  `Can't tell if the combat log is on. Type /combatlog if it isn't.` and
+  `Can't tell if the chat log is on. Type /chatlog if it isn't.`
+- **Tests:** *"unknown state is treated as off: the dialog"* became *"F10: unknown state: no
+  dialog, the line instead"*. New: F10 instance (5), F10 login (11, across four clients: combat
+  unknown with chat off; nothing armable; chat unknown; both unknown inside a dungeon plus
+  `/dt logs now`), F11 (6). logs: 106 checks.
+- **Guard proofs:** F10 login (`plan` back to `~= true`): 7 red, incl. *F10: ... the combat
+  button is not armed*, *F10: clicking the unarmed combat button switches nothing*. F10 instance
+  (the unknown branch removed): 6 red, incl. *F10: entering with the combat log unknown: no
+  dialog, nothing armed*. F11 removed: *F11: leaving the instance hides it*, *F11: combat over:
+  hidden*.
