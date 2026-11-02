@@ -39,6 +39,18 @@ Owner: Tim (in game: Stromham). Built from briefs in `docs/` by cloud sessions; 
 - **Tone:** dry, self-deprecating, a bit gothic. "Rest in Pieces", "Crypt Keeper", "Restless Dead".
   Keep player-facing text short.
 
+## Ruled exceptions to the rules above
+Tim has ruled these, each in a card's brief. They are deliberate, not drift: do not "fix" them,
+and do not widen them. A new exception needs its own ruling in a brief.
+- **Prints unasked:** guildies' death notices (card 3, `dt_crypt` R1), the bedtime nag once the
+  player sets a time (card 3), one line on a hardcore character's first login pointing at
+  `/dt rip share on` (card 3, rulings round), event reminders once switched on (card 6 R4).
+- **Reads another player:** your target's name, realm, class and level, only when you press
+  `/dt gank` (card 4, `dt_pvp` R1).
+- **Posts to a public channel:** `/dt recruit`, one line per typed command or click, guild
+  officers only, to General (card 5, `dt_prep` R1-R2 as amended by the rulings round).
+- **Shares without a separate opt-in:** a gank log, when you make it (card 4 R2).
+
 ## Code rules
 - Lua 5.1 (what WoW runs). One SavedVariables table: `DeadTiredDB` (account-wide). Character keys
   are `Realm-Name`.
@@ -59,6 +71,11 @@ Owner: Tim (in game: Stromham). Built from briefs in `docs/` by cloud sessions; 
   **stop and report**: do not substitute another Lua version silently.
 - **Guards are proved, not assumed:** for every guard the brief lists, remove it once, confirm a
   check goes red, and put it back. The report lists each removal and which check failed.
+
+- **Stop conditions mean stop, with one exception:** if a guard removal fails to turn a check red
+  because the round's own test is weak, you may strengthen that test (test files only, never
+  addon code), prove the guard again, and carry on. The report shows the test diff and says why.
+  Every other stop condition halts the round and is reported.
 
 ## Reporting
 Write `docs/COWORK_REPORT_<slug>.md` as the brief asks. Never write `docs/UAT_<slug>_results.md`:
