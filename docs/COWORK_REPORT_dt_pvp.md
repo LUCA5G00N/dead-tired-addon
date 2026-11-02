@@ -166,3 +166,26 @@ ALL GREEN
   (G11); what `UnitName` returns for realms on Forever (the stub returns `"Nethergarde"`, retail's
   no-spaces form); whether `UnitFactionGroup` answers for enemy players at range.
 - `docs/UAT_dt_pvp_results.md` was not written; that file is Tim's.
+
+## Fix round 1 (F7, F6b)
+
+Built 2026-11-02 from `docs/COWORK_BRIEF_dt_fixes1.md` (audit AUD-04, AUD-07). Round report:
+`docs/COWORK_REPORT_dt_fixes1.md` on the session branch. `card/dt_foundation` (F1-F5) was merged
+in first: clean, card 1's files identical to its branch, all suites green before these fixes.
+
+- **F7, `Gank.lua`:** `/dt gank`'s "Already noted" is decided by a session table
+  `lastPress[who] = DT.now()`, never by a stored value. A new log stores `t = time()` (the
+  epoch, guarded; nil if unreadable). No migration: a stored `t` below 1,000,000,000 is old
+  uptime, and nothing reads `t`. One consequence, by design: a `/reload` inside the 300 s
+  forgets the press.
+- **F6b, `Gank.lua`:** a received GANK, after validation, is kept at most once per
+  `<sender>#<who>` per 300 s (memory only); the rest count in `gank.dropped`.
+- **Tests:** the suite's stubs moved into `opts.setup` so `c:reload()`/`c:reboot()` keep them.
+  New: F7 (4 checks: the stored `t` is the epoch; noted after a restart; the window holds within
+  a session; a reload forgets it) and F6b (4 checks). The first log's check now asserts
+  `t == time()`. Existing board tests that inject the same enemy from the same sender now space
+  injections 301 s apart; the `|`-in-zone check logs a different enemy. gank: 58 checks.
+- **Guard proofs:** F7, the old stored-`GetTime()` comparison put back: 5 red, incl. *F7: after
+  a restart, the same enemy a day later is noted, not 'already noted'*. F6b removed: 4 red, incl.
+  *F6b: one sender's 10 GANKs on one enemy inside 300 s keep one*.
+- The audit's `test_gank_reboot.lua` passes unchanged. No player-facing line changed.

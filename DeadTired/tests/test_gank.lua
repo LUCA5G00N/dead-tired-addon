@@ -13,10 +13,15 @@ ALL[#ALL + 1] = "Gank.lua"
 local CLOSING = "Only logs from guildies running the addon, seen while you were online."
 local P = "|cff7fa650Dead Tired|r "
 
+local stub
 local function client(w, opts)
   opts.files = opts.files or ALL
   if opts.guild == nil and not opts.outside then opts.guild = G end
-  local c = w:client(opts)
+  opts.setup = function(c) stub(c) end   -- kept across c:reload() / c:reboot() (fix round 1, F3)
+  return w:client(opts)
+end
+
+function stub(c)
   c.faction, c.zone, c.stampStr = "Horde", "Stranglethorn Vale", "2026-11-04 23:00:00"
   local env = c.env
   env.UnitExists = function(u) if u == "player" then return true end return u == "target" and c.tgt ~= nil end
@@ -43,7 +48,6 @@ local function client(w, opts)
   end
   env.GetRealZoneText = function() return c.zone end
   env.date = function() return c.stampStr end
-  return c
 end
 local function rogue(over)
   local t = { name = "Backstabz", realm = "Nethergarde", faction = "Alliance", cls = "ROGUE", lvl = 60 }
@@ -98,7 +102,7 @@ do
   local e = logs(a)[1]
   check("an enemy on another realm is logged", #logs(a) == 1 and e.who == "Nethergarde-Backstabz" and e.cls == "ROGUE"
     and e.lvl == 60 and e.zone == "Stranglethorn Vale" and e.by == "Classic Beta PvP-Stromham"
-    and e.at == "2026-11-04 23:00:00" and type(e.t) == "number")
+    and e.at == "2026-11-04 23:00:00" and e.t == a.env.time())   -- F7: the stored t is the epoch
   check("the confirmation line, exactly", #a.printed == 1
     and a.printed[1] == P .. "Noted: Backstabz-Nethergarde (Rogue 60), Stranglethorn Vale. The crypt remembers.")
   check("and it is sent as GANK", ganksSent(a) == 1
@@ -170,7 +174,7 @@ do
     and #logs(b) == 1 and #b.printed == 0)
   inject("1^GANK^cls~DEATHKNIGHT^lvl~-1^who~R-N^zone~" .. string.rep("z", 48))
   check("the edges are valid: 11-letter class, level -1, 48-byte zone", #logs(b) == 2 and logs(b)[2].lvl == -1)
-  inject("1^GANK^cls~ROGUE^lvl~60^who~R-N^zone~The %7CTInterface%7Ct Pit")
+  inject("1^GANK^cls~ROGUE^lvl~60^who~R-Bar^zone~The %7CTInterface%7Ct Pit")   -- another enemy: F6b
   b:slash("ganks")
   check("a bar in a received zone prints safely on the board", b:said("The ||TInterface||t Pit") ~= nil)
 
@@ -189,6 +193,7 @@ do
     and a.printed[2] == P .. CLOSING)
   local n = 0
   local function inject(who, from, day, cls, lvl, zone)
+    w:advance(301)   -- F6b: one GANK per sender and enemy per 300 s
     a.stampStr = day .. " 01:00:00"
     a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^GANK^cls~" .. (cls or "ROGUE") .. "^lvl~" .. (lvl or 60)
       .. "^who~Nethergarde-" .. who .. "^zone~" .. (zone or "Duskwood"), "GUILD", from .. "-ClassicBetaPvP")
@@ -230,6 +235,7 @@ do
   local w = H.world()
   local a = client(w, { name = "Stromham" })
   local function inject(who, from, day, zone)
+    w:advance(301)   -- F6b: one GANK per sender and enemy per 300 s
     a.stampStr = day .. " 01:00:00"
     a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^GANK^cls~ROGUE^lvl~60^who~" .. who .. "^zone~" .. zone, "GUILD", from .. "-ClassicBetaPvP")
   end
@@ -280,6 +286,50 @@ do
   check("a log on one appears on the other's board", #b.printed == 0 and (function()
     b:slash("ganks"); return b:said("1. Backstabz-Nethergarde (Rogue 60) x1 by 1 guildie") ~= nil end)())
   check("the non-member receives and prints nothing", #x.printed == 0 and #logs(x) == 0)
+end
+
+-- ---------------------------------------------------------------- fix round 1 (F7, F6b)
+do
+  local w = H.world()
+  w.t = 500000                       -- the machine has been up ~5.8 days
+  local a = client(w, { name = "Stromham" })
+  a.tgt = rogue(); a:slash("gank")
+  check("F7 baseline: noted, and the stored t is the epoch, not uptime", #logs(a) == 1
+    and logs(a)[1].t == a.env.time() and logs(a)[1].t > 1000000000)
+  -- a restart: GetTime() starts again at 20 minutes, time() carries on; the enemy is back
+  w:advance(86400)
+  local a2 = a:reboot(1200)
+  a2.tgt = rogue(); a2.printed = {}
+  a2:slash("gank")
+  check("F7: after a restart, the same enemy a day later is noted, not 'already noted'",
+    a2:said("Noted: Backstabz") ~= nil and #logs(a2) == 2)
+  a2.printed = {}
+  w:advance(100); a2:slash("gank")
+  check("F7: the 300 s window still holds within a session", a2:said("Already noted") ~= nil and #logs(a2) == 2)
+  -- a reload inside the window forgets it: the press is recorded again (memory only, by design)
+  local a3 = a2:reload()
+  a3.tgt = rogue(); a3.printed = {}
+  a3:slash("gank")
+  check("F7: the window is memory only: after a /reload the press is noted", a3:said("Noted: Backstabz") ~= nil)
+end
+
+do
+  local w = H.world()
+  local a = client(w, { name = "Stromham" })
+  local function inject(who, from)
+    a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^GANK^cls~ROGUE^lvl~60^who~" .. who .. "^zone~Duskwood", "GUILD",
+      from .. "-ClassicBetaPvP")
+  end
+  inject("Nethergarde-Backstabz", "Ghoul")
+  for i = 1, 9 do w:advance(10); inject("Nethergarde-Backstabz", "Ghoul") end
+  check("F6b: one sender's 10 GANKs on one enemy inside 300 s keep one", #logs(a) == 1)
+  check("F6b: the rest are counted in gank.dropped", a:db().gank.dropped == 9)
+  inject("Nethergarde-Healbot", "Ghoul")
+  inject("Nethergarde-Backstabz", "Wight")
+  check("F6b: per sender and enemy: another enemy, or another guildie, is kept", #logs(a) == 3)
+  w:advance(210)    -- 300 s after Ghoul's first on Backstabz
+  inject("Nethergarde-Backstabz", "Ghoul")
+  check("F6b: at 300 s the same sender and enemy is kept again", #logs(a) == 4)
 end
 
 H.finish("gank")

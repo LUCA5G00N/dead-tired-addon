@@ -5,6 +5,9 @@
 --     which is checked and never stored), and only when /dt gank is pressed.
 -- R2: a log goes to the guild when it is made; receivers record it silently.
 -- R3: this file keeps its own store, DeadTiredDB.gank; card 1's files are untouched.
+-- Fix round 1: F7, the double-press window lives in memory and a log's stored t is the epoch
+-- (an old t below 1,000,000,000 is uptime, of unknown age, and nothing reads it); F6b, a received
+-- GANK is kept at most once per sender and enemy per 300 s.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -54,6 +57,7 @@ local function what(e) return "(" .. className(e.cls) .. " " .. lvlText(e.lvl) .
 -- ---------------------------------------------------------------- /dt gank
 
 local function nonEmpty(s) return type(s) == "string" and s ~= "" end
+local lastPress = {}      -- this session: [who] = DT.now() of the last /dt gank on them (F7)
 
 function DT.gank()
   -- 1. a player
@@ -84,19 +88,17 @@ function DT.gank()
   -- 4. where
   local zone = clean(try(GetRealZoneText))
   zone = nonEmpty(zone) and zone:sub(1, ZONE_MAX) or "somewhere"
-  -- 5. double press
-  local now, list = DT.now(), logs()
-  for i = #list, 1, -1 do
-    local e = list[i]
-    if e.who == who and e.t then
-      if now - e.t < AGAIN then                                                       -- guard: double-press window
-        return DT.out("Already noted. Grudges don't need two copies.")
-      end
-      break
-    end
+  -- 5. double press. Fix round 1 (F7): decided in memory, by GetTime() this session. GetTime()
+  -- is the machine's uptime, so it is never compared with a stored value.
+  local now = DT.now()
+  if lastPress[who] and now - lastPress[who] < AGAIN then                             -- guard: double-press window (F7, in memory)
+    return DT.out("Already noted. Grudges don't need two copies.")
   end
-  -- 6. record, send, confirm
-  local e = { who = who, cls = cls, lvl = lvl, zone = zone, by = DT.charKey() or "?", at = DT.stamp(), t = now }
+  lastPress[who] = now
+  -- 6. record, send, confirm. The stored time is the epoch (time()), which survives a restart.
+  local epoch = clean(try(time))
+  local e = { who = who, cls = cls, lvl = lvl, zone = zone, by = DT.charKey() or "?", at = DT.stamp(),
+    t = type(epoch) == "number" and epoch or nil }
   record(e)
   DT.send("GANK", { who = who, cls = cls, lvl = tostring(lvl), zone = zone })
   DT.out("Noted: " .. DT.display(who) .. " " .. what(e) .. ", " .. DT.safe(zone, ZONE_MAX) .. ". The crypt remembers.")
@@ -115,12 +117,22 @@ local function valid(f)
   return type(zone) == "string" and #zone >= 1 and #zone <= ZONE_MAX
 end
 
+-- Fix round 1 (F6b): at most one received GANK per sender and enemy per 300 s.
+local lastFrom = {}
+
 DT.on("GANK", function(from, f)
   if not valid(f) then                                                                -- guard: field validation
     local g = gank()
     g.badGank = g.badGank + 1
     return
   end
+  local k, t = from .. "#" .. f.who, DT.now()
+  if lastFrom[k] and t - lastFrom[k] < AGAIN then                                     -- guard: per-sender limit (F6b)
+    local g = gank()
+    g.dropped = (g.dropped or 0) + 1
+    return
+  end
+  lastFrom[k] = t
   -- Silent receipt (R2): stored, never printed, never replied to, never re-sent.
   record({ who = f.who, cls = f.cls, lvl = tonumber(f.lvl), zone = f.zone, by = from, at = DT.stamp() })
 end)

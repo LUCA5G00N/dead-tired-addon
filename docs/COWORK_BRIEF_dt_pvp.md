@@ -6,6 +6,10 @@ another card. No game client is available; everything is proved offline with stu
 Tim walks it in game. If the harness assigns you a different branch name, create that branch from
 `card/dt_foundation` and say so in the report.
 
+**Amended 2026-11-02 (fix round 1, F7 and F6b in `docs/COWORK_BRIEF_dt_fixes1.md`, audit AUD-04
+and AUD-07):** the double-press window lives in memory, and a stored `t` is the epoch; a received
+GANK is kept at most once per sender and enemy per 300 s. Marked *(amended, fix round 1)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_pvp.md`.
@@ -100,8 +104,9 @@ printed on the guildie's side until they asked.
 **Store.** `DeadTiredDB.gank` is created by Gank.lua itself (not by `DT.db()` in Core; R3):
 `gank = { badGank = 0, [<guildKey>] = { logs = { ... } } }`. A log is
 `{ who = <enemy Realm-Name>, cls = <classFile>, lvl = <number>, zone = <string>,
-by = <logger Realm-Name>, at = <DT.stamp()>, t = <DT.now() for the local log, nil when
-received> }`. Newest is appended last, capped at **500**, oldest dropped first.
+by = <logger Realm-Name>, at = <DT.stamp()>, t = <time() (epoch) for the local log, nil when
+received> }` *(amended, fix round 1: was `DT.now()`, the machine's uptime; a stored `t` below
+1,000,000,000 is of unknown age, and nothing reads it)*. Newest is appended last, capped at **500**, oldest dropped first.
 
 **`/dt gank`** (members only; the router already refuses non-members):
 1. The target must exist and be a player: `try(UnitExists, "target") == true` and
@@ -118,8 +123,9 @@ received> }`. Newest is appended last, capped at **500**, oldest dropped first.
    `lvl` is unreadable, or is `-1` (a skull), store `-1`. Validation is under *Inbound*.
 4. Zone: `clean(try(GetRealZoneText))`, a non-empty string truncated to 48 bytes, otherwise
    `"somewhere"`.
-5. **Double press:** if your own most recent local log of the same `who` is under **300 seconds**
-   old (by `DT.now()`), print *"Already noted. Grudges don't need two copies."* and stop.
+5. **Double press:** if you pressed on the same `who` under **300 seconds** ago **this session**
+   (a session table `lastPress[who] = DT.now()`, never stored), print *"Already noted. Grudges
+   don't need two copies."* and stop. *(amended, fix round 1)*
 6. Record it, `DT.send("GANK", { who = who, cls = cls, lvl = lvl, zone = zone })`, and print
    *"Noted: <Name> (<Class> <lvl>), <zone>. The crypt remembers."* Use the class in title case
    from the class file, `??` for level -1, and names through `DT.display`.
@@ -132,7 +138,8 @@ handling apply). Validate:
 - `zone` is 1-48 bytes.
 
 An invalid GANK is ignored and counted in `DeadTiredDB.gank.badGank`. A valid one is recorded
-with `by = <sender>`. **Nothing is printed, nothing is replied, nothing is re-sent.**
+with `by = <sender>`, at most once per sender and `who` per 300 s (in memory); another inside the
+window is counted in `DeadTiredDB.gank.dropped` *(amended, fix round 1)*. **Nothing is printed, nothing is replied, nothing is re-sent.**
 
 **The board, `/dt ganks`.** Group every log by `who`. For each enemy: the count, the number of
 distinct loggers (`by`), and the newest log's class, level, zone and date. Sort by count
