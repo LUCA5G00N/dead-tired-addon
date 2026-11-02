@@ -15,6 +15,7 @@ target; the stretch card only if credit is left after card 5 is reported.
 | 3 | `dt_crypt` | **"Rest in Pieces" death notices**, **graveyard memorial**, **bedtime nag** | S-M | 1 |
 | 4 | `dt_pvp` | **Gank diary** (target an Alliance player, log name/class/level/zone, shared board) | S-M | 1 |
 | 5 | `dt_prep` | **Raid-prep bag check**, **recruitment rotator** | S-M | 1 |
+| 7 | `dt_logs` | **Combat-log prompt**: ask to switch the combat log on when entering a dungeon or raid (brief proposed 2026-11-02) | S | 1 |
 | 6 | `dt_stretch` | Stretch, budget permitting: crafting request board, guild stash search (opt-in), slowest-leveller award, event tracker (STV Fishing Extravaganza) | M-L | 2 (requests), 1 |
 
 ## Branching and testing rule

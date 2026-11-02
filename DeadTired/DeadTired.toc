@@ -24,3 +24,4 @@ Stash.lua
 Played.lua
 EventsList.lua
 Events.lua
+Logs.lua
