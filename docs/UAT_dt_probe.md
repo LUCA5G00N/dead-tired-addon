@@ -34,6 +34,8 @@ On the character screen, tick **Load out of date AddOns** if the probe shows as 
   7. Open a profession window, `/dtprobe recipes`. Close it, `/dtprobe recipes` again.
   8. *Optional, when the chance comes:* target an Alliance player, `/dtprobe target`; again
      while you're in combat with them. Die once (anywhere) for the death section.
+  8b. `/dtprobe logging try` (with combat logging off: it tries to switch it on), then walk
+     into any dungeon entrance and back out (the instance section records it).
   9. Your guildie (not an officer) also does steps 1 and 3, so the officer flag is seen both ways.
   10. `/dtprobe report`, then log out (this writes the saved file).
 
