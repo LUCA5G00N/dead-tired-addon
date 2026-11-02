@@ -201,14 +201,15 @@ one and four others that check the brief's bounds:
 4. **No `DeadTired` code at runtime:** `grep -rnE "ns\.DT|DeadTired/|DT\." DeadTiredProbe/ --include=*.lua | grep -v "/tests/"` →
    only the header comment `-- A throwaway diagnostic, separate from DeadTired/ ...`.
    The `.toc` loads `Probe.lua` only.
-5. **G4:** `git diff main --stat` on `card/dt_probe`:
+5. **G4:** `git diff main --stat` on `card/dt_probe` (local `main` reset to `origin/main`, `dcec729`):
    ```
-   DeadTiredProbe/DeadTiredProbe.toc        |    8 +
-   DeadTiredProbe/Probe.lua                 |  978 +++++
-   DeadTiredProbe/tests/test_probe.lua      |  ~690 +++
-   docs/COWORK_REPORT_dt_probe.md           |  ...
+    DeadTiredProbe/DeadTiredProbe.toc   |   8 +
+    DeadTiredProbe/Probe.lua            | 978 ++++++++++++++++++++++++++++++++++++
+    DeadTiredProbe/tests/test_probe.lua | 662 ++++++++++++++++++++++++
+    docs/COWORK_REPORT_dt_probe.md      | 287 +++++++++++
+    4 files changed, 1935 insertions(+)
    ```
-   Only `DeadTiredProbe/` and `docs/` (exact counts are in the commit).
+   Only `DeadTiredProbe/` and `docs/`. (This report then grew by a few lines when this block was filled in.)
 
 ## Every line the probe can print
 
