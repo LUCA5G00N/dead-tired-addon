@@ -5,10 +5,10 @@ Walk-sheet: `docs/UAT_dt_stretch.md`. Built 2026-11-02 in a cloud session, offli
 and H1 are Tim's to walk.
 
 **Result:** stash search, the slowest-leveller award and the event tracker are built. All nine
-suites are green (269 checks: 46 stash, 23 played, 26 events). All seventeen guards, plus two
-extra checks, were proved red on the first run, and **no stop condition tripped**. **One finding
-needs Tim's ruling** (see *Differences* 1): the brief's 12-byte limit on holder names drops
-characters with accented names from stash answers.
+suites are green (271 checks: 48 stash, 23 played, 26 events). All seventeen guards, plus two
+extra checks, were proved red, and **no stop condition tripped**. The one finding (the 12-byte
+holder limit dropped accented names, *Differences* 1) was **ruled by Tim: 4 hits, holders up to
+24 bytes**, and is fixed on this branch (see *Amendment*).
 
 ## Branch and start
 
@@ -38,7 +38,7 @@ characters with accented names from stash answers.
 - **R2:** stash sharing is off by default. Scans happen only with it on (and as a member). Bound
   items are skipped, bags are scanned at login and on bag changes, and the bank when it is
   opened. The list is account-wide, and answers name the holding character. An answer holds
-  matching items only, at most 5, and is sent only in reply to a search. Terms are matched with
+  matching items only, at most 4 (after the amendment), and is sent only in reply to a search. Terms are matched with
   `string.find(…, 1, true)`.
 - **R3:** PLAYED is sent only from `TIME_PLAYED_MSG`, which fires when the player types
   `/played`. Nothing in `DeadTired/` names the function that asks the game for play time (G3,
@@ -49,7 +49,8 @@ characters with accented names from stash answers.
 
 ## Differences from the brief
 
-1. **Finding: holder names over 12 bytes are left out of stash answers.** The brief caps a
+1. **Finding (resolved, see *Amendment*): holder names over 12 bytes were left out of stash
+   answers.** The brief caps a
    holder at 12 bytes on the wire, to keep the longest STASH under 250 bytes. But character
    names can be up to 12 *letters*, and accented letters are 2 bytes each in UTF-8. "Ståhlgéhéim"
    is 11 letters and 14 bytes. Such a character's items are silently missing from answers. Rather
@@ -86,7 +87,7 @@ characters with accented names from stash answers.
 | No answers | `Nobody's got it. Or nobody's sharing.` |
 | A second search inside 30 s | `One search at a time. The crypt echoes.` |
 | `/dt stash` | `Your account offers 4 items across 1 character (bank read 2026-11-04). Sharing on.` / `Sharing off. Nothing offered.` |
-| `/dt stash share on` / `off` | `stash sharing on. Guildies' searches can see your tradeable items, five at a time.` / `stash sharing off. Your list is gone; your bags are your own again.` |
+| `/dt stash share on` / `off` | `stash sharing on. Guildies' searches can see your tradeable items, four at a time.` / `stash sharing off. Your list is gone; your bags are your own again.` |
 | `/dt slowest` | `The Crypt Keeper's Award for Glacial Progress goes to Turtle: 7.0 hours a level (level 30, 210.0 h played).`, then `2. Sloth: 5.0 h/level (level 10)` …, then `Only guildies running the addon who share their /played. Type /played to update yours.` |
 | No contenders | `No contenders. Everyone's either fast or shy.` |
 | `/dt slowest share on` / `off` | `sharing your /played. Type /played to put yourself on the board.` / `not sharing your /played. Your pace is your own.` |
@@ -103,7 +104,8 @@ characters with accented names from stash answers.
 1^PLAYED^h~100.5^lvl~30                                                              23 bytes
 ```
 
-**Longest:** STASH **224** bytes (5 hits of a 7-digit id, count 99999 and a 12-byte holder; `q`
+**Longest:** STASH **245** bytes after the amendment (4 hits of a 7-digit id, count 99999 and a
+24-byte holder; `q`
 999999; a 64-byte `to`), STASHQ **119** (a 32-byte term of `^`), PLAYED **27**. All are at most
 250, as worked at drafting.
 
@@ -120,7 +122,7 @@ restored. The suites were green again afterwards.
 | 3 | Stash: bound-item skip | condition → `true` | "a bound item is never listed", plus 2 more |
 | 4 | Stash: bank-constant guard | line deleted | "Enum.BagIndex.Bank absent: the bank is never read", "and /dt stash says so" |
 | 5 | Stash: plain matching | `find(want, 1, true)` → `find(want)` | "a term like %a+ or [[[ matches literally and never errors" |
-| 6 | Stash: 5-hit cap | line deleted | "at most 5 hits, largest first" |
+| 6 | Stash: 4-hit cap (amended from 5) | line deleted | "at most 4 hits, largest first" |
 | 7 | Stash: one answer per asker and search | line deleted | "one answer per asker and search", plus 5 more |
 | 8 | Stash: `STASH` to someone else ignored | line deleted | "an unloaded item shows as item <id>…", "an answer after the summary is ignored", plus 1 more |
 | 9 | Stash: `STASH` validation | condition → `false` | "each invalid STASH / STASHQ field is counted in badStash, nothing printed" |
@@ -137,6 +139,23 @@ restored. The suites were green again afterwards.
 A note on 7: removing "one answer per search" also broke the later checks in the same test. Each
 extra answer shifts the answer counts the following checks rely on, so the red is real but wide.
 
+## Amendment: 4 hits, 24-byte holders (Tim, 2026-11-02)
+
+Tim ruled on finding 1: **use 4 hits.** Changed on this branch, in one commit after the build:
+- **`Stash.lua`:** `MAX_HITS = 4`, a new `HOLDER_MAX = 24` used both when answering (a holder
+  over 24 bytes is still left out: no real name is) and when validating a received `STASH`; the
+  share-on line now says "four at a time".
+- **`tests/test_stash.lua`:**
+  - the cap check now expects 4;
+  - a 12-letter fully accented holder name (24 bytes) **is** answered, and a 25-byte one isn't;
+  - a received answer with a 24-byte holder is kept and printed;
+  - validation now rejects 25-byte holders and 5 entries;
+  - the byte budget uses 4 hits with 24-byte holders: **245 bytes**.
+- **The brief** carries an *Amended* note at the top, and each changed line is marked
+  *(amended)*. The walk-sheet's checks don't mention the hit count and are unchanged.
+- **Guard proofs re-run for all eleven stash guards** after the change: each still goes red,
+  including the 4-hit cap ("at most 4 hits, largest first") and validation.
+
 ## Offline acceptance
 
 - **G1:** `run_all.sh` exits 0 with nine suites:
@@ -148,8 +167,8 @@ comms: 53 passed, 0 failed
 roster: 26 passed, 0 failed
 alts: 21 passed, 0 failed
 welcome: 17 passed, 0 failed
-stash: longest STASH is 224 bytes, longest STASHQ is 119 bytes
-stash: 46 passed, 0 failed
+stash: longest STASH is 245 bytes, longest STASHQ is 119 bytes
+stash: 48 passed, 0 failed
 played: longest PLAYED is 27 bytes
 played: 23 passed, 0 failed
 events: 26 passed, 0 failed
@@ -167,16 +186,16 @@ ALL GREEN
  DeadTired/DeadTired.toc         |   4 +
  DeadTired/Events.lua            | 135 ++++++++++++++++++
  DeadTired/EventsList.lua        |  10 ++
- DeadTired/Played.lua            | 117 ++++++++++++++++
- DeadTired/Stash.lua             | 304 ++++++++++++++++++++++++++++++++++++++++
+ DeadTired/Played.lua            | 117 +++++++++++++++
+ DeadTired/Stash.lua             | 305 ++++++++++++++++++++++++++++++++++++++++
  DeadTired/tests/run_all.sh      |   2 +-
  DeadTired/tests/test_events.lua | 142 +++++++++++++++++++
  DeadTired/tests/test_played.lua | 136 ++++++++++++++++++
- DeadTired/tests/test_stash.lua  | 243 ++++++++++++++++++++++++++++++++
+ DeadTired/tests/test_stash.lua  | 266 +++++++++++++++++++++++++++++++++++
 ```
 
   (`run_all.sh`: one line changed, counted by git as one removed and one added.)
-- **G5:** STASH 224, STASHQ 119, PLAYED 27; all at most 250.
+- **G5:** STASH 245 (224 before the amendment), STASHQ 119, PLAYED 27; all at most 250.
 
 ## Merge order with cards 3, 4 and 5
 

@@ -163,23 +163,31 @@ do
     w:advance(10)
   end)
   check("a term like %a+ or [[[ matches literally and never errors", ok and #sentKind(a, "STASH") == 1)
-  -- the 5-hit cap
+  -- the 4-hit cap
   a:db().stash.chars["Classic Beta PvP-Ghoulalt"].bags = { [2589] = 1, [2592] = 2, [4306] = 3, [4338] = 4, [14047] = 5 }
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~9^term~cloth", "GUILD", "Lich-ClassicBetaPvP")
   w:advance(10)
   local capped = sentKind(a, "STASH")[2] or ""
   local n = select(2, capped:gsub(":", ":")) / 2
-  check("at most 5 hits, largest first", n == 5 and capped:find("hits~2589:20:Ghoul,2589:11:Ghoulalt,14047:5:Ghoulalt,2996:4:Ghoul,4338:4:Ghoulalt^", 1, true) ~= nil)
-  -- a holder name over 12 bytes is left out (the wire limit)
-  a:db().stash.chars["Classic Beta PvP-Ståhlgéhéimnís"] = { bags = { [2770] = 7 }, bank = {} }
+  check("at most 4 hits, largest first", n == 4 and capped:find("hits~2589:20:Ghoul,2589:11:Ghoulalt,14047:5:Ghoulalt,2996:4:Ghoul^", 1, true) ~= nil)
+  -- holder names: a 12-letter name with every letter accented is 24 bytes and is answered;
+  -- anything over 24 bytes (no real name is) is left out (the wire limit)
+  local accented = "\195\133\195\164\195\182\195\169\195\168\195\170\195\173\195\172\195\174\195\179\195\178\195\180"
+  a:db().stash.chars["Classic Beta PvP-" .. accented] = { bags = { [2770] = 7 }, bank = {} }
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~10^term~copper", "GUILD", "Lich-ClassicBetaPvP")
   w:advance(10)
-  check("a holder name over 12 bytes is left out of answers", #sentKind(a, "STASH") == 2)
+  check("a 12-letter accented holder name (24 bytes) is answered", #accented == 24 and #sentKind(a, "STASH") == 3
+    and sentKind(a, "STASH")[3]:find("hits~2770:7:" .. accented .. "^", 1, true) ~= nil)
+  a:db().stash.chars["Classic Beta PvP-" .. accented] = nil
+  a:db().stash.chars["Classic Beta PvP-" .. accented .. "x"] = { bags = { [2770] = 7 }, bank = {} }
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~12^term~copper", "GUILD", "Lich-ClassicBetaPvP")
+  w:advance(10)
+  check("a holder name over 24 bytes is left out of answers", #sentKind(a, "STASH") == 3)
   -- sharing turned off between question and answer
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~11^term~linen", "GUILD", "Lich-ClassicBetaPvP")
   a:db().stash.share = false
   w:advance(10)
-  check("sharing turned off before the delay ends: no answer", #sentKind(a, "STASH") == 2)
+  check("sharing turned off before the delay ends: no answer", #sentKind(a, "STASH") == 3)
 end
 
 -- ---------------------------------------------------------------- receiving: validation and addressing
@@ -203,12 +211,26 @@ do
   local bad = { "1^STASH^hits~2589:3:Ghoul^q~x^to~R-N", "1^STASH^hits~2589:3:Ghoul^q~1^to~NoRealm",
     "1^STASH^hits~^q~1^to~R-N", "1^STASH^q~1^to~R-N", "1^STASH^hits~12345678:3:Ghoul^q~1^to~R-N",
     "1^STASH^hits~2589:0:Ghoul^q~1^to~R-N", "1^STASH^hits~2589:100000:Ghoul^q~1^to~R-N",
-    "1^STASH^hits~2589:3:Abcdefghijklm^q~1^to~R-N", "1^STASH^hits~2589:3^q~1^to~R-N",
-    "1^STASH^hits~2589:3:Ghoul,^q~1^to~R-N", "1^STASH^hits~1:1:A,2:1:A,3:1:A,4:1:A,5:1:A,6:1:A^q~1^to~R-N",
+    "1^STASH^hits~2589:3:Abcdefghijklmnopqrstuvwxy^q~1^to~R-N", "1^STASH^hits~2589:3^q~1^to~R-N",
+    "1^STASH^hits~2589:3:Ghoul,^q~1^to~R-N", "1^STASH^hits~1:1:A,2:1:A,3:1:A,4:1:A,5:1:A^q~1^to~R-N",
     "1^STASHQ^q~1^term~ab", "1^STASHQ^q~abc^term~linen" }
   for _, t in ipairs(bad) do inject(t) end
   check("each invalid STASH / STASHQ field is counted in badStash, nothing printed", tim:db().stash.badStash == #bad
     and #tim.printed == 3)
+end
+
+-- ---------------------------------------------------------------- receiving a 24-byte holder name
+do
+  local w = H.world()
+  local tim = client(w, { name = "Stromham" })
+  local holder = string.rep("\195\169", 12)   -- 12 accented letters, 24 bytes
+  tim:slash("stash linen")
+  tim:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASH^hits~2589:3:" .. holder .. "^q~1^to~Classic Beta PvP-Stromham",
+    "GUILD", "Ghoul-ClassicBetaPvP")
+  tim.printed = {}
+  w:advance(10)
+  check("a received answer with a 24-byte holder is kept and printed", tim.printed[1] == P .. holder .. ": Linen Cloth x3"
+    and tim:db().stash.badStash == 0)
 end
 
 -- ---------------------------------------------------------------- byte budget
@@ -216,8 +238,9 @@ do
   local w = H.world()
   local a = client(w, { name = "Stromham" })
   local E = a.DT._comms.encode
-  local hits = table.concat({ "1234567:99999:Abcdefghijkl", "1234567:99999:Abcdefghijkl", "1234567:99999:Abcdefghijkl",
-    "1234567:99999:Abcdefghijkl", "1234567:99999:Abcdefghijkl" }, ",")
+  local holder = string.rep("\195\169", 12)   -- 12 accented letters, 24 bytes
+  local hits = table.concat({ "1234567:99999:" .. holder, "1234567:99999:" .. holder, "1234567:99999:" .. holder,
+    "1234567:99999:" .. holder }, ",")
   local m1 = E("STASH", { q = "999999", to = string.rep("r", 58) .. "-Abcde", hits = hits })
   local m2 = E("STASHQ", { q = "999999", term = string.rep("^", 32) })
   print("stash: longest STASH is " .. #m1 .. " bytes, longest STASHQ is " .. #m2 .. " bytes")

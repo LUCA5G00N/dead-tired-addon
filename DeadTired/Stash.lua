@@ -3,7 +3,7 @@
 --
 -- R2: off until /dt stash share on. Tradeable items only (bound items never listed), bags and
 -- (when opened) bank, for every character on the account that has run with sharing on. Nothing
--- is sent except an answer to a guildie's search: matching items only, at most 5. A search term
+-- is sent except an answer to a guildie's search: matching items only, at most 4. A search term
 -- is matched as plain text, never as a Lua pattern. Switching sharing off deletes the list.
 local ADDON, ns = ...
 local DT = ns.DT
@@ -13,7 +13,8 @@ local SCAN_GAP = 5          -- seconds between bag scans
 local SEARCH_WINDOW = 30    -- seconds between searches from one client
 local WAIT = 10             -- seconds the asker collects answers
 local DELAY_MIN, DELAY_SPREAD = 1, 4
-local MAX_HITS = 5
+local MAX_HITS = 4          -- 4, not 5 (Tim, 2026-11-02): room for 24-byte holder names in 250 bytes
+local HOLDER_MAX = 24       -- bytes: a 12-letter name with every letter accented
 local CLOSING = "Only guildies running the addon with stash sharing on answer."
 
 local function store()
@@ -140,7 +141,7 @@ local function matches(term)
   for _, o in ipairs(offers()) do
     local name = itemName(o.id)
     local holder = DT.nameOf(o.key)
-    if name and name:lower():find(want, 1, true) and #holder <= 12 then          -- guard: plain matching
+    if name and name:lower():find(want, 1, true) and #holder <= HOLDER_MAX then  -- guard: plain matching
       hits[#hits + 1] = { id = o.id, count = math.min(o.count, 99999), holder = holder }
     end
   end
@@ -149,7 +150,7 @@ local function matches(term)
     if a.id ~= b.id then return a.id < b.id end
     return a.holder < b.holder
   end)
-  while #hits > MAX_HITS do table.remove(hits) end                                -- guard: 5-hit cap
+  while #hits > MAX_HITS do table.remove(hits) end                                -- guard: 4-hit cap
   return hits
 end
 DT._stashMatches = matches
@@ -186,7 +187,7 @@ local function parseHits(s)
   local out = {}
   for part in (s .. ","):gmatch("([^,]*),") do
     local id, n, holder = part:match("^(%d+):(%d+):([^:,]+)$")
-    if not id or #id > 7 or #holder > 12 then return nil end
+    if not id or #id > 7 or #holder > HOLDER_MAX then return nil end
     n = tonumber(n)
     if n < 1 or n > 99999 then return nil end
     out[#out + 1] = { id = tonumber(id), count = n, holder = holder }
@@ -269,7 +270,7 @@ local function verb(msg)
   if low == "share on" then
     s.share = true
     scanBags()
-    return DT.out("stash sharing on. Guildies' searches can see your tradeable items, five at a time.")
+    return DT.out("stash sharing on. Guildies' searches can see your tradeable items, four at a time.")
   elseif low == "share off" then
     s.share = false
     s.chars = {}

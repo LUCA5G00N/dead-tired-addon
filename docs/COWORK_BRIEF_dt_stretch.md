@@ -15,6 +15,10 @@ in game. If the harness assigns you a different branch name, create that branch 
    `tests/test_roster.lua`.
 5. `reference/SPEC_forever_namespaces.md`: search it, don't read it top to bottom.
 
+**Amended 2026-11-02 by Tim, after the build:** stash answers carry **at most 4 hits** (was 5), and a
+holder name may be **up to 24 bytes** (was 12), so a 12-letter accented name fits. Longest STASH:
+245 bytes. The places below that changed are marked *(amended)*.
+
 **Draft-status:** **ratified by Tim 2026-11-02 (R1-R6 as proposed; R6: build now).** Written 2026-11-02, after cards 1, 3, 4 and 5 were
 built and **before any of them has been walked in game**. Card 1 is at `61fe2d3` on
 `card/dt_foundation`; Task 1 re-verifies every "already exists" claim against the branch you
@@ -65,7 +69,7 @@ The round may not be built while any of these is `proposed`. All six are ratifie
     search can therefore be answered by whichever of your characters is online, naming the
     character that holds the item.
   - Nothing is sent except answers to a guildie's search, and an answer carries only the items
-    matching that search, at most 5.
+    matching that search, at most 4 *(amended; was 5)*.
   - Answers travel on the guild addon channel, so other members' clients receive them too. Only
     the asker prints them.
   - Off by default.
@@ -162,14 +166,15 @@ usage).
 - Match `term` against `C_Item.GetItemNameByID(id)` for every item in every character entry on
   the account, case-insensitive, **plain substring, never a Lua pattern** (`string.find` with
   `plain = true`). Items whose name isn't loaded don't match.
-- At most **5** hits, largest count first.
+- At most **4** hits, largest count first *(amended; was 5)*.
 - Send `STASH {q, to=<asker>, hits=<id>:<count>:<holder name>,…}`, where the holder is the
   character name without its realm. With no hits, send nothing.
 
 **Receiving `STASH`:** only the client whose `charKey()` equals `to` and whose open search is `q`
 keeps it, once per sender.
-- Validate: `q` 1-6 digits; `to` is `Realm-Name`, 1-64 bytes; `hits` holds 1-5 entries, each
-  `^%d+:%d+:[^:,]+$`, with the id at most 7 digits, the count 1-99999 and the holder 1-12 bytes.
+- Validate: `q` 1-6 digits; `to` is `Realm-Name`, 1-64 bytes; `hits` holds 1-4 entries, each
+  `^%d+:%d+:[^:,]+$`, with the id at most 7 digits, the count 1-99999 and the holder 1-24 bytes
+  *(amended; was 1-5 entries and 1-12 bytes)*.
 - Invalid counts in `stash.badStash`. Nothing prints on receipt.
 
 **`/dt stash`** alone: the number of characters and distinct items on this account's list, and
@@ -225,7 +230,7 @@ ns.EventsList = {
 
 - **Opt-in, all three.** Stash, played and reminders are all off until switched on. With each
   off, its module sends nothing, prints nothing unasked, and (for stash) keeps no list.
-- **What leaves the client:** stash answers to a search (matching items only, at most 5), and
+- **What leaves the client:** stash answers to a search (matching items only, at most 4 *(amended)*), and
   PLAYED (`lvl`, `h`). Nothing else from this card. No full inventory, ever.
 - **No combat data.** No `COMBAT_LOG`, `CombatLog*`, `C_DeathRecap`, `UNIT_DIED`, `PARTY_KILL`.
 - **Nothing public.** No `SendChatMessage` in this card's files. **No `RequestTimePlayed`**
@@ -254,7 +259,7 @@ ns.EventsList = {
 4. **Stash search and answers**, three clients (sharing, sharing off, asker). Cover:
    - the 30 s window; the term length limits; a sharing member answers once, after 1-5 s;
    - an alt's items answer under the alt's name;
-   - at most 5 hits, largest first; no hits means no answer;
+   - at most 4 hits, largest first *(amended)*; no hits means no answer;
    - a term like `%a+` or `[` matches literally and never errors;
    - a non-sharing member sends nothing;
    - the summary text and order; late answers ignored; answers to others ignored;
@@ -269,9 +274,9 @@ ns.EventsList = {
    later today, and next week; "on now"; the countdown format; the clock absent; reminders off by
    default; on: the 30-minute line once, the start line once, nothing outside the window, nothing
    for a non-member, and none twice for one occurrence. Green.
-7. **Byte budget:** the longest `STASH` (5 hits of a 7-digit id, count 99999 and a 12-byte
+7. **Byte budget:** the longest `STASH` (4 hits of a 7-digit id, count 99999 and a 24-byte *(amended)*
    holder; `q` 999999; a 64-byte `to`), the longest `STASHQ` (a 32-byte term of `^`), and the
-   longest `PLAYED` are each at most 250 bytes. Worked at drafting: STASH 224, STASHQ 119.
+   longest `PLAYED` are each at most 250 bytes. Worked at drafting: STASH 224, STASHQ 119; after the amendment, STASH 245.
 8. **Full-addon check:** all eleven files (card 1's seven plus four) on two members and a
    non-member. A login prints only card 1's welcome; a stash search works end to end; the
    non-member sends and prints nothing.
@@ -280,7 +285,7 @@ ns.EventsList = {
 10. **Guard proofs.** Remove once, confirm a check goes red, restore:
     - stash: the `share` gate on scanning; the `share` gate on answering; the bound-item skip;
       the bank-constant guard; plain matching (change it to pattern matching, and see the `%a+`
-      check go red); the 5-hit cap; one answer per asker and search; `STASH` addressed to
+      check go red); the 4-hit cap *(amended)*; one answer per asker and search; `STASH` addressed to
       someone else ignored; `STASH` validation; the 30 s search window;
     - played: the `share` gate on sending; the 60 s window; `PLAYED` validation; the level-1
       exclusion;
@@ -312,7 +317,7 @@ card answers *what* you hold, and *which of your characters* holds it, when a gu
 R2 rules it. What still bounds it:
 - off until you switch it on;
 - tradeable items only;
-- only items matching the search, at most 5 per answer;
+- only items matching the search, at most 4 per answer *(amended)*;
 - nothing sent unless asked;
 - the term matched as plain text;
 - your list deleted when you switch sharing off.
