@@ -14,3 +14,4 @@ Comms.lua
 Roster.lua
 Alts.lua
 Welcome.lua
+Logs.lua
