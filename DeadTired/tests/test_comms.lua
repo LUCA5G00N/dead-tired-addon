@@ -82,8 +82,9 @@ do
   a.DT.send("TEST", { x = big })
   check("a long message is sent as 3 chunks", #a.sent == 3)
   local c1 = a.sent[1].text
-  check("chunk header: protocol ^ + ^ msgid ^ i ^ n ^ slice", c1:match("^1%^%+%^1%^1%^3%^") ~= nil
-    and a.sent[3].text:match("^1%^%+%^1%^3%^3%^") ~= nil)
+  local id0 = tonumber(c1:match("^1%^%+%^(%d+)%^"))
+  check("chunk header: protocol ^ + ^ msgid ^ i ^ n ^ slice", c1:match("^1%^%+%^%d+%^1%^3%^") ~= nil
+    and a.sent[3].text:match("^1%^%+%^" .. tostring(id0) .. "%^3%^3%^") ~= nil)
   local slices = {}
   for i = 1, 3 do slices[i] = a.sent[i].text:match("^1%^%+%^%d+%^%d+%^%d+%^(.*)$") end
   check("slices are at most 200 bytes and every chunk at most 255", #slices[1] == 200 and #slices[2] == 200
@@ -93,7 +94,10 @@ do
   check("reassembled and delivered once", #got == 1 and got[1].f.x == big)
   check("nothing left partial", next(b.DT._comms.partial()) == nil)
   a.DT.send("TEST", { x = big })
-  check("msgid is a per-session counter", a.sent[4].text:match("^1%^%+%^2%^1%^3%^") ~= nil)
+  check("msgid counts up within a session", a.sent[4].text:match("^1%^%+%^" .. (id0 + 1) .. "%^1%^3%^") ~= nil)
+  -- F5: the first msgid comes from the clock (time() % 100000), not 0, so a reload doesn't
+  -- reuse the ids of the session before it.
+  check("F5: the first msgid is time() % 100000 + 1", id0 == (a.env.time() % 100000) + 1)
   w:advance(5)
   check("the second long message arrives too", #got == 2)
 
