@@ -37,6 +37,28 @@ its own viewport (but built on a standard frame so the skin maintenance stays ea
 This replaces the 7 Nov "single viewport that follows the last window" idea: each module gets
 its own viewport instead. Nothing docks on Blizzard windows (the Wizardry dock stays Wizardry's).
 
+### The hybrid: mesh other addons in, don't rebuild them (Tim, 7 Nov 16:08)
+*Tim:* Naowh's "one addon to rule them all" mostly recreates good addons. Softer: our bar
+replaces minimap buttons, an info bar you place where you like (the old Titan Panel idea), and
+gives the popular addons a place to live. We still build our own modules, but don't take on the
+maintenance weight of full addons like the dungeon journal.
+
+How (proposal):
+- **The standard, not scraping.** Most addons publish a **LibDataBroker (LDB)** object (a launcher
+  or a line of text) and draw their minimap button with **LibDBIcon**. Titan Panel, ChocolateBar
+  and Bazooka are LDB hosts: that's how they "support" hundreds of addons without code for each.
+  Our bar is an LDB host too. Reparenting other addons' minimap buttons (the Minimap Button Bag
+  way) is the fragile fallback: it touches frames we didn't make. Later, if ever.
+- **Our modules publish LDB objects as well** (deaths today, who's on, recruit cooldown, quiz
+  streak), so they work in **any** bar, not only ours.
+- **Already on Forever:** Titan Panel and MinimapButtonButton (both in mein-mmo's top Forever
+  addons). So the honest order is: (1) DT publishes LDB objects, which costs little and works
+  with Titan today; (2) our own bar, only for what Titan doesn't give us: the Dead Tired skin,
+  one look with our viewports, and the launcher. If a guildie already runs Titan, they don't need
+  our bar.
+- The test applies to the bar itself: guildies who want an info bar already have one. Ours earns
+  its place by being the way into DT, and by looking like it.
+
 ## Comms (card 1, revised)
 - **R-1, the restricted-flag rule (needs Tim's ruling):** hold messages only while
   `C_ChatInfo.InChatMessagingLockdown()` is true (boss fights, M+, PvP matches); otherwise send,
