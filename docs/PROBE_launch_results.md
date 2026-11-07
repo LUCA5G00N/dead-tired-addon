@@ -4,10 +4,29 @@ What `DeadTiredProbe` 0.1.0 (`card/dt_probe` a25b538) recorded on the live clien
 session from the saved files; **Tim checks it**. This is the results doc the probe brief points
 at. It is not a walk result: `UAT_dt_probe.md` is still Tim's to walk.
 
-**Verdict: fork B, ruled by Tim on 7 Nov, 11:00 UK.** Addon messages are restricted on every
-read, and the one ping gave up after its full minute. The guildie half of the test was **not
-run, by decision** (it would only prove a negative we already expect). That is a known gap, kept
-on purpose: see *Gaps* below.
+**Verdict: fork A: addon messages work.** Superseded on 7 Nov 12:56-13:20 UK (see *Update* below).
+The probe found the restricted flag true on every login and held its ping, so the first draft of
+this doc (and Tim's 11:00 ruling) said fork B. Two hand tests then showed messages get through
+while the flag still says restricted: the flag is misleading on Forever (reason 4 in the restart
+note). Tim's account type was checked as well: not trial, not Veteran.
+
+## Update, 7 Nov 12:40-13:20 UK (hand tests, Tim's screenshots)
+
+| Time | Test | Result |
+|---|---|---|
+| 12:40 | `/dump IsTrialAccount(), IsVeteranTrialAccount()` | `false`, `false` (Tim's account is subscribed) |
+| 12:56:25 | `SendAddonMessage("DTT","hi","GUILD")` typed by Tim (two macros), flag still restricted | returned **0** (Success) |
+| 12:56:26 | `CHAT_MSG_ADDON` listener for prefix DTT | **`heard hi GUILD Stromham Hamson`**: the server took it and delivered it back |
+| ~13:20 | Naowh Forever's Group Inspect, in a party with Echo Nightclaw (also running Naowh) | "Everyone inspected": Echo's gear, talents and stats arrived by addon message, both ways |
+
+Why the probe never saw this: it obeys the house rule (`CLAUDE.md`: anything sent while
+restricted is queued), so it never sent. Naowh Forever 1.2.14 sends to GUILD, PARTY and WHISPER
+checking only `InChatMessagingLockdown` and the send result, never the restricted flag.
+
+**Consequence for DeadTired (a ruling for Tim, not applied here):** as built, DeadTired would hold
+every message for ever. The house rule needs changing to: hold while `InChatMessagingLockdown` is
+true; otherwise send and record the `SendAddonMessage` result (AUD-10's enum). Until then, every
+shared feature on rc2 is silent.
 
 ## Sources
 - `_forever_\WTF\Account\LUCASGOON\SavedVariables\DeadTiredProbe.lua` after the 7 Nov 10:51
@@ -58,8 +77,8 @@ an addon message heard.
 
 | Section (card question) | Forever says | What it means |
 |---|---|---|
-| **comms: restricted** (card 1, all shared features) | `AreOutgoingAddonChatMessagesRestricted` **true on 22 of 22 logins**: in and out of the guild, levels 1-18, six characters, fresh logins and reloads, out of combat, never in lockdown | **Fork B.** DeadTired's queue would hold for ever. Every shared feature is silent unless this changes |
-| **comms: ping** (card 1 G-checks) | Run 18, 10:33:22: `held on GUILD: addon messages restricted`. Retried 13 times; saved as `<gave up: still restricted after 60 s>`. Nothing was sent (house rule: held, not forced) | The flag doesn't lift within a minute of asking. Whether a send would actually be dropped is **not tested** (no forced send; Q1 not taken) |
+| **comms: restricted** (card 1, all shared features) | `AreOutgoingAddonChatMessagesRestricted` **true on 22 of 22 logins**: in and out of the guild, levels 1-18, six characters, fresh logins and reloads, out of combat, never in lockdown | The flag is **misleading**: messages go through anyway (*Update*). Under the current house rule DeadTired would hold for ever |
+| **comms: ping** (card 1 G-checks) | Run 18, 10:33:22: `held on GUILD: addon messages restricted`. Retried 13 times; saved as `<gave up: still restricted after 60 s>`. Nothing was sent (house rule: held, not forced) | The flag doesn't lift within a minute. The probe never sent; the hand tests (*Update*) did, and got through |
 | **comms: prefix** (AUD-10) | First registration returns **0** every login. In run 18 the ping registered again and got **1** | It's an enum: 0 = Success, 1 = DuplicatePrefix. **The probe's `registered = false` is the probe misreading**; registration works. Card 1's `Comms.lua` ignores the return, so it isn't affected |
 | **guild** (cards 1, 5) | Stromham: `DEAD TIRED`, Guild Master, rank 0, officer true, can speak true. Marvella (run 15): Initiate, officer **false**, can speak true. Before guild data loads, `GetGuildInfo` answers nil for about a second after login, then fills in | The guild gate and the officer check have real values both ways. Step 9's "officer flag seen both ways" is met by an alt, not a guildie |
 | **build** (card 1 P2) | 1.60.1 **70790** (3 Nov) until 7 Nov 01:00; **70862** (6 Nov) from 7 Nov 10:26. Interface **16001** throughout. `WOW_PROJECT_ID` 18. Game mode 1 | A client patch overnight on 6-7 Nov. No `.toc` change needed |
@@ -77,22 +96,17 @@ an addon message heard.
 | **target** (card 4) | Not run | Tim will run it when Alliance are about |
 | **logging try** (card 7) | Not run | Optional |
 
-## Gaps (kept on purpose)
-- **No guildie run.** Tim ruled (7 Nov) not to ask a guildie to install the probe just to confirm
-  a negative. So there's no second account's restricted flag, account type or level, and no ping
-  from a different account.
-- **No forced send.** Q1 (may the probe alone send once while restricted) was not taken. "Messages
-  are blocked" is inferred from the flag, not observed.
-- **Account type** (reason 2 in the restart note) not checked.
+## Gaps
+- **No guildie run of the probe.** Not needed now: the cross-player test was Naowh's Group Inspect
+  with Echo. A guildie's restricted flag is still unread (it doesn't matter if the rule changes).
+- **The probe's own ping** never sent (house rule). It would need the rule change to test.
 - **Target** and **logging try** not run yet.
 
-If Blizzard lifts the restriction later, the first sign will be the flag reading false at login.
-The probe can be put back to check.
 
 ## For the rulings round
 - **AUD-10:** record `SendAddonMessage` and `RegisterAddonMessagePrefix` results as the enum
   (0 = Success). Fix the probe's `registered` read at the same time.
 - **AUD-06:** pick the `Realm-Name` key form (spaced or normalised).
-- **Held-queue wording:** under fork B the queue never drains, so "held" must say so plainly.
-- **Card 2:** the draft's R2 shares by sending answers to guildies. Under fork B that can't
-  happen, so card 2 needs re-briefing, not just ratifying (see the recipes results).
+- **The restricted-flag rule** (above): the first ruling, because every shared card depends on it.
+- **Held-queue wording:** for lockdown only (boss fights, M+, PvP matches): say plainly it's held.
+- **Card 2:** its directory can work as drafted once the rule changes; native lookup is still off.

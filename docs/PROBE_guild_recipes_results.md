@@ -45,12 +45,9 @@ Caveats, for the ruling, not against the result:
 ## What it means for card 2 (for the rulings round, not decided here)
 - **R1** says: build the addon directory either way; no `dt_professions_native` follow-up if
   native doesn't work. **That follow-up is off.**
-- **But fork B (7 Nov) cuts deeper.** The directory itself (R2, R4) works by sending answers to a
-  guildie's search, and addon messages are restricted on every read
-  (`PROBE_launch_results.md`). As drafted, card 2 would be silent. It needs **re-briefing**
-  (R1's own "re-brief" option), not ratifying. The likely shape is solo-only (your own
-  professions and recipes, kept locally) with the shared directory routed through the Discord
-  bridge instead.
+- **Fork B was reversed the same day** (`PROBE_launch_results.md`, *Update*): addon messages do
+  get through. So card 2's addon directory (R2, R4) can work as drafted, once the house rule on
+  the restricted flag changes. It needs ratifying against this result, not re-briefing.
 - Whatever shape it takes, `GetAllRecipeIDs` needs the profession window open and ready, and
   recipe IDs from Forever's new recipes are large (1213638): no byte budgets that assume classic
   IDs.
