@@ -10,6 +10,11 @@ Tim walks it in game. If the harness assigns you a different branch name, create
 and AUD-07):** the double-press window lives in memory, and a stored `t` is the epoch; a received
 GANK is kept at most once per sender and enemy per 300 s. Marked *(amended, fix round 1)*.
 
+**Amended 2026-11-09 (fix round 3, AUD-06 in `docs/COWORK_BRIEF_dt_fixes3.md`):** `/dt gank`
+builds `who` with card 1's `DT.keyOf(name, realm)`, so the realm is spelt without spaces or
+hyphens; a received `who` is stored in that spelling; stored logs' `who` and `by` are rewritten
+once per account (`DeadTiredDB.gank.keysV = 2`). Changed lines are marked *(amended, fix round 3)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_pvp.md`.
@@ -115,8 +120,8 @@ received> }` *(amended, fix round 1: was `DT.now()`, the machine's uptime; a sto
 2. It must be the **other faction**: `clean(try(UnitFactionGroup, "target"))` and
    `clean(try(UnitFactionGroup, "player"))` are both non-empty strings, and they differ.
    Otherwise print *"That's one of ours. Put the pen down."* and stop.
-3. Read `name, realm = clean(try(UnitName, "target"))` (realm nil or empty means your own realm,
-   spelt as `GetRealmName` spells it), `cls = select(2, try(UnitClass, "target"))` (the
+3. Read `name, realm = clean(try(UnitName, "target"))` (realm nil or empty means your own realm;
+   `who = DT.keyOf(name, realm)`, the one key spelling *(amended, fix round 3)*), `cls = select(2, try(UnitClass, "target"))` (the
    upper-case class file, e.g. `ROGUE`), `lvl = clean(try(UnitLevel, "target"))`. **If the name is
    nil, secret or empty,** print *"The game won't say who that is right now. Try again out of
    combat."* and stop: nothing is recorded or sent. If `cls` is unreadable, store `"UNKNOWN"`; if
