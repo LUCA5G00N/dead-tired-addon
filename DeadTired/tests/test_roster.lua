@@ -36,10 +36,10 @@ do
   w:advance(60)
   check("settled: b never answers a reply; 3 HELLOs in all", hellos(a) == 2 and hellos(b) == 1)
   local ra, rb = a.DT.roster(), b.DT.roster()
-  check("each stores the other under the guild, Realm-Name", ra["Classic Beta PvP-Graverobber"]
-    and rb["Classic Beta PvP-Stromham"] and rb["Classic Beta PvP-Stromham"].v == "0.1.0"
-    and rb["Classic Beta PvP-Stromham"].seen == "2026-11-04 23:00:00" and b:db().roster["dead tired"] == rb)
-  check("each records itself as the account's own", ra["Classic Beta PvP-Stromham"].mine == true)
+  check("each stores the other under the guild, Realm-Name", ra["ClassicBetaPvP-Graverobber"]
+    and rb["ClassicBetaPvP-Stromham"] and rb["ClassicBetaPvP-Stromham"].v == "0.1.0"
+    and rb["ClassicBetaPvP-Stromham"].seen == "2026-11-04 23:00:00" and b:db().roster["dead tired"] == rb)
+  check("each records itself as the account's own", ra["ClassicBetaPvP-Stromham"].mine == true)
 
   -- A fresh HELLO from someone already answered (e.g. after /dt main) gets no second reply.
   b.DT.hello()
@@ -61,9 +61,9 @@ end
 do
   local w = H.world()
   local db = { roster = { ["dead tired"] = {
-    ["Classic Beta PvP-Lich"] = { v = "0.1.0", main = "", seen = "2026-11-03 01:00:00" },
+    ["ClassicBetaPvP-Lich"] = { v = "0.1.0", main = "", seen = "2026-11-03 01:00:00" },
     ["Nethergarde-Banshee"] = { v = "0.1.0", main = "Nethergarde-Banshee", seen = "2026-11-03 01:00:00" },
-    ["Classic Beta PvP-Myalt"] = { v = "0.1.0", main = "", seen = "x", mine = true },
+    ["ClassicBetaPvP-Myalt"] = { v = "0.1.0", main = "", seen = "x", mine = true },
   } } }
   local a = w:client({ name = "Stromham", guild = G, files = FILES, random = half, db = db })
   a:slash("who")
@@ -77,8 +77,8 @@ do
     a:said("this session (1): Lich ||TInterface||t") ~= nil and a:said("seen before (1): Banshee") ~= nil)
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^HELLO^main~nonsense^v~0.1.0", "GUILD", "Ghoul-ClassicBetaPvP")
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^HELLO^main~", "GUILD", "Wight-ClassicBetaPvP")
-  check("a HELLO with a bad main or no version is not stored", a.DT.roster()["Classic Beta PvP-Ghoul"] == nil
-    and a.DT.roster()["Classic Beta PvP-Wight"] == nil and a:db().comms.badHello == 2)
+  check("a HELLO with a bad main or no version is not stored", a.DT.roster()["ClassicBetaPvP-Ghoul"] == nil
+    and a.DT.roster()["ClassicBetaPvP-Wight"] == nil and a:db().comms.badHello == 2)
 end
 
 -- ---------------------------------------------------------------- three clients, an early reply
@@ -93,9 +93,9 @@ do
   c:login(); w:advance(3); a:login()
   w:advance(60)
   local heardA = a.DT._roster.heard()
-  check("three clients: everyone hears everyone", heardA["Classic Beta PvP-Graverobber"] and heardA["Classic Beta PvP-Ghoul"]
-    and b.DT._roster.heard()["Classic Beta PvP-Stromham"] and c.DT._roster.heard()["Classic Beta PvP-Stromham"]
-    and c.DT._roster.heard()["Classic Beta PvP-Graverobber"])
+  check("three clients: everyone hears everyone", heardA["ClassicBetaPvP-Graverobber"] and heardA["ClassicBetaPvP-Ghoul"]
+    and b.DT._roster.heard()["ClassicBetaPvP-Stromham"] and c.DT._roster.heard()["ClassicBetaPvP-Stromham"]
+    and c.DT._roster.heard()["ClassicBetaPvP-Graverobber"])
   local before = hellos(a) + hellos(b) + hellos(c)
   w:advance(120)
   check("three clients: settled, nothing more is said", hellos(a) + hellos(b) + hellos(c) == before)
@@ -185,11 +185,11 @@ do
   inject("1^HELLO^main~^s~1234567^v~0.1.0", "Wight-ClassicBetaPvP")
   w:advance(30)
   check("F1: a token that isn't 1-6 digits is refused and counted", a:db().comms.badHello == 2
-    and replies(a) == 0 and a.DT._roster.heard()["Classic Beta PvP-Ghoul"] == nil)
+    and replies(a) == 0 and a.DT._roster.heard()["ClassicBetaPvP-Ghoul"] == nil)
   inject("1^HELLO^main~^v~0.1.0", "Ghoul-ClassicBetaPvP")
   w:advance(30)
   check("F1: a HELLO with no token is answered (token 0)", replies(a) == 1
-    and a.DT._roster.answered()["Classic Beta PvP-Ghoul#0"] == true)
+    and a.DT._roster.answered()["ClassicBetaPvP-Ghoul#0"] == true)
   inject("1^HELLO^main~^s~0^v~0.1.0", "Ghoul-ClassicBetaPvP")
   w:advance(30)
   check("F1: ... and is the same session as an explicit s~0", replies(a) == 1)
@@ -223,6 +223,25 @@ do
     if not cs[i]:said("this session (4)") then all = false end
   end
   check("F2: every client lists every other (" .. total .. " messages in all)", all)
+end
+
+-- ---------------------------------------------------------------- AUD-06: display and sender keys
+do
+  local w = H.world()
+  local a = w:client({ name = "Stromham", realm = "Argent Dawn", guild = G, files = FILES, random = half })
+  local DT = a.DT
+  check("AUD-06: a sender Name-ArgentDawn and the local Argent Dawn realm give the same key",
+    DT.senderKey("Bob-ArgentDawn") == DT.keyOf("Bob", "Argent Dawn") and DT.senderKey("Bob") == "ArgentDawn-Bob"
+    and DT.charKey() == "ArgentDawn-Stromham" and DT.senderKey("Stromham-ArgentDawn") == DT.charKey())
+  check("AUD-06: display hides the own realm", DT.display("ArgentDawn-Bob") == "Bob"
+    and DT.display("Argent Dawn-Bob") == "Bob" and DT.display(DT.charKey()) == "Stromham")
+  check("AUD-06: display names another realm", DT.display("Nethergarde-Bob") == "Bob-Nethergarde")
+  a.normRealm = false
+  check("AUD-06: display hides the own realm on the GetRealmName fallback too", DT.display("ArgentDawn-Bob") == "Bob")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^HELLO^main~Argent Dawn-Bob^v~0.1.0", "GUILD", "Bob-ArgentDawn")
+  check("AUD-06: one entry per character; a main sent in the old spelling is stored in the new",
+    DT.roster()["ArgentDawn-Bob"] and DT.roster()["ArgentDawn-Bob"].main == "ArgentDawn-Bob"
+    and DT.roster()["Argent Dawn-Bob"] == nil)
 end
 
 H.finish("roster")

@@ -50,14 +50,44 @@ function DT.build()
   return tostring(v or "?") .. "-" .. tostring(b or "?")
 end
 
+-- Fix round 3 (AUD-06): one realm spelling for every character key, "NormalisedRealm-Name".
+-- DT.realmKey(realm): the realm with spaces and hyphens removed ("Argent Dawn" -> "ArgentDawn",
+-- as CHAT_MSG_ADDON spells it). With no realm, the player's own: GetNormalizedRealmName when it
+-- answers a non-empty string, else GetRealmName, normalised the same way. nil when unknown.
+function DT.realmKey(realm)
+  if realm == nil then
+    realm = clean(try(GetNormalizedRealmName))
+    if type(realm) ~= "string" or realm == "" then realm = clean(try(GetRealmName)) end
+  end
+  if type(realm) ~= "string" then return nil end
+  realm = realm:gsub("[%s%-]", "")                                       -- guard: realmKey normalise (AUD-06)
+  if realm == "" then return nil end
+  return realm
+end
+
+-- DT.keyOf(name, realm): the character key; realm nil means the player's own realm.
+function DT.keyOf(name, realm)
+  if type(name) ~= "string" or name == "" then return nil end
+  local r = DT.realmKey(realm)
+  if not r then return nil end
+  return r .. "-" .. name
+end
+
+-- A stored "Realm-Name" key in the one spelling; anything that isn't a key comes back as it was.
+function DT.normKey(key)
+  if type(key) ~= "string" then return key end
+  local name = key:match("%-([^%-]+)$")
+  if not name then return key end
+  return DT.keyOf(name, key:sub(1, #key - #name - 1)) or key
+end
+
 -- nil until the client can name the character (UnitName answers "Unknown" at ADDON_LOADED on
 -- a cold login).
 function DT.charKey()
-  local name, realm = clean(try(UnitName, "player")), clean(try(GetRealmName))
+  local name = clean(try(UnitName, "player"))
   if type(name) ~= "string" or name == "" or name == "Unknown"
      or (UNKNOWNOBJECT and name == UNKNOWNOBJECT) then return nil end
-  if type(realm) ~= "string" or realm == "" then return nil end
-  return realm .. "-" .. name
+  return DT.keyOf(name)
 end
 
 function DT.after(d, fn)
@@ -79,12 +109,66 @@ function DT.safe(s, max)
   return s
 end
 
--- "Realm-Name" -> "Name". Character names never contain "-", realms may.
+-- "Realm-Name" -> "Name". Character names never contain "-"; a realm in an old key may.
 function DT.nameOf(key)
   return type(key) == "string" and (key:match("%-([^%-]+)$") or key) or "?"
 end
 
 -- ---------------------------------------------------------------- the store
+
+-- Fix round 3 (AUD-06): rewrite a stored table's character keys to the one spelling.
+-- tbl's string keys that are character keys are rewritten; so is each named field (`fields`, a
+-- list) of every entry that is a table. Where two old keys collapse into one, the entry with the
+-- newer `stamp` field (default "seen"; stamps compare as strings or numbers) is kept; on a tie,
+-- or with no stamp, the entry already under the new key (else the first old key, sorted) stays.
+-- Safe to run again: a key already in the one spelling is left alone. Returns rewritten, merged.
+local function newer(a, b, stamp)
+  local sa = type(a) == "table" and a[stamp] or nil
+  local sb = type(b) == "table" and b[stamp] or nil
+  if sa == nil then return false end
+  if sb == nil then return true end
+  if type(sa) ~= type(sb) or (type(sa) ~= "string" and type(sa) ~= "number") then return false end
+  return sa > sb
+end
+
+function DT.migrateKeys(tbl, fields, stamp)
+  if type(tbl) ~= "table" then return 0, 0 end
+  stamp = stamp or "seen"
+  local n, merged = 0, 0
+  for _, e in pairs(tbl) do
+    if type(e) == "table" then
+      for _, f in ipairs(fields or {}) do
+        local v = DT.normKey(e[f])
+        if v ~= e[f] then e[f] = v; n = n + 1 end
+      end
+    end
+  end
+  local moves = {}
+  for k in pairs(tbl) do
+    if type(k) == "string" and DT.normKey(k) ~= k then moves[#moves + 1] = k end
+  end
+  table.sort(moves)
+  for _, k in ipairs(moves) do
+    local nk, e = DT.normKey(k), tbl[k]
+    tbl[k] = nil
+    n = n + 1
+    if tbl[nk] == nil then tbl[nk] = e
+    else
+      merged = merged + 1
+      if newer(e, tbl[nk], stamp) then tbl[nk] = e end
+    end
+  end
+  return n, merged
+end
+
+-- Once per account (DeadTiredDB.keysV = 2): the roster and the alt registry (every roster key,
+-- every entry's main, the account's main) move to the one spelling.
+local function migrate(db)
+  if db.keysV == 2 then return end                                      -- guard: migration runs once (AUD-06)
+  for _, g in pairs(db.roster) do DT.migrateKeys(g, { "main" }) end
+  db.account.main = DT.normKey(db.account.main)
+  db.keysV = 2
+end
 
 -- One SavedVariables table, account-wide. Created and filled with defaults on first use.
 function DT.db()
@@ -98,6 +182,7 @@ function DT.db()
   if type(db.roster) ~= "table" then db.roster = {} end
   if type(db.account) ~= "table" then db.account = {} end
   if db.welcome == nil then db.welcome = true end
+  migrate(db)
   return db
 end
 
@@ -188,6 +273,16 @@ function DT.help()
   DT.out(DT.VERSION .. ", still twitching. /dt " .. table.concat(names, " | "))
 end
 
+-- DT.inCommand is true while a typed /dt verb runs (fix round 3: Comms says "held" only to a
+-- player who asked for something, never for a send the addon makes by itself).
+local function run(fn, msg)
+  DT.inCommand = true
+  local r = { pcall(fn, msg) }
+  DT.inCommand = false
+  if not r[1] then error(r[2], 0) end
+  return unpack(r, 2, table.maxn(r))
+end
+
 function DT.dispatch(msg)
   DT.raw = (msg or ""):gsub("^%s+", ""):gsub("%s+$", "")
   msg = DT.raw:lower()
@@ -201,7 +296,7 @@ function DT.dispatch(msg)
     if (msg == v.prefix or msg:sub(1, #v.prefix + 1) == v.prefix .. " ")
        and (not best or #v.prefix > #best.prefix) then best = v end
   end
-  if best then return best.fn(msg) end
+  if best then return run(best.fn, msg) end
   return DT.help()
 end
 
