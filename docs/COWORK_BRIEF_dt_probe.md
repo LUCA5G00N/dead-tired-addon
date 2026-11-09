@@ -40,6 +40,10 @@ unknown until launch. So every section must work, and record usefully, **outside
 sections 2, 3 and 13 record that there is no guild, and `ping` falls back to a party. The probe
 can be run again once the guild exists; each run is kept (see *Shape of the record*).
 
+**Amended 2026-11-09 (fix round 3, AUD-10 in `docs/COWORK_BRIEF_dt_fixes3.md`):** section 4's
+`registered` is true when `RegisterAddonMessagePrefix` returned `0` (Success), `1`
+(DuplicatePrefix) or `true`; the raw return is still recorded in `register`. Nothing else changed.
+
 ## Ratified for this round
 
 - **Q1: the probe may read what the cards may not.** It is Tim's diagnostic tool, run on his own

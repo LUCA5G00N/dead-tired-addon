@@ -792,5 +792,21 @@ check("instances: entries print nothing", #S.printed == 1)
 check("logging and instances: no LoggingCombat or LoggingChat call", (S.calls.LoggingCombat or 0) == 0
   and (S.calls.LoggingChat or 0) == 0)
 
+-- ---------------------------------------------------------------- fix round 3: the registered read (AUD-10)
+for _, case in ipairs({ { "0 (Success)", 0, true }, { "1 (DuplicatePrefix)", 1, true }, { "true", true, true },
+    { "2", 2, false }, { "false", false, false }, { "an error", "error", false } }) do
+  local p = fresh(function()
+    C_ChatInfo.RegisterAddonMessagePrefix = function()
+      if case[2] == "error" then error("no prefix for you") end
+      return case[2]
+    end
+  end)
+  local c = secs(p).comms
+  check("registered (AUD-10): return " .. case[1] .. " -> " .. tostring(case[3]), c.registered == case[3])
+  if case[2] ~= "error" then
+    check("registered (AUD-10): the raw return " .. case[1] .. " is kept", c.register == case[2])
+  end
+end
+
 realPrint(string.format("probe: %d passed, %d failed", passes, fails))
 os.exit(fails == 0 and 0 or 1)

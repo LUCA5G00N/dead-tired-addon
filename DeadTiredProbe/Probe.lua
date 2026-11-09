@@ -302,9 +302,12 @@ end
 
 -- ---------------------------------------------------------------- 4 comms (PEW + 15 s, ping, messages)
 
+-- Fix round 3 (AUD-10): registered when the client answers 0 (Success), 1 (DuplicatePrefix: the
+-- prefix is already ours) or true. The raw return is kept in `register` as before.
 local function register(sec)
   sec.register = A1("C_ChatInfo.RegisterAddonMessagePrefix", PREFIX)
-  sec.registered = sec.register == true
+  local r = sec.register
+  sec.registered = r == 0 or r == 1 or r == true                         -- guard: registered read (AUD-10)
 end
 
 function S.comms(sec)
