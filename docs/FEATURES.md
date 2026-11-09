@@ -106,6 +106,25 @@ help (Naowh, Questie-style addons), threat, swing, macros, action bars, auto-rep
 Session, Money, Rep, Quests and Professions panes; marks and the kill counter; every recorder;
 the hub. Skills pane: drop (duplicated twice).
 
+## Licences and publishing (7-9 Nov)
+- **DeadTired is MIT** (*Tim*, 9 Nov). `LICENSE` at the repo root; copyright line reads
+  `LUCA5G00N` (change to a real name if wanted).
+- **Bundled libraries** (all fine when shipped inside DT, each with its own licence/notice kept):
+  LibStub and ChatThrottleLib (public domain), CallbackHandler (BSD 2-clause), Ace3 incl.
+  AceComm/AceDB (BSD-style; never redistribute it standalone), LibDBIcon (Ace3-style BSD),
+  LibSharedMedia (LGPL 2.1: keep it as its own unmodified file), LibSerialize (MIT), LibDeflate
+  (zlib). **LibDataBroker-1.1: licence unclear: confirm before the first release.**
+- **Proposed library set** (ruling): LibStub, CallbackHandler, LibDataBroker, LibDBIcon,
+  LibSharedMedia, AceComm + ChatThrottleLib, LibSerialize, LibDeflate; maybe AceDB. DT keeps its
+  own module core. Needs a `CLAUDE.md` line on bundling third-party libraries.
+- **Publishing:** CurseForge has no upload fee; authors must be of age, grant Overwolf a
+  distribution licence, include bundled licences, and may not copy code/text/design from other
+  mods. Also Wago and GitHub releases; the BigWigs packager uploads to all three. Check the name
+  "Dead Tired" is free on each. Blizzard's add-on policy (free, not obfuscated, no in-game
+  solicitation): confirm against the current page before release.
+- **Lesson from Naowh (Tim, 9 Nov):** a lot of undescribed automation. DT stays quiet, and every
+  automatic action it takes is described where the player switches it on.
+
 ## Rulings needed (draft as questions; Tim decides)
 1. **R-1:** the restricted-flag rule (above). First, because every shared module waits on it.
 2. AUD-10 (send results as the enum; fix the probe's `registered` read) and AUD-06 (realm key).
@@ -116,7 +135,8 @@ the hub. Skills pane: drop (duplicated twice).
 5. **Shell:** the launcher bar is a new "shows unasked" element: on by default or opt-in?
 6. **Skins:** the Dead Tired skin's look (colours, textures). Who curates.
 7. **WizardryLogPrompt:** retire (proposal) or keep.
-8. **What's Training's data:** use it (MIT, with credit) for the level-up card, or keep the card
+8. **Libraries:** the proposed set above, and the `CLAUDE.md` bundling rule.
+9. **What's Training's data:** use it (MIT, with credit) for the level-up card, or keep the card
    to the talent point.
 
 ## Proposed order (rounds kept few: every round costs plan usage)
