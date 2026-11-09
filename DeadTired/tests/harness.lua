@@ -9,8 +9,14 @@
 -- Stub style follows reference/wizardry/tests/test_forever_core.lua: GetTime, date, time,
 -- GetBuildInfo ("1.60.1", "70245"), UnitName, GetRealmName ("Classic Beta PvP"), issecretvalue,
 -- C_Timer.After, DEFAULT_CHAT_FRAME, CreateFrame with RegisterEvent / SetScript.
+-- Fix round 3: GetNormalizedRealmName (the realm without spaces or hyphens; c.normRealm
+-- overrides it, false makes it answer nil, "absent" removes it), C_ChatInfo.InChatMessagingLockdown
+-- (c.lockdown: true / false, "absent" or "error"), and a settable SendAddonMessage result
+-- (c.sendResult: 0 by default; H.NIL answers nil; a function is called; anything that isn't a
+-- success is refused: kept in c.refused, not sent, not delivered).
 
 local H = {}
+H.NIL = {}
 
 local here = (arg and arg[0] or ""):match("^(.*)[/\\]tests[/\\][^/\\]+$")
 H.addonDir = here or "DeadTired"
@@ -81,7 +87,7 @@ Client.__index = Client
 function World:client(opts)
   local c = setmetatable({ world = self, name = opts.name or "Stromham", realm = opts.realm or "Classic Beta PvP",
     guild = opts.guild, printed = {}, sent = {}, frames = {}, registered = {}, secrets = {},
-    restricted = false, sendError = false, ns = {}, opts = opts, uptimeOffset = opts.uptimeOffset or 0 }, Client)
+    restricted = false, sendError = false, lockdown = false, sendResult = 0, refused = {}, ns = {}, opts = opts, uptimeOffset = opts.uptimeOffset or 0 }, Client)
   local env = setmetatable({}, { __index = _G })
   c.env = env
   env._G = env
@@ -93,6 +99,12 @@ function World:client(opts)
   env.time = function() return 1793833200 + math.floor(self.t - 1000) end
   env.GetBuildInfo = function() return "1.60.1", "70245", "Nov 1 2026", 16001 end
   env.GetRealmName = function() return c.realm end
+  env.GetNormalizedRealmName = function()
+    if c.normRealm == false then return nil end
+    if c.normRealm ~= nil then return c.normRealm end
+    return (c.realm:gsub("[%s%-]", ""))
+  end
+  if opts.normRealm == "absent" then env.GetNormalizedRealmName = nil end
   env.UnitName = function(u) if u == "player" then return c.name end end
   env.issecretvalue = function(v) return c.secrets[v] == true end
   env.GetGuildInfo = function(u)
@@ -103,15 +115,27 @@ function World:client(opts)
   env.C_Timer = { After = function(d, fn) self:schedule(d, fn) end }
   env.C_ChatInfo = {
     RegisterAddonMessagePrefix = function(p) c.registered[p] = true return true end,
-    AreOutgoingAddonChatMessagesRestricted = function() return c.restricted end,
+    AreOutgoingAddonChatMessagesRestricted = function() c.flagCalls = (c.flagCalls or 0) + 1 return c.restricted end,
+    InChatMessagingLockdown = function()
+      if c.lockdown == "error" then error("no lockdown info") end
+      return c.lockdown
+    end,
     SendAddonMessage = function(prefix, text, chan)
       if c.sendError then error("send failed") end
       assert(type(text) == "string" and #text <= 255, "addon message over 255 bytes")
+      local r = c.sendResult
+      if type(r) == "function" then r = r(text) end
+      if r == H.NIL then r = nil end
+      if not (r == 0 or r == true or r == nil) then
+        table.insert(c.refused, { prefix = prefix, text = text, chan = chan, t = self.t, r = r })
+        return r
+      end
       table.insert(c.sent, { prefix = prefix, text = text, chan = chan, t = self.t })
       self:deliver(c, prefix, text, chan)
-      return 0
+      return r
     end,
   }
+  if opts.lockdown == "absent" then env.C_ChatInfo.InChatMessagingLockdown = nil end
   env.DEFAULT_CHAT_FRAME = { AddMessage = function(_, m) table.insert(c.printed, m) end }
   env.SlashCmdList = {}
   env.CreateFrame = function()
@@ -185,7 +209,9 @@ function Client:said(needle)
   for _, m in ipairs(self.printed) do if m:find(needle, 1, true) then return m end end
 end
 
-function Client:key() return self.realm .. "-" .. self.name end
+-- The one key spelling (fix round 3, AUD-06): the realm without spaces or hyphens.
+function Client:key() return self.realm:gsub("[%s%-]", "") .. "-" .. self.name end
+function Client:oldKey() return self.realm .. "-" .. self.name end
 
 function Client:db() return self.env.DeadTiredDB end
 
