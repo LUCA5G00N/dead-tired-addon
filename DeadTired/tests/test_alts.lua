@@ -24,19 +24,19 @@ strom:slash("alts")
 check("no main yet: /dt alts says so", strom:said("you haven't named a main") ~= nil)
 local n0 = #strom.sent
 strom:slash("main")
-check("/dt main sets the account's main", timDB.account.main == "Classic Beta PvP-Stromham"
+check("/dt main sets the account's main", timDB.account.main == "ClassicBetaPvP-Stromham"
   and strom:said("Stromham is now your main") ~= nil)
 check("/dt main sends a fresh HELLO carrying the main", #strom.sent == n0 + 1
-  and lastHello(strom).text == "1^HELLO^main~Classic Beta PvP-Stromham^s~" .. strom.DT.sessionToken .. "^v~0.1.0")
+  and lastHello(strom).text == "1^HELLO^main~ClassicBetaPvP-Stromham^s~" .. strom.DT.sessionToken .. "^v~0.1.0")
 w:advance(30)
-check("the guildie stores Stromham's main", pal.DT.roster()["Classic Beta PvP-Stromham"].main == "Classic Beta PvP-Stromham")
+check("the guildie stores Stromham's main", pal.DT.roster()["ClassicBetaPvP-Stromham"].main == "ClassicBetaPvP-Stromham")
 check("and does not reply to a HELLO from someone already answered", #pal.sent == 2)
 strom:logout()
 
 -- Tim logs an alt on the same account: same SavedVariables, so the same main.
 local alt = w:client({ name = "Bonechill", guild = G, files = FILES, random = half, db = timDB })
 alt:login(); w:advance(30)
-check("the alt's login HELLO reports the account's main", lastHello(alt).text:find("main~Classic Beta PvP-Stromham", 1, true) ~= nil)
+check("the alt's login HELLO reports the account's main", lastHello(alt).text:find("main~ClassicBetaPvP-Stromham", 1, true) ~= nil)
 pal:slash("alts Bonechill")
 check("/dt alts <alt> on the other side names Stromham as main and the alt in the group",
   pal:said("Stromham's lot: main Stromham; alts (1): Bonechill.") ~= nil)
@@ -63,7 +63,7 @@ check("and sends a fresh HELLO with no main", lastHello(alt).text == "1^HELLO^ma
 w:advance(30)
 pal:slash("alts bonechill")
 check("the other side sees the main gone", pal:said("Bonechill hasn't named a main.") ~= nil)
-check("the account's own entries lose the main too", timDB.roster["dead tired"]["Classic Beta PvP-Stromham"].main == "")
+check("the account's own entries lose the main too", timDB.roster["dead tired"]["ClassicBetaPvP-Stromham"].main == "")
 alt:slash("main banana")
 check("/dt main <anything else> explains itself and changes nothing", timDB.account.main == nil
   and alt:said("/dt main clear forgets it") ~= nil)
@@ -74,5 +74,35 @@ pal:slash("alts bonechill")
 check("the same name on two realms asks for the realm", pal:said("more than one bonechill") ~= nil)
 pal:slash("alts bonechill-nethergarde")
 check("and the realm picks one", pal:said("Bonechill-Nethergarde hasn't named a main.") ~= nil)
+
+-- ---------------------------------------------------------------- AUD-06: the migration at load
+do
+  local w = H.world()
+  local db = { account = { main = "Argent Dawn-Stromham" }, roster = { ["dead tired"] = {
+    ["Argent Dawn-Stromham"] = { v = "0.1.0", main = "Argent Dawn-Stromham", seen = "2026-11-01 20:00:00", mine = true },
+    ["ArgentDawn-Stromham"] = { v = "0.1.0", main = "", seen = "2026-11-01 19:00:00" },
+    ["Argent Dawn-Bonechill"] = { v = "0.1.0", main = "Argent Dawn-Stromham", seen = "2026-11-01 18:00:00", mine = true },
+    ["ArgentDawn-Bonechill"] = { v = "0.1.0", main = "Argent Dawn-Stromham", seen = "2026-11-02 18:00:00" },
+    ["Nethergarde-Ghoul"] = { v = "0.1.0", main = "Nethergarde-Ghoul", seen = "2026-11-01 18:00:00" },
+  } } }
+  local a = w:client({ name = "Stromham", realm = "Argent Dawn", guild = G, files = FILES, db = db })
+  local r = db.roster["dead tired"]
+  local n = 0
+  for _ in pairs(r) do n = n + 1 end
+  check("AUD-06 migration: every roster key rewritten, collapsing pairs merged (3 entries)", n == 3
+    and r["Argent Dawn-Stromham"] == nil and r["Argent Dawn-Bonechill"] == nil and r["Nethergarde-Ghoul"])
+  check("AUD-06 migration: the merge keeps the newer seen", r["ArgentDawn-Stromham"].mine == true
+    and r["ArgentDawn-Stromham"].seen == "2026-11-01 20:00:00" and r["ArgentDawn-Bonechill"].seen == "2026-11-02 18:00:00")
+  check("AUD-06 migration: each main and the account's main rewritten", db.account.main == "ArgentDawn-Stromham"
+    and r["ArgentDawn-Stromham"].main == "ArgentDawn-Stromham" and r["ArgentDawn-Bonechill"].main == "ArgentDawn-Stromham")
+  check("AUD-06 migration: flagged once for the account", db.keysV == 2)
+  a:slash("alts")
+  check("AUD-06 migration: /dt alts shows the main and the alt once each", a:said("Stromham's lot: main Stromham; alts (1): Bonechill.") ~= nil)
+  -- A key in the old spelling written after the migration (as an old copy would): not touched again.
+  r["Argent Dawn-Wight"] = { v = "0.1.0", main = "", seen = "x" }
+  local b = w:client({ name = "Stromham", realm = "Argent Dawn", guild = G, files = FILES, db = db })
+  check("AUD-06 migration: runs once per account, not at every load", r["Argent Dawn-Wight"] ~= nil
+    and r["ArgentDawn-Wight"] == nil and b.DT.db().keysV == 2)
+end
 
 H.finish("alts")

@@ -42,12 +42,12 @@ end
 DT.roster = store
 
 -- A key as people read it: the name alone on the player's own realm, Name-Realm elsewhere.
+-- Fix round 3 (AUD-06): "own realm" is tested in the one key spelling, DT.realmKey().
 function DT.display(key)
   if type(key) ~= "string" or key == "" then return "?" end
   local name = DT.nameOf(key)
   local realm = key:sub(1, #key - #name - 1)
-  local own = DT.clean(DT.try(GetRealmName))
-  if realm == "" or realm == own then return DT.safe(name, 24) end
+  if realm == "" or DT.realmKey(realm) == DT.realmKey() then return DT.safe(name, 24) end
   return DT.safe(name .. "-" .. realm, 48)
 end
 
@@ -75,6 +75,7 @@ DT.on("HELLO", function(from, f)
     c.badHello = (c.badHello or 0) + 1
     return
   end
+  main = DT.normKey(main)                       -- AUD-06: a main sent in an old spelling
   store()[from] = { v = v, main = main, seen = DT.stamp() }
   heard[from] = DT.now()
   if f.r == "1" then return end                 -- a reply is never replied to
