@@ -152,7 +152,7 @@ do
   check("each invalid PLAYED is counted in badPlayed and not stored", a:db().played.badPlayed == #bad
     and next(a.DT.playedBoard()) == nil)
   inject("1^PLAYED^h~100000^lvl~100")
-  check("the edges are valid", a.DT.playedBoard()["Classic Beta PvP-Ghoul"].hours == 100000)
+  check("the edges are valid", a.DT.playedBoard()["ClassicBetaPvP-Ghoul"].hours == 100000)
 end
 
 -- ---------------------------------------------------------------- the award
@@ -221,37 +221,37 @@ do
   played(b, 360000, 3600)
   w:advance(1)
   check("F9 baseline: B's play time is on A's and C's boards, with the time received",
-    a.DT.playedBoard()["Classic Beta PvP-Graverobber"] ~= nil and c.DT.playedBoard()["Classic Beta PvP-Graverobber"] ~= nil
-    and a.DT.playedBoard()["Classic Beta PvP-Graverobber"].t == a.env.time() - 1)
+    a.DT.playedBoard()["ClassicBetaPvP-Graverobber"] ~= nil and c.DT.playedBoard()["ClassicBetaPvP-Graverobber"] ~= nil
+    and a.DT.playedBoard()["ClassicBetaPvP-Graverobber"].t == a.env.time() - 1)
   c:logout()            -- C is offline when B withdraws
   b:slash("slowest share off")
   check("F9: share off sends one PLAYED with off~1 and nothing else", sentKind(b, "PLAYED")[2] == "1^PLAYED^off~1"
     and #sentKind(b, "PLAYED") == 2)
   check("F9: the share-off line, exactly",
     b.printed[1] == P .. "not sharing your /played. Your entry is being withdrawn from guildies' boards.")
-  check("F9: and B's own entry leaves B's board", b.DT.playedBoard()["Classic Beta PvP-Graverobber"] == nil)
+  check("F9: and B's own entry leaves B's board", b.DT.playedBoard()["ClassicBetaPvP-Graverobber"] == nil)
   w:advance(1)
-  check("F9: a guildie online deletes B's entry on off~1", a.DT.playedBoard()["Classic Beta PvP-Graverobber"] == nil)
+  check("F9: a guildie online deletes B's entry on off~1", a.DT.playedBoard()["ClassicBetaPvP-Graverobber"] == nil)
   a:slash("slowest")
   check("F9: and B is off A's award", a.printed[1] == P .. "No contenders. Everyone's either fast or shy.")
   -- malformed withdrawals are counted and change nothing
   local bad0 = a:db().played.badPlayed
-  a.DT.playedBoard()["Classic Beta PvP-Wight"] = { lvl = 20, hours = 50, t = a.env.time() }
+  a.DT.playedBoard()["ClassicBetaPvP-Wight"] = { lvl = 20, hours = 50, t = a.env.time() }
   for _, t in ipairs({ "1^PLAYED^off~2", "1^PLAYED^h~5.0^lvl~20^off~1", "1^PLAYED^off~" }) do
     a:fire("CHAT_MSG_ADDON", "DEADTIRED", t, "GUILD", "Wight-ClassicBetaPvP")
   end
   check("F9: a withdrawal with another value or other fields is counted bad, nothing deleted",
-    a:db().played.badPlayed == bad0 + 3 and a.DT.playedBoard()["Classic Beta PvP-Wight"] ~= nil)
+    a:db().played.badPlayed == bad0 + 3 and a.DT.playedBoard()["ClassicBetaPvP-Wight"] ~= nil)
   -- C, offline at the time, keeps the entry until it ages out: 30 days
   local cdb = c:db()
   w:advance(29 * 86400)
   local c2 = client(w, { name = "Ghoul", db = cdb })
-  check("F9: at 29 days an offline guildie still has the entry", c2.DT.playedBoard()["Classic Beta PvP-Graverobber"] ~= nil)
+  check("F9: at 29 days an offline guildie still has the entry", c2.DT.playedBoard()["ClassicBetaPvP-Graverobber"] ~= nil)
   c2:slash("slowest")
   check("F9: ... and still shows it", c2:said("Graverobber") ~= nil)
   w:advance(86400 + 10)
   c2:slash("slowest")
-  check("F9: past 30 days, /dt slowest drops it before printing", c2.DT.playedBoard()["Classic Beta PvP-Graverobber"] == nil
+  check("F9: past 30 days, /dt slowest drops it before printing", c2.DT.playedBoard()["ClassicBetaPvP-Graverobber"] == nil
     and c2.printed[1] == P .. "No contenders. Everyone's either fast or shy.")
 end
 
@@ -260,21 +260,40 @@ do
   local w = H.world()
   local now = 1793833200
   local db = { played = { share = false, badPlayed = 0, ["dead tired"] = {
-    ["Classic Beta PvP-Old"] = { lvl = 30, hours = 100, t = now - 31 * 86400 },
-    ["Classic Beta PvP-Notime"] = { lvl = 30, hours = 100 },
-    ["Classic Beta PvP-Fresh"] = { lvl = 30, hours = 100, t = now - 86400 } } } }
+    ["ClassicBetaPvP-Old"] = { lvl = 30, hours = 100, t = now - 31 * 86400 },
+    ["ClassicBetaPvP-Notime"] = { lvl = 30, hours = 100 },
+    ["ClassicBetaPvP-Fresh"] = { lvl = 30, hours = 100, t = now - 86400 } } } }
   local a = client(w, { name = "Stromham", db = db })
   local b = a.DT.playedBoard()
-  check("F9: at load, an entry over 30 days old is dropped", b["Classic Beta PvP-Old"] == nil)
-  check("F9: at load, an entry with no time is dropped", b["Classic Beta PvP-Notime"] == nil)
-  check("F9: at load, a recent entry stays", b["Classic Beta PvP-Fresh"] ~= nil)
+  check("F9: at load, an entry over 30 days old is dropped", b["ClassicBetaPvP-Old"] == nil)
+  check("F9: at load, an entry with no time is dropped", b["ClassicBetaPvP-Notime"] == nil)
+  check("F9: at load, a recent entry stays", b["ClassicBetaPvP-Fresh"] ~= nil)
   -- no clock: nothing is dropped
   local db2 = { played = { share = false, badPlayed = 0, ["dead tired"] = {
-    ["Classic Beta PvP-Old"] = { lvl = 30, hours = 100, t = now - 31 * 86400 } } } }
+    ["ClassicBetaPvP-Old"] = { lvl = 30, hours = 100, t = now - 31 * 86400 } } } }
   local x = client(w, { name = "Wight", db = db2, load = false })
   x.env.time = function() error("no clock") end
   x:fire("ADDON_LOADED", "DeadTired")
-  check("F9: with no readable clock nothing is dropped", x.DT.playedBoard()["Classic Beta PvP-Old"] ~= nil)
+  check("F9: with no readable clock nothing is dropped", x.DT.playedBoard()["ClassicBetaPvP-Old"] ~= nil)
+end
+
+-- ---------------------------------------------------------------- fix round 3 (AUD-06)
+do
+  local w = H.world()
+  local now = 1793833200
+  local db = { played = { share = false, badPlayed = 0, ["dead tired"] = {
+    ["Classic Beta PvP-Ghoul"] = { lvl = 30, hours = 100, t = now - 86400 },
+    ["Argent Dawn-Wight"] = { lvl = 20, hours = 50, t = now - 100 },
+    ["ArgentDawn-Wight"] = { lvl = 19, hours = 45, t = now - 5000 } } } }
+  local a = client(w, { name = "Stromham", db = db })
+  local b = db.played["dead tired"]
+  check("AUD-06: an old spaced key on the played board is rewritten", b["ClassicBetaPvP-Ghoul"] ~= nil
+    and b["Classic Beta PvP-Ghoul"] == nil and db.played.keysV == 2)
+  check("AUD-06: two keys collapsing into one keep the newer t", b["ArgentDawn-Wight"].lvl == 20
+    and b["Argent Dawn-Wight"] == nil)
+  b["Classic Beta PvP-Lich"] = { lvl = 20, hours = 50, t = now - 100 }
+  client(w, { name = "Stromham", db = db })
+  check("AUD-06: the played migration runs once", b["Classic Beta PvP-Lich"] ~= nil)
 end
 
 H.finish("played")

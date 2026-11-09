@@ -170,9 +170,20 @@ end
 -- For the offline tests only.
 DT._played = { hooked = function() return hooked end, stamp = function() return typedAt end }
 
+-- Fix round 3 (AUD-06): every board's keys move to the one key spelling, once per account
+-- (DeadTiredDB.played.keysV = 2). Where two collapse into one, the newer t (time()) is kept.
+local function migrate()
+  local p = store()
+  if p.keysV == 2 then return end                                      -- guard: played migration once
+  for _, b in pairs(p) do
+    if type(b) == "table" then DT.migrateKeys(b, {}, "t") end
+  end
+  p.keysV = 2
+end
+
 DT.module({
   id = "played",
-  init = function() store(); prune(); hookPlayed() end,
+  init = function() store(); migrate(); prune(); hookPlayed() end,
   events = { TIME_PLAYED_MSG = onPlayed },
   ready = DT.errors,
   errorKey = "played", lastKey = "lastPlayed",
