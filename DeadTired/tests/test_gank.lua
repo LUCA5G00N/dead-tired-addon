@@ -101,7 +101,7 @@ do
   a.tgt = rogue(); a:slash("gank")
   local e = logs(a)[1]
   check("an enemy on another realm is logged", #logs(a) == 1 and e.who == "Nethergarde-Backstabz" and e.cls == "ROGUE"
-    and e.lvl == 60 and e.zone == "Stranglethorn Vale" and e.by == "Classic Beta PvP-Stromham"
+    and e.lvl == 60 and e.zone == "Stranglethorn Vale" and e.by == "ClassicBetaPvP-Stromham"
     and e.at == "2026-11-04 23:00:00" and e.t == a.env.time())   -- F7: the stored t is the epoch
   check("the confirmation line, exactly", #a.printed == 1
     and a.printed[1] == P .. "Noted: Backstabz-Nethergarde (Rogue 60), Stranglethorn Vale. The crypt remembers.")
@@ -114,10 +114,10 @@ do
   check("at 301 s: a second log", #logs(a) == 2 and ganksSent(a) == 2)
 
   a.tgt = rogue({ name = "Paladork", realm = false }); a:slash("gank")
-  check("an enemy on our realm: the realm spelt as GetRealmName spells it", logs(a)[3].who == "Classic Beta PvP-Paladork"
+  check("an enemy on our realm: the realm in the one key spelling (fix round 3, AUD-06)", logs(a)[3].who == "ClassicBetaPvP-Paladork"
     and a:said("Noted: Paladork (Rogue 60)") ~= nil)
   a.tgt = rogue({ name = "Shieldy", realm = "" }); a:slash("gank")
-  check("an empty realm is our realm too", logs(a)[4].who == "Classic Beta PvP-Shieldy")
+  check("an empty realm is our realm too", logs(a)[4].who == "ClassicBetaPvP-Shieldy")
   a.tgt = rogue({ name = "Skully", lvl = -1 }); a:slash("gank")
   check("level -1 (a skull) is stored as -1 and shown as ??", logs(a)[5].lvl == -1 and a:said("(Rogue ??)") ~= nil
     and a.sent[#a.sent].text:find("lvl~-1", 1, true))
@@ -147,7 +147,7 @@ do
   w:advance(1)
   local e = logs(b)[1]
   check("a valid log is stored on the receiver, with by", #logs(b) == 1 and e.who == "Nethergarde-Backstabz"
-    and e.cls == "ROGUE" and e.lvl == 60 and e.zone == "Stranglethorn Vale" and e.by == "Classic Beta PvP-Stromham"
+    and e.cls == "ROGUE" and e.lvl == 60 and e.zone == "Stranglethorn Vale" and e.by == "ClassicBetaPvP-Stromham"
     and e.t == nil)
   check("nothing printed on the receiver", #b.printed == 0)
   check("nothing replied, nothing re-sent", #b.sent == 0 and ganksSent(a) == 1)
@@ -330,6 +330,28 @@ do
   w:advance(210)    -- 300 s after Ghoul's first on Backstabz
   inject("Nethergarde-Backstabz", "Ghoul")
   check("F6b: at 300 s the same sender and enemy is kept again", #logs(a) == 4)
+end
+
+-- ---------------------------------------------------------------- fix round 3 (AUD-06)
+do
+  local w = H.world()
+  local db = { gank = { ["dead tired"] = { logs = {
+    { who = "Classic Beta PvP-Paladork", cls = "PALADIN", lvl = 40, zone = "Duskwood", by = "Classic Beta PvP-Stromham", at = "2026-11-01 20:00:00" },
+    { who = "Nethergarde-Backstabz", cls = "ROGUE", lvl = 60, zone = "Duskwood", by = "Argent Dawn-Ghoul", at = "2026-11-01 21:00:00" },
+  } } } }
+  local a = client(w, { name = "Stromham", db = db })
+  local l = db.gank["dead tired"].logs
+  check("AUD-06: an old spaced key in the gank log is rewritten (who and by)", l[1].who == "ClassicBetaPvP-Paladork"
+    and l[1].by == "ClassicBetaPvP-Stromham" and l[2].by == "ArgentDawn-Ghoul" and l[2].who == "Nethergarde-Backstabz"
+    and db.gank.keysV == 2)
+  a.tgt = rogue({ name = "Paladork", realm = false }); w:advance(400); a:slash("gank")
+  a:slash("ganks")
+  check("AUD-06: a new log of the same enemy groups with the migrated one", a:said("Paladork (Rogue 60) x2") ~= nil)
+  l[1].who = "Classic Beta PvP-Paladork"
+  client(w, { name = "Stromham", db = db })
+  check("AUD-06: the gank migration runs once", l[1].who == "Classic Beta PvP-Paladork")
+  a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^GANK^cls~ROGUE^lvl~60^who~Argent Dawn-Sneaky^zone~Duskwood", "GUILD", "Ghoul-ClassicBetaPvP")
+  check("AUD-06: a received who in the old spelling is stored in the new", l[#l].who == "ArgentDawn-Sneaky")
 end
 
 H.finish("gank")

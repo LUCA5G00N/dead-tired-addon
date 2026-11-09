@@ -76,11 +76,12 @@ function DT.gank()
   if not nonEmpty(name) then                                                          -- guard: unreadable name
     return DT.out("The game won't say who that is right now. Try again out of combat.")
   end
-  if not nonEmpty(realm) then realm = clean(try(GetRealmName)) end
-  if not nonEmpty(realm) then
+  -- Fix round 3 (AUD-06): the one key spelling; no realm means ours.
+  local who = DT.keyOf(name, nonEmpty(realm) and realm or nil)
+  if not who then
     return DT.out("The game won't say who that is right now. Try again out of combat.")
   end
-  local who = (realm .. "-" .. name):sub(1, WHO_MAX)
+  who = who:sub(1, WHO_MAX)
   local cls = clean(select(2, try(UnitClass, "target")))
   if type(cls) ~= "string" or not cls:match("^[A-Z]+$") or #cls > 12 then cls = "UNKNOWN" end
   local lvl = clean(try(UnitLevel, "target"))
@@ -134,7 +135,7 @@ DT.on("GANK", function(from, f)
   end
   lastFrom[k] = t
   -- Silent receipt (R2): stored, never printed, never replied to, never re-sent.
-  record({ who = f.who, cls = f.cls, lvl = tonumber(f.lvl), zone = f.zone, by = from, at = DT.stamp() })
+  record({ who = DT.normKey(f.who), cls = f.cls, lvl = tonumber(f.lvl), zone = f.zone, by = from, at = DT.stamp() })
 end)
 
 -- ---------------------------------------------------------------- the board
@@ -219,9 +220,20 @@ local function one(arg)
   DT.out(CLOSING)
 end
 
+-- Fix round 3 (AUD-06): every gank log's `who` and `by` move to the one key spelling, once per
+-- account (DeadTiredDB.gank.keysV = 2).
+local function migrate()
+  local g = gank()
+  if g.keysV == 2 then return end                                      -- guard: gank migration once
+  for _, t in pairs(g) do
+    if type(t) == "table" and type(t.logs) == "table" then DT.migrateKeys(t.logs, { "who", "by" }) end
+  end
+  g.keysV = 2
+end
+
 DT.module({
   id = "gank",
-  init = function() gank() end,
+  init = function() gank(); migrate() end,
   ready = DT.errors,
   errorKey = "gank", lastKey = "lastGank",
 })
