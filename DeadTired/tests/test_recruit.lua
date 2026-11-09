@@ -260,4 +260,98 @@ do
   check("and the next press still posts line 1", #a.posts == 1 and a.posts[1][1] == a.ns.Recruit.LINES[1])
 end
 
+-- ---------------------------------------------------------------- fix round 3: the nudge
+do
+  local NUDGE = P .. "The crypt door creaks open: you can recruit again (/dt recruit)."
+  local function nudges(c) local n = 0 for _, m in ipairs(c.printed) do if m == NUDGE then n = n + 1 end end return n end
+  local function sends(c) local n = 0 for _, p in ipairs(c.posts) do n = n + 1 end return n end
+  local function fresh(w, opts) local c = client(w, opts or { name = "Stromham" }); c:login(); return c end
+
+  local w = H.world()
+  local a = fresh(w)
+  check("nudge: the brief's wording", a.DT._recruit.NUDGE == "The crypt door creaks open: you can recruit again (/dt recruit).")
+  a:slash("recruit")
+  check("nudge: the post goes", #a.posts == 1)
+  a.printed = {}
+  w:advance(899)
+  a.now = a.now + 899
+  check("nudge: nothing before the cooldown ends", nudges(a) == 0)
+  w:advance(1)
+  a.now = a.now + 1
+  check("nudge: after 900 s, exactly one line", nudges(a) == 1 and #a.printed == 1)
+  w:advance(3600)
+  check("nudge: once only", nudges(a) == 1)
+  check("nudge: it never posts anything", sends(a) == 1)
+
+  -- A second post: the first post's nudge is cancelled, the second's comes 900 s after it.
+  local w2 = H.world()
+  local b = fresh(w2)
+  b:slash("recruit")
+  w2:advance(600); b.now = b.now + 900   -- (an alt's clock moved on; the cooldown has ended)
+  b:slash("recruit")
+  check("nudge: the second post goes", #b.posts == 2)
+  b.printed = {}
+  w2:advance(300)
+  check("nudge: no line for the first post when a second came since", nudges(b) == 0)
+  w2:advance(599)
+  check("nudge: ...not yet for the second", nudges(b) == 0)
+  w2:advance(1)
+  check("nudge: the second post's own nudge 900 s after it", nudges(b) == 1)
+
+  -- Not an officer any more when it falls due; or out of the guild.
+  local w3 = H.world()
+  local c = fresh(w3)
+  c:slash("recruit")
+  c.officer = false
+  c.printed = {}
+  w3:advance(900)
+  check("nudge: no line if not an officer at the time", nudges(c) == 0)
+  local d = fresh(w3, { name = "Bonechill" })
+  d:slash("recruit")
+  d.guild = nil
+  d.printed = {}
+  w3:advance(900)
+  check("nudge: no line if out of the guild at the time", nudges(d) == 0)
+
+  -- Switched off (saved, account-wide), then on.
+  local w4 = H.world()
+  local db = {}
+  local e = fresh(w4, { name = "Stromham", db = db })
+  e:slash("recruit nudge off")
+  check("nudge off: saved account-wide, nothing printed", db.prep.recruitNudge == false and #e.printed == 0)
+  e:slash("recruit")
+  e.printed = {}
+  w4:advance(900)
+  check("nudge off: no line", nudges(e) == 0)
+  e:logout()
+  local e2 = fresh(w4, { name = "Bonechill", db = db })
+  e2.now = e2.now + 1000
+  e2:slash("recruit")
+  e2.printed = {}
+  w4:advance(900)
+  check("nudge off: still off on another character after a login", nudges(e2) == 0 and #e2.posts == 1)
+  e2:slash("recruit nudge on")
+  check("nudge on: saved", db.prep.recruitNudge == true)
+  e2.now = e2.now + 1000
+  e2:slash("recruit")
+  e2.printed = {}
+  w4:advance(900)
+  check("nudge on: the line is back", nudges(e2) == 1)
+  e2:logout()
+
+  -- No post this session: nothing at login, even with the cooldown still running from the last.
+  local f = fresh(w4, { name = "Stromham", db = db })
+  f.printed = {}
+  w4:advance(3600)
+  check("nudge: no line at login without a post this session", nudges(f) == 0 and #f.printed == 0)
+  -- A refused post (not an officer) schedules nothing.
+  f.officer = false
+  f.now = f.now + 1000
+  f:slash("recruit")
+  f.officer = true
+  f.printed = {}
+  w4:advance(900)
+  check("nudge: a refused post schedules nothing", nudges(f) == 0 and #f.posts == 0)
+end
+
 H.finish("recruit")

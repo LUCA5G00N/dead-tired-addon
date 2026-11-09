@@ -161,7 +161,7 @@ DT.on("PREP", function(from, f)
     p.badPrep = p.badPrep + 1
     return
   end
-  if f.to ~= DT.charKey() then return end                             -- guard: addressed to someone else
+  if DT.normKey(f.to) ~= DT.charKey() then return end                 -- guard: addressed to someone else (AUD-06: one spelling)
   if not open or tostring(open.q) ~= f.q then return end              -- guard: late answers
   if open.answers[from] then return end
   open.answers[from] = { ok = f.ok == "1", short = tonumber(f.short) }
