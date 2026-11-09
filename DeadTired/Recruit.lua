@@ -7,6 +7,10 @@
 -- A1 (rulings round, 2026-11-02): guild officers only (the game's own flag), and the channel is
 --     General, found among the joined channels by name: exactly "General" or "General - <zone>".
 -- The lines are Tim's (RecruitLines.lua, from docs/RECRUIT_lines.md) and are never edited here.
+-- Fix round 3, the nudge (a ruled "prints unasked" exception): after a post this session, one
+-- line when the cooldown ends, once, only if still an officer and a member and nothing was posted
+-- since. It prints; it never posts. /dt recruit nudge off|on (DeadTiredDB.prep.recruitNudge,
+-- account-wide, default on).
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -17,6 +21,7 @@ local MAX_CHANNELS = 20      -- ids scanned when only GetChannelName is there
 local COOLDOWN = tonumber(R.COOLDOWN) or 900
 local LINES = type(R.LINES) == "table" and R.LINES or {}
 local COUNT = 5
+local NUDGE = "The crypt door creaks open: you can recruit again (/dt recruit)."
 
 -- Checked once, at load: exactly five non-empty lines, each at most 255 bytes, no "|" (the chat
 -- escape character) and no control bytes.
@@ -78,6 +83,21 @@ local function findChannel()
   end
 end
 
+-- The nudge. posts counts this session's posts; a timer only speaks for the latest one.
+local posts = 0
+local function nudgeOn() return store().recruitNudge ~= false end
+
+local function schedule()
+  posts = posts + 1
+  local mine = posts
+  DT.after(COOLDOWN, function()
+    if mine ~= posts then return end                                  -- guard: nothing posted since (nudge)
+    if not nudgeOn() then return end                                  -- guard: nudge switched off
+    if not DT.isMember() or not isOfficer() then return end           -- guard: still an officer (nudge)
+    DT.out(NUDGE)
+  end)
+end
+
 local function post()
   if not isOfficer() then                                             -- guard: officer gate (A1)
     return DT.out("Officers only. The rest of us just haunt the place.")
@@ -107,6 +127,7 @@ local function post()
   p.recruitAt = now
   p.recruitNext = i % COUNT + 1
   DT.out("Posted line " .. i .. " of " .. COUNT .. " to " .. CHANNEL .. ".")
+  schedule()
 end
 
 local function peek()
@@ -117,7 +138,8 @@ local function peek()
 end
 
 -- For the offline tests only.
-DT._recruit = { valid = function() return VALID end, linesValid = linesValid, lines = LINES, matches = matches }
+DT._recruit = { valid = function() return VALID end, linesValid = linesValid, lines = LINES, matches = matches,
+  NUDGE = NUDGE }
 
 DT.module({
   id = "recruit",
@@ -127,6 +149,9 @@ DT.module({
 })
 DT.verb("recruit", function(msg)
   if msg == "recruit next" then return peek() end
+  -- No reply line: the brief gives none (fix round 3, "write no other new player-facing text").
+  if msg == "recruit nudge off" then store().recruitNudge = false return end
+  if msg == "recruit nudge on" then store().recruitNudge = true return end
   if msg == "recruit" then return post() end
   return DT.out("/dt recruit posts the next line; /dt recruit next shows which.")
 end, "recruit [next]")

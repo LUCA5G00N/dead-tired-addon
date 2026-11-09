@@ -132,9 +132,9 @@ do
   check("nobody answers before 1 s", #a.sent == 0 and #c.sent == 0)
   w:advance(1)
   check("a sharing member answers once with ok and short only", #sentKind(a, "PREP") == 1
-    and sentKind(a, "PREP")[1] == "1^PREP^ok~1^q~" .. q1 .. "^short~0^to~Classic Beta PvP-Stromham")
+    and sentKind(a, "PREP")[1] == "1^PREP^ok~1^q~" .. q1 .. "^short~0^to~ClassicBetaPvP-Stromham")
   w:advance(4)
-  check("the second within 5 s, short 2", sentKind(c, "PREP")[1] == "1^PREP^ok~0^q~" .. q1 .. "^short~2^to~Classic Beta PvP-Stromham")
+  check("the second within 5 s, short 2", sentKind(c, "PREP")[1] == "1^PREP^ok~0^q~" .. q1 .. "^short~2^to~ClassicBetaPvP-Stromham")
   check("a member with sharing off sends nothing at all, and doesn't even note the question", #b.sent == 0
     and next(b.DT._prep.answered()) == nil)
   tim.printed = {}
@@ -177,14 +177,23 @@ do
   w:advance(60)
   tim:slash("prep check")
   local q = tostring(tim.env.time() % 1000000)
-  inject("1^PREP^ok~0^q~" .. q .. "^short~3^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^PREP^ok~0^q~" .. q .. "^short~1^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^PREP^ok~1^q~" .. q .. "^short~0^to~Classic Beta PvP-Someoneelse", "Wight")
-  inject("1^PREP^ok~1^q~" .. qOld .. "^short~0^to~Classic Beta PvP-Stromham", "Lich")
+  inject("1^PREP^ok~0^q~" .. q .. "^short~3^to~ClassicBetaPvP-Stromham", "Ghoul")
+  inject("1^PREP^ok~0^q~" .. q .. "^short~1^to~ClassicBetaPvP-Stromham", "Ghoul")
+  inject("1^PREP^ok~1^q~" .. q .. "^short~0^to~ClassicBetaPvP-Someoneelse", "Wight")
+  inject("1^PREP^ok~1^q~" .. qOld .. "^short~0^to~ClassicBetaPvP-Stromham", "Lich")
   tim.printed = {}
   w:advance(10)
   check("once per sender; addressed elsewhere and old questions ignored", tim.printed[1] == P .. "Ready (0): none. Short (1): Ghoul (3 short).")
-  inject("1^PREP^ok~1^q~" .. q .. "^short~0^to~Classic Beta PvP-Stromham", "Wight")
+  -- Fix round 3 (AUD-06): an answer addressed in the old spelling still reaches the asker.
+  w:advance(60)
+  tim:slash("prep check")
+  local q3 = tostring(tim.env.time() % 1000000)
+  inject("1^PREP^ok~1^q~" .. q3 .. "^short~0^to~Classic Beta PvP-Stromham", "Ghoul")
+  tim.printed = {}
+  w:advance(10)
+  check("AUD-06: an answer whose to is in the old spaced spelling is counted once",
+    tim.printed[1] == P .. "Ready (1): Ghoul. Short (0): none.")
+  inject("1^PREP^ok~1^q~" .. q .. "^short~0^to~ClassicBetaPvP-Stromham", "Wight")
   check("an answer after the summary is ignored (no print, nothing kept)", #tim.printed == 2 and tim.DT._prep.open() == nil)
   local bad = { "1^PREP^ok~1^q~x^short~0^to~R-N", "1^PREP^ok~1^q~1234567^short~0^to~R-N", "1^PREP^ok~2^q~1^short~0^to~R-N",
     "1^PREP^ok~1^q~1^short~1^to~R-N", "1^PREP^ok~0^q~1^short~0^to~R-N", "1^PREP^ok~0^q~1^short~51^to~R-N",

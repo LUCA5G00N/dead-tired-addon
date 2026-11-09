@@ -16,6 +16,15 @@ for guild officers only (`C_GuildInfo.IsGuildOfficer() == true`, nothing else), 
 and AUD-07):** the roll-call id comes from the clock, and one roll call per asker per 60 s is
 answered. Marked *(amended, fix round 1)*.
 
+**Amended 2026-11-09 (fix round 3, `docs/COWORK_BRIEF_dt_fixes3.md`):** AUD-06: a PREP answer's
+`to` is compared in card 1's one key spelling, so an asker on a realm with a space in its name
+gets answers (prep stores no character keys, so nothing is migrated). **The recruit nudge** (a
+ruled *prints unasked* exception): after a successful `/dt recruit` post, one line when the
+15-minute cooldown ends, once, that session only, only if still an officer and a member and
+nothing was posted since: *"The crypt door creaks open: you can recruit again (/dt recruit)."*
+`/dt recruit nudge off` / `on` (account-wide, saved, default on). It never posts. Changed lines
+are marked *(amended, fix round 3)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_prep.md`.
@@ -229,6 +238,10 @@ its line and sending nothing:
 
 **`/dt recruit next`:** prints which line goes next and the time left on the cooldown. Nothing is
 posted. The rotation can't be skipped from the command line.
+
+**The nudge** *(amended, fix round 3)*: a post schedules one line for when the cooldown ends
+(900 s); a later post replaces it; it is dropped if, when due, the player is no longer an officer
+or a member, or has typed `/dt recruit nudge off`. It prints only; it never calls the chat send.
 
 ## Working rules
 
