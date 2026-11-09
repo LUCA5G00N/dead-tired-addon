@@ -224,9 +224,21 @@ DT.listen("member", function(isMember) if isMember then hcLine() end end)
 -- For the offline tests only.
 DT._crypt = { tick = tick, nags = function() return shown end }
 
+-- Fix round 3 (AUD-06): the graveyard's `who` and the hardcore line's hcTold keys move to the one
+-- key spelling, once per account (DeadTiredDB.crypt.keysV = 2).
+local function migrate()
+  local c = crypt()
+  if c.keysV == 2 then return end                                      -- guard: crypt migration once
+  for _, g in pairs(c) do
+    if type(g) == "table" and type(g.deaths) == "table" then DT.migrateKeys(g.deaths, { "who" }) end
+  end
+  DT.migrateKeys(c.hcTold, {})
+  c.keysV = 2
+end
+
 DT.module({
   id = "crypt",
-  init = function() crypt() end,
+  init = function() crypt(); migrate() end,
   events = {
     PLAYER_DEAD = onDead,
     PLAYER_ENTERING_WORLD = function()

@@ -15,6 +15,11 @@ The places below that changed are marked *(amended)*.
 received DEATH is kept at most once per sender per 60 s; the rest are counted, silently. Marked
 *(amended, fix round 1)* below.
 
+**Amended 2026-11-09 (fix round 3, AUD-06 in `docs/COWORK_BRIEF_dt_fixes3.md`):** card 1's keys
+are now `NormalisedRealm-Name` (realm without spaces or hyphens). The graveyard's `who` and the
+hardcore line's `hcTold` keys are rewritten to that spelling once per account
+(`DeadTiredDB.crypt.keysV = 2`) in the module's init. Nothing else here changed.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_crypt.md`.

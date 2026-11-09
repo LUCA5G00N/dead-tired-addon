@@ -80,7 +80,7 @@ do
   local b = client(w, { name = "Graverobber" })
   a:fire("PLAYER_DEAD")
   local e = list(a)[1]
-  check("a member's death is recorded locally", #list(a) == 1 and e.who == "Classic Beta PvP-Stromham"
+  check("a member's death is recorded locally", #list(a) == 1 and e.who == "ClassicBetaPvP-Stromham"
     and e.lvl == 23 and e.zone == "Stranglethorn Vale" and e.hc == false and e.mine == true
     and e.at == "2026-11-04 23:00:00")
   check("a normal death is not sent by default", deathsSent(a) == 0)
@@ -158,7 +158,7 @@ do
   check("hardcore notice, exactly", #b.printed == 1
     and b.printed[1] == "|cff7fa650Dead Tired|r Rest in Pieces: Stromham, level 23, Stranglethorn Vale. Hardcore. Gone for good.")
   local e = list(b)[1]
-  check("the receiver records it, not as its own", #list(b) == 1 and e.who == "Classic Beta PvP-Stromham"
+  check("the receiver records it, not as its own", #list(b) == 1 and e.who == "ClassicBetaPvP-Stromham"
     and e.mine == false and e.hc == true and e.lvl == 23)
   check("nothing replies to a DEATH", deathsSent(b) == 0 and #b.sent == 0)
   w:advance(30)
@@ -323,7 +323,7 @@ do
   h.hc = true
   h:login()
   check("A2: first login of a hardcore member prints the line, once", told(h) == 1
-    and db.crypt.hcTold["Classic Beta PvP-Mortis"] == true)
+    and db.crypt.hcTold["ClassicBetaPvP-Mortis"] == true)
   check("A2: after card 1's welcome, and nothing else", #h.printed == 2 and h.printed[1]:find("Rest in Pieces, Mortis", 1, true))
   h:fire("PLAYER_ENTERING_WORLD", false, false)          -- a zone change in the same session
   h.DT.recheckGuild()
@@ -340,7 +340,7 @@ do
   local h4 = client(w2, { name = "Vesper", db = db }); h4.hc = true
   h4:login()
   check("A2: another hardcore character on the account gets its own line", told(h4) == 1
-    and db.crypt.hcTold["Classic Beta PvP-Vesper"] == true)
+    and db.crypt.hcTold["ClassicBetaPvP-Vesper"] == true)
 
   -- Not on a normal character, not for a non-member, not once share is set.
   local w3 = H.world()
@@ -424,6 +424,31 @@ do
   inject("Lich", "Silithus")
   check("F6a: an invalid DEATH is counted bad and doesn't start the window", a:db().crypt.badDeath == 1
     and #a.printed == 4)
+end
+
+-- ---------------------------------------------------------------- fix round 3 (AUD-06): the store migrated
+do
+  local w = H.world()
+  local db = { crypt = { hcTold = { ["Classic Beta PvP-Mortis"] = true }, ["dead tired"] = { deaths = {
+    { who = "Classic Beta PvP-Ghoul", lvl = 12, zone = "Duskwood", hc = false, at = "2026-11-01 20:00:00", mine = false },
+    { who = "Nethergarde-Wight", lvl = 14, zone = "Duskwood", hc = false, at = "2026-11-01 21:00:00", mine = false },
+  } } } }
+  local a = client(w, { name = "Mortis", db = db })
+  local d = db.crypt["dead tired"].deaths
+  check("AUD-06: an old spaced key in the graveyard is rewritten", d[1].who == "ClassicBetaPvP-Ghoul"
+    and d[2].who == "Nethergarde-Wight" and #d == 2)
+  check("AUD-06: the hardcore line's record moves too", db.crypt.hcTold["ClassicBetaPvP-Mortis"] == true
+    and db.crypt.hcTold["Classic Beta PvP-Mortis"] == nil and db.crypt.keysV == 2)
+  a.hc = true
+  a:login()
+  local HC = "This one's hardcore."
+  check("AUD-06: so a character already told is not told again", a:said(HC) == nil)
+  d[1].who = "Classic Beta PvP-Ghoul"
+  client(w, { name = "Mortis", db = db })
+  check("AUD-06: the crypt migration runs once", d[1].who == "Classic Beta PvP-Ghoul")
+  a:slash("graveyard")
+  check("AUD-06: the graveyard hides the own realm, names another", a:printedText():find(" Ghoul 12", 1, true) ~= nil
+    and a:said("Wight-Nethergarde") ~= nil and a:said("Classic") == nil)
 end
 
 H.finish("crypt")
