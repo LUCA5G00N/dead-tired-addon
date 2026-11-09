@@ -27,7 +27,7 @@ S.noDate = true
 check("stamp falls back to time() when date fails", DT.stamp() == "1793833200")
 S.noDate = false
 check("build", DT.build() == "1.60.1-70245")
-check("charKey is Realm-Name", DT.charKey() == "Classic Beta PvP-Stromham")
+check("charKey is NormalisedRealm-Name (AUD-06)", DT.charKey() == "ClassicBetaPvP-Stromham")
 S.name = "Unknown"
 check("charKey refuses 'Unknown'", DT.charKey() == nil)
 S.name = "Stromham"
@@ -41,12 +41,55 @@ check("safe escapes UI codes and strips control bytes", DT.safe("a|Tx\1b") == "a
 check("safe bounds length", #DT.safe(string.rep("x", 100), 10) == 13)
 check("nameOf strips the realm, even one with a hyphen", DT.nameOf("Azjol-Nerub-Bob") == "Bob"
   and DT.nameOf("Classic Beta PvP-Stromham") == "Stromham")
+-- ---------------------------------------------------------------- AUD-06: one key spelling
+check("AUD-06: realmKey() is GetNormalizedRealmName when it answers", DT.realmKey() == "ClassicBetaPvP")
+S.normRealm = ""
+check("AUD-06: realmKey() falls back to GetRealmName, spaces removed, when it answers empty",
+  DT.realmKey() == "ClassicBetaPvP")
+S.normRealm = false
+S.realm = "CAMWOW EU4 Realm 2 PvP"
+check("AUD-06: ...or nil: 'CAMWOW EU4 Realm 2 PvP' -> CAMWOWEU4Realm2PvP", DT.realmKey() == "CAMWOWEU4Realm2PvP"
+  and DT.charKey() == "CAMWOWEU4Realm2PvP-Stromham")
+S.realm = "Azjol-Nerub"
+check("AUD-06: hyphens removed too", DT.realmKey() == "AzjolNerub" and DT.charKey() == "AzjolNerub-Stromham")
+S.realm, S.normRealm = "Classic Beta PvP", nil
+check("AUD-06: realmKey(realm) normalises a given realm", DT.realmKey("Argent Dawn") == "ArgentDawn"
+  and DT.realmKey("ArgentDawn") == "ArgentDawn" and DT.realmKey("") == nil and DT.realmKey(5) == nil)
+check("AUD-06: keyOf(name, realm) and keyOf(name) for the own realm", DT.keyOf("Bob", "Argent Dawn") == "ArgentDawn-Bob"
+  and DT.keyOf("Bob") == "ClassicBetaPvP-Bob" and DT.keyOf("", "X") == nil and DT.keyOf(nil) == nil)
+check("AUD-06: normKey rewrites an old key, leaves the rest", DT.normKey("Classic Beta PvP-Stromham") == "ClassicBetaPvP-Stromham"
+  and DT.normKey("Azjol-Nerub-Bob") == "AzjolNerub-Bob" and DT.normKey("ArgentDawn-Bob") == "ArgentDawn-Bob"
+  and DT.normKey("") == "" and DT.normKey("?") == "?" and DT.normKey(nil) == nil)
+do
+  local t = {
+    ["Classic Beta PvP-Ann"] = { seen = "2026-11-01 10:00:00", main = "Classic Beta PvP-Ann", tag = "old" },
+    ["ClassicBetaPvP-Ann"] = { seen = "2026-11-02 10:00:00", main = "ClassicBetaPvP-Ann", tag = "new" },
+    ["Argent Dawn-Bea"] = { seen = "2026-11-05 10:00:00", main = "Argent Dawn-Cid", tag = "newer" },
+    ["ArgentDawn-Bea"] = { seen = "2026-11-03 10:00:00", main = "", tag = "older" },
+    ["Nethergarde-Cid"] = { seen = "x", main = "Argent Dawn-Cid" },
+    [1] = { who = "Classic Beta PvP-Dee" },
+  }
+  local n, merged = DT.migrateKeys(t, { "main", "who" })
+  check("AUD-06: migrateKeys rewrites keys and the named fields", t["Nethergarde-Cid"].main == "ArgentDawn-Cid"
+    and t[1].who == "ClassicBetaPvP-Dee" and t["Classic Beta PvP-Ann"] == nil and t["Argent Dawn-Bea"] == nil)
+  check("AUD-06: two keys collapsing into one keep the newer seen, either way round",
+    t["ClassicBetaPvP-Ann"].tag == "new" and t["ArgentDawn-Bea"].tag == "newer"
+    and t["ArgentDawn-Bea"].main == "ArgentDawn-Cid")
+  local count = 0
+  for _ in pairs(t) do count = count + 1 end
+  check("AUD-06: migrateKeys answers what it did; nothing else lost", merged == 2 and n == 6 and count == 4)
+  check("AUD-06: migrateKeys again changes nothing", DT.migrateKeys(t, { "main", "who" }) == 0)
+  local u = { ["Classic Beta PvP-Eve"] = { t = 5 }, ["ClassicBetaPvP-Eve"] = { t = 9 } }
+  DT.migrateKeys(u, {}, "t")
+  check("AUD-06: migrateKeys can compare another stamp field", u["ClassicBetaPvP-Eve"].t == 9)
+end
 local db = DT.db()
 check("db creates DeadTiredDB with defaults", c:db() == db and db.welcome == true
   and db.comms.dropped == 0 and db.comms.malformed == 0 and db.comms.unknownVersion == 0
   and type(db.roster) == "table" and type(db.account) == "table" and type(db.errors) == "table")
 db.welcome = false
 check("db keeps saved values", DT.db().welcome == false)
+check("AUD-06: a new store is marked migrated", db.keysV == 2)
 
 -- ---------------------------------------------------------------- modules
 local store, calls = nil, { init = 0, ev = 0 }
