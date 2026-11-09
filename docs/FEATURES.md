@@ -125,6 +125,12 @@ the hub. Skills pane: drop (duplicated twice).
 - **Lesson from Naowh (Tim, 9 Nov):** a lot of undescribed automation. DT stays quiet, and every
   automatic action it takes is described where the player switches it on.
 
+## Ruled 9 Nov (for `dt_fixes3`)
+R-1 lockdown only (flag recorded, never gates); AUD-10 retry then drop (3 tries); AUD-06 one
+normalised realm key with a one-time migration; held line "The dead are gagged for this fight.
+Your message goes when it's over."; recruit nudge once after a post (`/dt recruit nudge off`);
+WizardryLogPrompt retired. Brief: `docs/COWORK_BRIEF_dt_fixes3.md`.
+
 ## Rulings needed (draft as questions; Tim decides)
 1. **R-1:** the restricted-flag rule (above). First, because every shared module waits on it.
 2. AUD-10 (send results as the enum; fix the probe's `registered` read) and AUD-06 (realm key).

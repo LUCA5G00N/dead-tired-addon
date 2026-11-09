@@ -22,8 +22,11 @@ Owner: Tim (in game: Stromham). Built from briefs in `docs/` by cloud sessions; 
 - **Secret values.** Retail can hand addons "secret" values. Every read of game state goes through
   the guarded-read helpers (`try`, `clean`, `secret`): copy the pattern in
   `reference/wizardry/Forever/Core.lua`.
-- **Addon messages can be restricted** (`C_ChatInfo.AreOutgoingAddonChatMessagesRestricted`).
-  Anything sent while restricted is queued, not dropped and not forced.
+- **Addon messages are held only in lockdown** (`C_ChatInfo.InChatMessagingLockdown`: boss fights,
+  M+, PvP matches). Anything sent then is queued, not dropped and not forced. On Forever,
+  `AreOutgoingAddonChatMessagesRestricted` reads true even while messages get through (probe
+  results, 7 Nov): record it for diagnostics, never gate a send on it (ruling R-1, 2026-11-09).
+  A send the game refuses (a non-success result) is retried, then dropped and counted (AUD-10).
 - **Blizzard rules:** no automatic posting to public chat channels (a human click per message),
   no network access, no reading other players' bags or professions except what they choose to send.
 
@@ -45,7 +48,9 @@ and do not widen them. A new exception needs its own ruling in a brief.
 - **Prints unasked:** guildies' death notices (card 3, `dt_crypt` R1), the bedtime nag once the
   player sets a time (card 3), one line on a hardcore character's first login pointing at
   `/dt rip share on` (card 3, rulings round), event reminders once switched on (card 6 R4), the combat-log prompt on entering a dungeon or
-  raid while the combat log is off (card 7, `dt_logs` R1; `/dt logs off` stops it).
+  raid while the combat log is off (card 7, `dt_logs` R1; `/dt logs off` stops it), the recruit-ready nudge
+  once the cooldown ends after a post this session (card 5, fix round 3; `/dt recruit nudge off`
+  stops it).
 - **Reads another player:** your target's name, realm, class and level, only when you press
   `/dt gank` (card 4, `dt_pvp` R1).
 - **Posts to a public channel:** `/dt recruit`, one line per typed command or click, guild
