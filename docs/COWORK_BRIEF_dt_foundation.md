@@ -10,6 +10,15 @@ reply covers every HELLO before it (F2); the harness gains `reload`/`reboot` (F3
 module `init` is recorded and its events still register (F4); chunk ids start from the clock (F5).
 Changed lines are marked *(amended)*.
 
+**Amended 2026-11-09 (fix round 3, `docs/COWORK_BRIEF_dt_fixes3.md`, rulings R-1, AUD-10,
+AUD-06):** the queue holds only for `C_ChatInfo.InChatMessagingLockdown()`; the restricted flag
+is recorded once per login and never gates a send (R-1), and a typed command held for lockdown
+prints "The dead are gagged for this fight. Your message goes when it's over." once per hold. A
+send the game refuses goes back to the front of the queue, is retried, and is dropped after 3
+refusals (AUD-10). Every character key is `NormalisedRealm-Name` (`DT.realmKey`, `DT.keyOf`),
+and stored keys are rewritten once per account (`DeadTiredDB.keysV = 2`, AUD-06). Changed lines
+are marked *(amended, fix round 3)*.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_foundation.md`.
@@ -46,7 +55,8 @@ This repo has no rulings yet. The binding rules are in `CLAUDE.md`. Two discipli
 from Tim's `WoWWizardry` repo and restated here because that repo isn't available to this session:
 - **WoWWizardry 0012 clause 4** (as applied there): every guard is removed once during the build
   to prove a check goes red, then restored.
-- **WoWWizardry 0003 / 0017**: characters are keyed `Realm-Name`.
+- **WoWWizardry 0003 / 0017**: characters are keyed `Realm-Name`; the realm is spelt without
+  spaces or hyphens (`GetNormalizedRealmName`, else `GetRealmName` squashed) *(amended, fix round 3)*.
 
 **Ratify before code:** nothing. Tim ratifies this brief as a whole.
 
@@ -89,11 +99,18 @@ shows the other's main and alts.
   reassembles per sender and `msgid` and discards an incomplete set after 30 seconds.
 - **Throttle:** a token bucket, capacity 5, refilling 1 token per second. Sends beyond it wait in
   a FIFO queue.
-- **Restricted:** while `C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()` returns true, the
-  queue holds and is retried every 5 seconds. Queue cap 50: the oldest is dropped and
-  `DeadTiredDB.comms.dropped` counts it.
+- **Lockdown:** while `C_ChatInfo.InChatMessagingLockdown()` returns true, the queue holds and
+  is retried every 5 seconds; absent or erroring counts as not in lockdown.
+  `AreOutgoingAddonChatMessagesRestricted()` is read once per login into
+  `comms.flagRestricted` / `comms.flagReads` and never gates a send *(amended, fix round 3, R-1)*.
+  Queue cap 50: the oldest is dropped and `DeadTiredDB.comms.dropped` counts it.
+- **Refused sends:** a `SendAddonMessage` result other than success (`0`, `true`, `nil`) or an
+  error is counted (`comms.sendRefused`, `comms.lastRefusal`), requeued at the front and retried
+  after at least 1 s; after 3 refusals it is dropped (`comms.refusedDropped`) *(amended, fix round
+  3, AUD-10)*.
 - **Inbound:** `CHAT_MSG_ADDON` with the prefix and channel `GUILD` only. The sender is
-  normalised to `Realm-Name` (a bare `Name` takes the player's own realm). Messages from the
+  normalised to `Realm-Name` (a bare `Name` takes the player's own realm), the realm spelt by
+  `DT.realmKey` *(amended, fix round 3, AUD-06)*. Messages from the
   player themself are ignored. A message with an unknown `PROTOCOL` is counted in
   `DeadTiredDB.comms.unknownVersion` and ignored. A malformed message is counted in
   `DeadTiredDB.comms.malformed` and ignored; it never raises.

@@ -4,8 +4,12 @@
 --   <PROTOCOL>^<KIND>^<key>~<value>^<key>~<value>...      KIND: upper-case letters only
 --   keys and values escaped: % ^ ~ | and every byte below 32 become %XX (upper-case hex)
 --   over 250 bytes: chunks <PROTOCOL>^+^<msgid>^<i>^<n>^<slice>, slice at most 200 bytes
--- Outbound: token bucket (5, +1/s) feeding a FIFO queue; held while addon messages are
--- restricted, retried every 5 s; queue cap 50, oldest dropped and counted.
+-- Outbound: token bucket (5, +1/s) feeding a FIFO queue; held only while the client is in chat
+-- messaging lockdown (boss fights, M+, PvP matches), retried every 5 s (fix round 3, R-1: the
+-- AreOutgoingAddonChatMessagesRestricted flag reads true on Forever while messages get through,
+-- so it is recorded once per login for diagnostics and never gates a send). A send the game
+-- refuses goes back to the front of the queue and is retried after at least 1 s; after 3
+-- refusals it is dropped and counted (AUD-10). Queue cap 50, oldest dropped and counted.
 -- Inbound: counted and dropped when malformed or of an unknown protocol; never raises on bad
 -- input. Inbound data is handed to DT.on handlers as plain strings, never executed.
 local ADDON, ns = ...
@@ -21,7 +25,10 @@ local SLICE = 200         -- longest chunk slice
 local MAX_CHUNKS = 32     -- refuse (outbound) or call malformed (inbound) anything bigger
 local STALE = 30          -- seconds an incomplete chunk set is kept
 local BUCKET, RATE = 5, 1 -- token bucket: capacity, tokens per second
-local RETRY = 5           -- seconds between tries while restricted
+local RETRY = 5           -- seconds between tries while in lockdown
+local REFUSE_WAIT = 1     -- least wait after a refused send (AUD-10)
+local MAX_REFUSALS = 3    -- refusals of one message before it is dropped (AUD-10)
+local HELD_LINE = "The dead are gagged for this fight. Your message goes when it's over."
 local QUEUE_CAP = 50
 local MAX_FIELDS = 32
 
@@ -72,6 +79,10 @@ end
 local queue = {}
 local tokens, lastRefill = BUCKET, nil
 local pending = false
+local refusals = 0        -- AUD-10: refusals of the message at the head of the queue
+local notBefore = nil     -- AUD-10: after a refusal, the clock time the next try may go
+local holding = false     -- the pump is holding for lockdown
+local heldSaid = false    -- the held line has been printed for this hold
 -- Fix round 1 (F5): chunk ids start from the clock, so a /reload doesn't reuse the ids of the
 -- session before it (receivers keep partial sets for 30 s, keyed sender#msgid).
 local msgid = 0
@@ -84,9 +95,34 @@ local handlers = {}
 
 local function stats() return DT.db().comms end
 
-local function restricted()
-  local f = C_ChatInfo and C_ChatInfo.AreOutgoingAddonChatMessagesRestricted
+-- R-1: hold only in lockdown. Absent, erroring or secret: not in lockdown (the throttle and
+-- the refusal retry still protect the send).
+local function lockdown()
+  local f = C_ChatInfo and C_ChatInfo.InChatMessagingLockdown
   return (try(f)) == true
+end
+
+-- R-1: the restricted flag, read once per login and recorded; nothing reads it back.
+local flagRead = false
+local function recordFlag()
+  if flagRead then return end
+  flagRead = true
+  local s = stats()
+  local f = C_ChatInfo and C_ChatInfo.AreOutgoingAddonChatMessagesRestricted
+  s.flagRestricted = clean(try(f))
+  s.flagReads = (s.flagReads or 0) + 1
+end
+
+-- AUD-10: what SendAddonMessage answered. Success is Enum.SendAddonMessageResult.Success (0
+-- when that table is absent), or true / nil on clients that answer those. Anything else, or a
+-- raised error, is a refusal.
+local function succeeded(ok, r)
+  if not ok then return false end
+  r = clean(r)
+  if r == nil or r == true then return true end
+  local E = Enum and Enum.SendAddonMessageResult
+  local code = type(E) == "table" and type(E.Success) == "number" and E.Success or 0
+  return r == code                                                       -- guard: success test (AUD-10)
 end
 
 -- ---------------------------------------------------------------- outbound
@@ -106,19 +142,40 @@ end
 
 pump = function()
   while #queue > 0 do
-    if restricted() then wake(RETRY) return end                          -- guard: restricted hold
+    if lockdown() then holding = true; wake(RETRY) return end            -- guard: lockdown hold (R-1)
+    holding, heldSaid = false, false
+    if notBefore then
+      local t = DT.now()
+      if t < notBefore then wake(notBefore - t) return end                -- the refusal wait
+      notBefore = nil
+    end
     refill()
     if tokens < 1 then wake(math.max(0.05, (1 - tokens) / RATE)) return end -- guard: throttle
     local m = table.remove(queue, 1)
     tokens = tokens - 1
     local send = C_ChatInfo and C_ChatInfo.SendAddonMessage
-    local ok = type(send) == "function" and pcall(send, PREFIX, m, CHANNEL)
+    local ok, r = false, "absent"
+    if type(send) == "function" then ok, r = pcall(send, PREFIX, m, CHANNEL) end
     local s = stats()
-    if ok then
+    if succeeded(ok, r) then
+      refusals = 0
       s.sent = (s.sent or 0) + 1
       if #m > (s.longest or 0) then s.longest = #m end
     else
-      s.sendFailed = (s.sendFailed or 0) + 1
+      s.sendRefused = (s.sendRefused or 0) + 1
+      s.lastRefusal = DT.safe(clean(r) == nil and "?" or r, 64)
+      refusals = refusals + 1
+      if refusals >= MAX_REFUSALS then                                   -- guard: 3-refusal limit (AUD-10)
+        refusals = 0
+        s.refusedDropped = (s.refusedDropped or 0) + 1
+      else
+        table.insert(queue, 1, m)                                        -- guard: front-of-queue requeue (AUD-10)
+        refill()
+        local d = math.max(REFUSE_WAIT, (1 - tokens) / RATE)
+        notBefore = DT.now() + d
+        wake(d)
+        return
+      end
     end
   end
 end
@@ -126,6 +183,7 @@ end
 local function enqueue(m)
   if #queue >= QUEUE_CAP then
     table.remove(queue, 1)
+    refusals = 0
     local s = stats()
     s.dropped = s.dropped + 1
   end
@@ -148,6 +206,11 @@ function DT.send(kind, fields)
     end
   end
   pump()
+  -- The held line: a typed command's message waits for lockdown; said once per hold.
+  if holding and DT.inCommand and not heldSaid then                       -- guard: held line once per hold
+    heldSaid = true
+    DT.out(HELD_LINE)
+  end
   return true
 end
 
@@ -159,20 +222,14 @@ end
 
 -- ---------------------------------------------------------------- inbound
 
--- "Name-Realm" (realm without spaces, as CHAT_MSG_ADDON names it) or a bare "Name" ->
--- "Realm-Name", with the player's own realm spelt as GetRealmName spells it.
+-- "Name-Realm" (as CHAT_MSG_ADDON names it) or a bare "Name" (the player's own realm) ->
+-- the one key spelling, DT.keyOf (fix round 3, AUD-06).
 local function senderKey(sender)
   sender = clean(sender)
   if type(sender) ~= "string" or sender == "" then return nil end
-  local own = clean(try(GetRealmName))
   local name, realm = sender:match("^([^%-]+)%-(.+)$")
-  if not name then
-    name, realm = sender, own
-  elseif type(own) == "string" and realm:gsub("[%s%-]", "") == own:gsub("[%s%-]", "") then
-    realm = own
-  end
-  if type(realm) ~= "string" or realm == "" or name == "" then return nil end
-  return realm .. "-" .. name
+  if not name then name = sender end
+  return DT.keyOf(name, realm)
 end
 DT.senderKey = senderKey
 
@@ -238,7 +295,8 @@ end
 -- For the offline tests only.
 DT._comms = { encode = encode, esc = esc, unesc = unesc, parseBody = parseBody, senderKey = senderKey,
   queue = function() return queue end, partial = function() return partial end,
-  tokens = function() return tokens end }
+  tokens = function() return tokens end, holding = function() return holding end,
+  refusals = function() return refusals end, HELD_LINE = HELD_LINE }
 
 DT.module({
   id = "comms",
@@ -247,7 +305,7 @@ DT.module({
     local reg = C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix
     try(reg, PREFIX)
   end,
-  events = { CHAT_MSG_ADDON = inbound },
+  events = { CHAT_MSG_ADDON = inbound, PLAYER_ENTERING_WORLD = recordFlag },
   ready = DT.errors,
   errorKey = "comms", lastKey = "lastComms",
 })

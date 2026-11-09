@@ -48,7 +48,7 @@ do
   check("sent on GUILD with the prefix", #a.sent == 1 and a.sent[1].chan == "GUILD" and a.sent[1].prefix == "DEADTIRED")
   w:advance(0)
   check("the other client receives it once, sender normalised to Realm-Name, fields decoded", #got == 1
-    and got[1].from == "Classic Beta PvP-Stromham" and got[1].f.x == "hi^there~|")
+    and got[1].from == "ClassicBetaPvP-Stromham" and got[1].f.x == "hi^there~|")
 end
 
 -- ---------------------------------------------------------------- own messages
@@ -61,7 +61,7 @@ do
   check("own message ignored: a bare Name takes the player's realm", #got == 0)
   inject(b, "1^TEST^x~other", "Ghoul")
   check("a bare Name from someone else is Realm-Name on the player's realm", #got == 1
-    and got[1].from == "Classic Beta PvP-Ghoul")
+    and got[1].from == "ClassicBetaPvP-Ghoul")
   inject(b, "1^TEST^x~far", "Ghoul-Nethergarde")
   check("another realm keeps its own name", got[2].from == "Nethergarde-Ghoul")
 end
@@ -107,7 +107,7 @@ do
   inject(b, ch(9, 3), "Ghoul"); inject(b, ch(9, 1), "Wight"); inject(b, ch(9, 1), "Ghoul")
   inject(b, ch(9, 2), "Ghoul")
   check("out of order, per sender: Ghoul's set completes, Wight's waits", #got == 3
-    and got[3].from == "Classic Beta PvP-Ghoul")
+    and got[3].from == "ClassicBetaPvP-Ghoul")
 
   -- Stale: an incomplete set is discarded after 30 seconds.
   local stale0 = b:db().comms.stale
@@ -140,31 +140,169 @@ do
   check("throttle: the bucket refills to 5, no more", #a.sent == 13)
 end
 
--- ---------------------------------------------------------------- restricted, queue cap
+-- ---------------------------------------------------------------- lockdown (R-1), queue cap
+-- Fix round 3 (R-1): the hold is for C_ChatInfo.InChatMessagingLockdown only. These checks were
+-- the "restricted: ..." checks, rewritten to the lockdown form.
 do
   local w, a = setup()
-  a.restricted = true
+  a.lockdown = true
   a.DT.send("TEST", { n = 1 })
-  check("restricted: nothing sent, the message is held", #a.sent == 0 and #a.DT._comms.queue() == 1)
+  check("lockdown: nothing sent, the message is held", #a.sent == 0 and #a.DT._comms.queue() == 1)
   w:advance(4.9)
-  check("restricted: still held before the 5 s retry", #a.sent == 0)
-  a.restricted = false
+  check("lockdown: still held before the 5 s retry", #a.sent == 0)
+  a.lockdown = false
   w:advance(0.2)
-  check("restricted: sent on the 5 s retry once lifted", #a.sent == 1)
+  check("lockdown: sent on the 5 s retry once lifted", #a.sent == 1)
 
-  a.restricted = true
+  a.lockdown = true
   for i = 1, 55 do a.DT.send("TEST", { n = i }) end
   check("queue cap: 50 held, the 5 oldest dropped and counted", #a.DT._comms.queue() == 50
     and a:db().comms.dropped == 5)
-  a.restricted = false
+  a.lockdown = false
   w:advance(120)
   check("queue cap: the survivors go out oldest first", #a.sent == 51 and a.sent[2].text == "1^TEST^n~6"
     and a.sent[51].text == "1^TEST^n~55")
   a.sendError = true
-  a.DT.send("TEST", { n = 1 })
-  check("a SendAddonMessage failure is counted, never raised", (a:db().comms.sendFailed or 0) == 1)
+  local okRaise = pcall(a.DT.send, "TEST", { n = 1 })
+  check("a SendAddonMessage error is counted as a refusal, never raised", okRaise
+    and (a:db().comms.sendRefused or 0) == 1 and a:db().comms.lastRefusal:find("send failed", 1, true) ~= nil)
   a.sendError = false
+  w:advance(2)
   check("the longest message sent is recorded", a:db().comms.longest == #"1^TEST^n~55")
+end
+
+-- ---------------------------------------------------------------- R-1: the flag never gates
+do
+  local w, a = setup()
+  a.restricted = true
+  a:login()
+  check("R-1: the restricted flag is read at login and recorded (flagReads 1, flagRestricted true)",
+    a:db().comms.flagReads == 1 and a:db().comms.flagRestricted == true and a.flagCalls == 1)
+  a:fire("PLAYER_ENTERING_WORLD", false, false)
+  check("R-1: read once per login, not on every loading screen", a:db().comms.flagReads == 1)
+  a.DT.send("TEST", { n = 1 })
+  check("R-1: flag true, no lockdown: the message is sent", #a.sent == 1)
+  for i = 2, 9 do a.DT.send("TEST", { n = i }) end
+  w:advance(10)
+  check("R-1: flag true: the whole queue goes, and the pump never asked the flag", #a.sent == 9
+    and a.flagCalls == 1)
+  local n = w:client({ name = "Ghoul", guild = G, files = FILES, db = a:db() })
+  n.restricted = false
+  n:login()
+  check("R-1: the next login reads it again: flagReads 2, the last reading kept", n:db().comms.flagReads == 2
+    and n:db().comms.flagRestricted == false)
+end
+do
+  local w = H.world()
+  local a = w:client({ name = "Stromham", guild = G, files = FILES, lockdown = "absent" })
+  a.restricted = true
+  a.DT.send("TEST", { n = 1 })
+  check("R-1: InChatMessagingLockdown absent: sends", #a.sent == 1)
+  local b = w:client({ name = "Ghoul", guild = G, files = FILES })
+  b.lockdown = "error"
+  b.DT.send("TEST", { n = 1 })
+  check("R-1: InChatMessagingLockdown erroring: sends", #b.sent == 1)
+  b.lockdown = true
+  b.DT.send("TEST", { n = 2 })
+  check("R-1: lockdown true: held", #b.sent == 1 and #b.DT._comms.queue() == 1)
+  w:advance(5.1)
+  check("R-1: lockdown true: retried and still held", #b.sent == 1)
+  b.lockdown = false
+  w:advance(5)
+  check("R-1: lockdown lifted: sent", #b.sent == 2 and b.sent[2].text == "1^TEST^n~2")
+end
+
+-- ---------------------------------------------------------------- the held line
+do
+  local w, a = setup()
+  local LINE = a.DT._comms.HELD_LINE
+  local function held() local n = 0 for _, m in ipairs(a.printed) do if m:find(LINE, 1, true) then n = n + 1 end end return n end
+  check("held line: the brief's wording", LINE == "The dead are gagged for this fight. Your message goes when it's over.")
+  a.DT.verb("shout", function() a.DT.send("TEST", { x = "1" }) end)
+  a.printed = {}
+  a.DT.send("TEST", { x = "auto" })
+  check("held line: never for a send outside lockdown", held() == 0 and #a.sent == 1)
+  a.lockdown = true
+  a.DT.send("TEST", { x = "auto" })
+  check("held line: never for a send the addon makes by itself", held() == 0)
+  a.env.SlashCmdList.DEADTIRED("shout")
+  check("held line: a typed command's message held for lockdown prints it once", held() == 1)
+  a.env.SlashCmdList.DEADTIRED("shout")
+  check("held line: not for the second queued message", held() == 1)
+  w:advance(5.1)
+  a.env.SlashCmdList.DEADTIRED("shout")
+  check("held line: not again while the same hold goes on", held() == 1)
+  a.lockdown = false
+  w:advance(5.1)
+  check("held line: the hold ends, everything goes", #a.DT._comms.queue() == 0 and #a.sent == 5)
+  a.env.SlashCmdList.DEADTIRED("shout")
+  check("held line: not for a command outside lockdown", held() == 1)
+  a.lockdown = true
+  a.env.SlashCmdList.DEADTIRED("shout")
+  check("held line: a new hold prints it again", held() == 2)
+end
+
+-- ---------------------------------------------------------------- AUD-10: refused sends
+do
+  local w, a, b, got = setup()
+  a.sendResult = 0
+  a.DT.send("TEST", { n = 1 })
+  check("AUD-10: return 0: sent", #a.sent == 1 and (a:db().comms.sendRefused or 0) == 0)
+  a.sendResult = true
+  a.DT.send("TEST", { n = 2 })
+  a.sendResult = H.NIL
+  a.DT.send("TEST", { n = 3 })
+  check("AUD-10: return true and return nil: sent", #a.sent == 3 and (a:db().comms.sendRefused or 0) == 0)
+  w:advance(10)
+  a.sendResult = 5
+  a.DT.send("TEST", { n = 4 })
+  a.DT.send("TEST", { n = 5 })
+  local q = a.DT._comms.queue()
+  check("AUD-10: return 5: refused, counted, the code kept", #a.sent == 3 and #a.refused == 1
+    and a:db().comms.sendRefused == 1 and a:db().comms.lastRefusal == "5")
+  check("AUD-10: the refused message is still at the head of the queue", #q == 2 and q[1] == "1^TEST^n~4"
+    and q[2] == "1^TEST^n~5")
+  w:advance(0.9)
+  check("AUD-10: nothing retried inside the 1 s wait", #a.refused == 1)
+  a.sendResult = 0
+  w:advance(0.2)
+  check("AUD-10: retried after the wait, then sent in order", #a.sent == 5 and a.sent[4].text == "1^TEST^n~4"
+    and a.sent[5].text == "1^TEST^n~5")
+end
+do
+  local w, a = setup()
+  a.sendResult = function(text) if text == "1^TEST^n~1" then return 5 end return 0 end
+  a.DT.send("TEST", { n = 1 })
+  a.DT.send("TEST", { n = 2 })
+  w:advance(1.05)
+  check("AUD-10: two refusals: still queued, still first", #a.refused == 2 and a.DT._comms.queue()[1] == "1^TEST^n~1"
+    and #a.sent == 0)
+  w:advance(1.05)
+  check("AUD-10: the third refusal drops it and counts the drop", #a.refused == 3
+    and a:db().comms.refusedDropped == 1 and a:db().comms.sendRefused == 3)
+  check("AUD-10: the next message then goes", #a.sent == 1 and a.sent[1].text == "1^TEST^n~2"
+    and #a.DT._comms.queue() == 0)
+  a.sendResult = 7
+  a.DT.send("TEST", { n = 3 })
+  check("AUD-10: a new message starts its own count", a.DT._comms.refusals() == 1)
+  a.sendResult = 0
+  w:advance(2)
+  check("AUD-10: ...and goes when the game takes it", #a.sent == 2 and a.DT._comms.refusals() == 0)
+  a.sendError = true
+  a.DT.send("TEST", { n = 4 })
+  check("AUD-10: a raised error counts as a refusal and requeues", a:db().comms.sendRefused == 5
+    and a.DT._comms.queue()[1] == "1^TEST^n~4")
+  a.sendError = false
+  w:advance(2)
+  check("AUD-10: ...and is retried", a.sent[3].text == "1^TEST^n~4")
+  a.env.Enum = { SendAddonMessageResult = { Success = 0, AddonMessageThrottle = 3 } }
+  a.sendResult = 3
+  a.DT.send("TEST", { n = 5 })
+  check("AUD-10: with Enum present, a non-Success code is a refusal", a:db().comms.sendRefused == 6
+    and a:db().comms.lastRefusal == "3")
+  a.sendResult = 0
+  w:advance(2)
+  check("AUD-10: with Enum present, Success (0) is sent", a.sent[4].text == "1^TEST^n~5")
 end
 
 -- ---------------------------------------------------------------- unknown version, malformed
