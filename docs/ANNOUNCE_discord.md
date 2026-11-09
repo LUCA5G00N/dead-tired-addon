@@ -17,7 +17,7 @@ Also: who runs it (`/dt who`), alts, a guild stash search, the slowest-leveller 
 
 Lists only show guildies running the addon, so the more of us dead, the better.
 
-Download: <link to DeadTired-0.1.0-rc2.zip>, unzip into `_forever_\Interface\AddOns`.
+Download: <link to DeadTired-0.1.0-rc3.zip>, unzip into `_forever_\Interface\AddOns`.
 Guide (what it shares, and how to switch each bit off): <link to the guide>
 Bugs: BugSack screenshot to #dt-chat.
 

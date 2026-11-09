@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the release zips (dt_release, Q4). Run from the repo root: sh tools/package.sh
 # Needs zip (and git, to read the card-1 and probe folders from their branches).
-#   dist/DeadTired-0.1.0-rc2.zip      DeadTired/ from this checkout, without tests/
+#   dist/DeadTired-0.1.0-rc3.zip      DeadTired/ from this checkout, without tests/
 #   dist/DeadTired-0.1.0-card1.zip    DeadTired/ from card/dt_foundation alone, without tests/
 #   dist/DeadTiredProbe-0.1.0.zip     DeadTiredProbe/ from card/dt_probe, without tests/
 # Each zip unzips to Interface\AddOns\<Folder>\<Folder>.toc. Refs can be overridden:
@@ -39,8 +39,8 @@ pack() {   # pack <zip name> <stage dir> <folder>
   zip -sf "dist/$1" | sed -n '2,$p' | grep -v '^Total' | sed 's/^ */   /'
 }
 
-stage . DeadTired "$TMP/rc2"
-pack DeadTired-0.1.0-rc2.zip "$TMP/rc2" DeadTired
+stage . DeadTired "$TMP/rc3"
+pack DeadTired-0.1.0-rc3.zip "$TMP/rc3" DeadTired
 stage "$CARD1_REF" DeadTired "$TMP/card1"
 pack DeadTired-0.1.0-card1.zip "$TMP/card1" DeadTired
 stage "$PROBE_REF" DeadTiredProbe "$TMP/probe"

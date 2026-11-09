@@ -68,7 +68,8 @@ print("together: message kinds (" .. #ml .. "): " .. table.concat(ml, ", "))
 check("no two modules register the same verb (" .. table.concat(dupVerbs, ",") .. ")", #dupVerbs == 0)
 check("no two cards use the same top-level DeadTiredDB key (" .. table.concat(dupKeys, ",") .. ")", #dupKeys == 0)
 check("no two cards use the same message kind (" .. table.concat(dupKinds, ",") .. ")", #dupKinds == 0)
-check("15 verbs, 12 keys, 8 kinds, as the cards built them", #names(verbs) == 15 and #names(keys) == 12
+-- Fix round 3: 13 keys, card 1's keysV (AUD-06, the one-time key migration) the new one.
+check("15 verbs, 13 keys, 8 kinds, as the cards built them", #names(verbs) == 15 and #names(keys) == 13
   and #names(kinds) == 8)
 
 -- ---------------------------------------------------------------- clients

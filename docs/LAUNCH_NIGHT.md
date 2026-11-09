@@ -1,6 +1,6 @@
 # Launch night running order (Wed 2026-11-04, from 11pm UK)
 
-All zips are in `dist/` on `release/0.1.0-rc2`. Unzip into `_forever_\Interface\AddOns`; tick
+All zips are in `dist/` on `release/0.1.0-rc3`. Unzip into `_forever_\Interface\AddOns`; tick
 **Load out of date AddOns** if asked. Only one `DeadTired` folder at a time: delete the old one
 before unzipping the next. The offline checks (G1-G4/G5 on each sheet) were run by the build
 sessions; tonight is the in-game ones.
@@ -9,7 +9,7 @@ sessions; tonight is the in-game ones.
 |---|---|---|---|
 | 1. Probe | `dist/DeadTiredProbe-0.1.0.zip` (you and the guildie) | `docs/UAT_dt_probe.md` | 6 (G6, the 10-step run; G1-G5 are offline) |
 | 2. Card 1 alone | `dist/DeadTired-0.1.0-card1.zip` | `docs/UAT_dt_foundation.md` | 11 (G5-G9 with **G6b**, H1) |
-| 3. Cards 3-7 | swap to `dist/DeadTired-0.1.0-rc2.zip` | `docs/UAT_dt_crypt.md` | 12 (G6-G11, H1) |
+| 3. Cards 3-7 | swap to `dist/DeadTired-0.1.0-rc3.zip` | `docs/UAT_dt_crypt.md` | 12 (G6-G11, H1) |
 | | | `docs/UAT_dt_pvp.md` | 12 (G6-G11, H1) |
 | | | `docs/UAT_dt_prep.md` | 13 (G6-G12, H1) |
 | | | `docs/UAT_dt_stretch.md` | 13 (G6-G12, H1) |
@@ -22,9 +22,10 @@ sessions; tonight is the in-game ones.
 2. **Card 1 alone**, from the `-card1` zip. Includes **G6b** (fix round 1): both online and
    listing each other, you `/reload`, then relog: `/dt who` lists the guildie again within 20 s.
    **If card 1 fails, stop here** (ROADMAP rule 3): nothing else is walked tonight.
-3. **Swap to the `-rc2` zip** and walk the five sheets in order: crypt, pvp, prep, stretch, logs.
+3. **Swap to the `-rc3` zip** and walk the five sheets in order: crypt, pvp, prep, stretch, logs.
    A card that fails is noted; the others still count. Note: on the combined build,
    `SendChatMessage` greps find card 5's one ruled call site (`Recruit.lua`); that is expected.
+   WizardryLogPrompt is retired (9 Nov): card 7's prompt is now the only logs prompt.
 4. **Hand over** `_forever_\WTF\Account\<ACCOUNT>\SavedVariables\DeadTiredProbe.lua` (and the
    guildie's) to a session for `docs/PROBE_launch_results.md`, and note which cards passed, so
    each can be merged to `main` on its own.

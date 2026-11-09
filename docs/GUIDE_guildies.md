@@ -12,11 +12,11 @@ online. If someone's missing, they probably don't have it (or have that sharing 
 It's quiet: one welcome line when you log in, and otherwise nothing unless you ask, apart from
 the few things listed under *What it prints on its own*.
 
-This is release candidate **0.1.0-rc2**, for testing on launch night.
+This is release candidate **0.1.0-rc3**, for testing on launch night.
 
 ## Install
 
-1. Download `DeadTired-0.1.0-rc2.zip`.
+1. Download `DeadTired-0.1.0-rc3.zip`.
 2. Unzip it into your WoW Forever AddOns folder, `_forever_\Interface\AddOns`, so you end up with
    `_forever_\Interface\AddOns\DeadTired\DeadTired.toc`. (Not `DeadTired\DeadTired\...`.)
 3. At the character screen, click **AddOns**, make sure **Dead Tired** is ticked. If it says
@@ -129,7 +129,8 @@ This is release candidate **0.1.0-rc2**, for testing on launch night.
 The welcome line (`/dt welcome off` hides it, `/dt welcome on` brings it back); guildies' death
 notices (`/dt rip off`); the hardcore reminder (once, ever, per character); your bedtime
 reminders (only after `/dt bedtime`); event reminders (only after `/dt events remind on`); the
-combat-log window or line in dungeons and raids (`/dt logs off`). Nothing else.
+combat-log window or line in dungeons and raids (`/dt logs off`); for officers, one line when
+`/dt recruit` is ready again after your post (`/dt recruit nudge off` stops it). Nothing else.
 
 ## Found a bug?
 
