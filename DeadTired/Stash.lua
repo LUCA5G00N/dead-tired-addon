@@ -230,7 +230,7 @@ DT.on("STASH", function(from, f)
     s.badStash = s.badStash + 1
     return
   end
-  if f.to ~= DT.charKey() then return end                                        -- guard: addressed to someone else
+  if DT.normKey(f.to) ~= DT.charKey() then return end                            -- guard: addressed to someone else (AUD-06: one spelling)
   if not open or tostring(open.q) ~= f.q then return end                         -- late answers
   if open.answers[from] then return end
   open.answers[from] = hits
@@ -315,10 +315,21 @@ end
 DT._stash = { open = function() return open end, answered = function() return answered end,
   scanBags = scanBags, bankIDs = bankIDs }
 
+-- Fix round 3 (AUD-06): the account's per-character lists move to the one key spelling, once per
+-- account (DeadTiredDB.stash.keysV = 2). Two old keys can't name one character (one realm has
+-- one GetRealmName spelling), so nothing collapses here in practice; if it did, the entry already
+-- under the new key stays.
+local function migrate()
+  local s = store()
+  if s.keysV == 2 then return end                                      -- guard: stash migration once
+  DT.migrateKeys(s.chars, {})
+  s.keysV = 2
+end
+
 local entered = false
 DT.module({
   id = "stash",
-  init = function() store() end,
+  init = function() store(); migrate() end,
   events = {
     PLAYER_ENTERING_WORLD = function()
       if entered then return end

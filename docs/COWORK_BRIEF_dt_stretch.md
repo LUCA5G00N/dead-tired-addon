@@ -12,6 +12,12 @@ AUD-03, AUD-07, AUD-09):** the search id comes from the clock; one search per as
 answered; shared play time can be withdrawn and ages out after 30 days. Marked *(amended, fix
 round 1)*.
 
+**Amended 2026-11-09 (fix round 3, AUD-06 in `docs/COWORK_BRIEF_dt_fixes3.md`):** card 1's keys
+are now `NormalisedRealm-Name`. The stash's `chars` keys and every played board's keys are
+rewritten once per account (`DeadTiredDB.stash.keysV`, `DeadTiredDB.played.keysV` = 2; on the
+board, two keys collapsing keep the newer `t`), and a STASH answer's `to` is compared in that
+spelling. Nothing else here changed.
+
 **Read before Task 1, in order:**
 1. `CLAUDE.md` (house rules; they bind throughout this round).
 2. This brief, then `docs/UAT_dt_stretch.md`.

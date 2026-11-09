@@ -107,7 +107,7 @@ do
   local alt = client(w, { name = "Bonechill", db = a:db(), bags = { [0] = { item(4338, 15) } } })
   alt:login()
   check("an alt on the same account adds its own entry, keeping the main's",
-    alt:db().stash.chars["Classic Beta PvP-Bonechill"].bags[4338] == 15 and alt:db().stash.chars["Classic Beta PvP-Stromham"] ~= nil)
+    alt:db().stash.chars["ClassicBetaPvP-Bonechill"].bags[4338] == 15 and alt:db().stash.chars["ClassicBetaPvP-Stromham"] ~= nil)
   alt:slash("stash")
   check("/dt stash on the alt: bank not read yet", alt:said("across 2 characters (bank not read yet)") ~= nil)
   alt:slash("stash share off")
@@ -190,7 +190,7 @@ do
   local b = client(w, { name = "Wight", bags = { [0] = { item(2589, 99) } } })                 -- sharing off
   a:slash("stash share on")
   -- a's alt, same account, with more linen
-  a:db().stash.chars["Classic Beta PvP-Ghoulalt"] = { bags = { [2589] = 50 }, bank = { [2589] = 10 } }
+  a:db().stash.chars["ClassicBetaPvP-Ghoulalt"] = { bags = { [2589] = 50 }, bank = { [2589] = 10 } }
   tim:slash("stash Linen")
   local q1 = tostring(tim.env.time() % 1000000)   -- F8b: the id is the clock, not a counter
   check("a search sends STASHQ with the term, and says so", sentKind(tim, "STASHQ")[1] == "1^STASHQ^q~" .. q1 .. "^term~Linen"
@@ -200,7 +200,7 @@ do
   w:advance(0.2)
   local ans = sentKind(a, "STASH")[1]
   check("a sharing member answers once: the alt's items under the alt's name, largest first",
-    ans == "1^STASH^hits~2589:60:Ghoulalt,2589:20:Ghoul,2996:4:Ghoul^q~" .. q1 .. "^to~Classic Beta PvP-Stromham")
+    ans == "1^STASH^hits~2589:60:Ghoulalt,2589:20:Ghoul,2996:4:Ghoul^q~" .. q1 .. "^to~ClassicBetaPvP-Stromham")
   check("a member with sharing off sends nothing and doesn't note the question", #b.sent == 0
     and next(b.DT._stash.answered()) == nil)
   tim.printed = {}
@@ -232,7 +232,7 @@ do
   end)
   check("a term like %a+ or [[[ matches literally and never errors", ok and #sentKind(a, "STASH") == 1)
   -- the 4-hit cap
-  a:db().stash.chars["Classic Beta PvP-Ghoulalt"].bags = { [2589] = 1, [2592] = 2, [4306] = 3, [4338] = 4, [14047] = 5 }
+  a:db().stash.chars["ClassicBetaPvP-Ghoulalt"].bags = { [2589] = 1, [2592] = 2, [4306] = 3, [4338] = 4, [14047] = 5 }
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~9^term~cloth", "GUILD", "Banshee-ClassicBetaPvP")
   w:advance(10)
   local capped = sentKind(a, "STASH")[2] or ""
@@ -241,13 +241,13 @@ do
   -- holder names: a 12-letter name with every letter accented is 24 bytes and is answered;
   -- anything over 24 bytes (no real name is) is left out (the wire limit)
   local accented = "\195\133\195\164\195\182\195\169\195\168\195\170\195\173\195\172\195\174\195\179\195\178\195\180"
-  a:db().stash.chars["Classic Beta PvP-" .. accented] = { bags = { [2770] = 7 }, bank = {} }
+  a:db().stash.chars["ClassicBetaPvP-" .. accented] = { bags = { [2770] = 7 }, bank = {} }
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~10^term~copper", "GUILD", "Ghast-ClassicBetaPvP")
   w:advance(10)
   check("a 12-letter accented holder name (24 bytes) is answered", #accented == 24 and #sentKind(a, "STASH") == 3
     and sentKind(a, "STASH")[3]:find("hits~2770:7:" .. accented .. "^", 1, true) ~= nil)
-  a:db().stash.chars["Classic Beta PvP-" .. accented] = nil
-  a:db().stash.chars["Classic Beta PvP-" .. accented .. "x"] = { bags = { [2770] = 7 }, bank = {} }
+  a:db().stash.chars["ClassicBetaPvP-" .. accented] = nil
+  a:db().stash.chars["ClassicBetaPvP-" .. accented .. "x"] = { bags = { [2770] = 7 }, bank = {} }
   a:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASHQ^q~12^term~copper", "GUILD", "Shade-ClassicBetaPvP")
   w:advance(10)
   check("a holder name over 24 bytes is left out of answers", #sentKind(a, "STASH") == 3)
@@ -265,18 +265,20 @@ do
   local function inject(text, from) tim:fire("CHAT_MSG_ADDON", "DEADTIRED", text, "GUILD", (from or "Ghoul") .. "-ClassicBetaPvP") end
   tim:slash("stash linen")
   local Q = tostring(tim.env.time() % 1000000)   -- F8b
-  inject("1^STASH^hits~2589:3:Ghoul^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^STASH^hits~2589:9:Ghoul^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Ghoul")
-  inject("1^STASH^hits~2589:5:Wight^q~" .. Q .. "^to~Classic Beta PvP-Someone", "Wight")
-  inject("1^STASH^hits~2589:6:Lich^q~" .. (Q + 1) % 1000000 .. "^to~Classic Beta PvP-Stromham", "Lich")
-  inject("1^STASH^hits~99999:2:Bones^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Bones")
+  inject("1^STASH^hits~2589:3:Ghoul^q~" .. Q .. "^to~ClassicBetaPvP-Stromham", "Ghoul")
+  inject("1^STASH^hits~2589:9:Ghoul^q~" .. Q .. "^to~ClassicBetaPvP-Stromham", "Ghoul")
+  inject("1^STASH^hits~2589:5:Wight^q~" .. Q .. "^to~ClassicBetaPvP-Someone", "Wight")
+  inject("1^STASH^hits~2589:6:Lich^q~" .. (Q + 1) % 1000000 .. "^to~ClassicBetaPvP-Stromham", "Lich")
+  inject("1^STASH^hits~99999:2:Bones^q~" .. Q .. "^to~ClassicBetaPvP-Stromham", "Bones")
+  inject("1^STASH^hits~2592:4:Oldie^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Oldie")   -- AUD-06
   tim.printed = {}
   w:advance(10)
   check("once per sender; addressed elsewhere and other searches ignored", tim.printed[1] == P .. "Ghoul: Linen Cloth x3")
   check("an unloaded item shows as item <id>, and its load is requested", tim.printed[2] == P .. "Bones: item 99999 x2"
     and tim.requested[99999] == true)
-  inject("1^STASH^hits~2589:1:Late^q~" .. Q .. "^to~Classic Beta PvP-Stromham", "Late")
-  check("an answer after the summary is ignored", #tim.printed == 3 and tim.DT._stash.open() == nil)
+  check("AUD-06: an answer whose to is in the old spaced spelling still arrives", tim.printed[3] == P .. "Oldie: Wool Cloth x4")
+  inject("1^STASH^hits~2589:1:Late^q~" .. Q .. "^to~ClassicBetaPvP-Stromham", "Late")
+  check("an answer after the summary is ignored", #tim.printed == 4 and tim.DT._stash.open() == nil)
   local bad = { "1^STASH^hits~2589:3:Ghoul^q~x^to~R-N", "1^STASH^hits~2589:3:Ghoul^q~1^to~NoRealm",
     "1^STASH^hits~^q~1^to~R-N", "1^STASH^q~1^to~R-N", "1^STASH^hits~12345678:3:Ghoul^q~1^to~R-N",
     "1^STASH^hits~2589:0:Ghoul^q~1^to~R-N", "1^STASH^hits~2589:100000:Ghoul^q~1^to~R-N",
@@ -285,7 +287,7 @@ do
     "1^STASHQ^q~1^term~ab", "1^STASHQ^q~abc^term~linen" }
   for _, t in ipairs(bad) do inject(t) end
   check("each invalid STASH / STASHQ field is counted in badStash, nothing printed", tim:db().stash.badStash == #bad
-    and #tim.printed == 3)
+    and #tim.printed == 4)
 end
 
 -- ---------------------------------------------------------------- receiving a 24-byte holder name
@@ -295,7 +297,7 @@ do
   local holder = string.rep("\195\169", 12)   -- 12 accented letters, 24 bytes
   tim:slash("stash linen")
   local Q = tostring(tim.env.time() % 1000000)   -- F8b
-  tim:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASH^hits~2589:3:" .. holder .. "^q~" .. Q .. "^to~Classic Beta PvP-Stromham",
+  tim:fire("CHAT_MSG_ADDON", "DEADTIRED", "1^STASH^hits~2589:3:" .. holder .. "^q~" .. Q .. "^to~ClassicBetaPvP-Stromham",
     "GUILD", "Ghoul-ClassicBetaPvP")
   tim.printed = {}
   w:advance(10)
@@ -378,6 +380,26 @@ do
   ask(12)
   w:advance(10)
   check("F6d: 30 s later the same asker is answered again", #sentKind(a, "STASH") == 3)
+end
+
+-- ---------------------------------------------------------------- fix round 3 (AUD-06)
+do
+  local w = H.world()
+  local db = { stash = { share = true, badStash = 0, chars = {
+    ["Classic Beta PvP-Bonechill"] = { bags = { [4338] = 15 }, bank = {} } } } }
+  local a = client(w, { name = "Stromham", db = db })
+  local chars = db.stash.chars
+  check("AUD-06: an old spaced key in the stash is rewritten", chars["ClassicBetaPvP-Bonechill"]
+    and chars["ClassicBetaPvP-Bonechill"].bags[4338] == 15 and chars["Classic Beta PvP-Bonechill"] == nil
+    and db.stash.keysV == 2)
+  a:login()
+  local n = 0
+  for _ in pairs(chars) do n = n + 1 end
+  check("AUD-06: the logged-in character's own list joins it, two characters, one spelling", n == 2
+    and chars["ClassicBetaPvP-Stromham"] ~= nil)
+  chars["Classic Beta PvP-Ghoulalt"] = { bags = {}, bank = {} }
+  client(w, { name = "Stromham", db = db })
+  check("AUD-06: the stash migration runs once", chars["Classic Beta PvP-Ghoulalt"] ~= nil)
 end
 
 H.finish("stash")
