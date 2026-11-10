@@ -177,8 +177,13 @@ first time"*: the note box may be easy to miss.
      `"Stromham"`, `GetUnitName("player", true)` = `"Stromham Hamson"`, addon senders arrive as the
      full form. Build every key (own, senders, targets) from the full form; merge old short-name
      entries. (rc3: you appear as your own alt.)
-  2. **Realm comparison that agrees across clients.** On Liliac's client Tim's realm showed as
-     foreign. Read `GetRealmName`/`GetNormalizedRealmName` on two accounts before choosing.
+  2. **Connected realms are real on Forever.** Liliac's reading (10 Nov): `UnitName` "Lilbit",
+     `GetUnitName("player", true)` "Lilbit High", `GetRealmName` "CAMWOW EU4 Realm 4 PvP",
+     `GetNormalizedRealmName` "CAMWOWEU4Realm4PvP"; Tim is on **Realm 2**. So the guild spans
+     realms, Liliac's client was right to show Tim's realm, and the realm half of every key matters.
+     **Asymmetry to probe:** Tim's `/dt who` showed "Lilbit High" with no realm, though Lilbit is on
+     another realm. Record the raw `CHAT_MSG_ADDON` sender string for a cross-realm guildie before
+     building keys. Two-part names confirmed for a second player.
   3. **No taint on the chat path.** rc3 blocks the "allow scripts" confirmation for anyone running
      it (Liliac). The command router must not touch Blizzard's chat edit box or slash tables
      beyond registering `/dt`.
