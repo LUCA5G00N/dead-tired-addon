@@ -125,6 +125,27 @@ the hub. Skills pane: drop (duplicated twice).
 - **Lesson from Naowh (Tim, 9 Nov):** a lot of undescribed automation. DT stays quiet, and every
   automatic action it takes is described where the player switches it on.
 
+## General requirements (apply to every module)
+- **Configurable from our UI, clearly, and from the terminal too** (Tim, 10 Nov). Every setting a
+  module has appears in its settings card in plain words (what it does, what it shares, what it
+  switches on automatically), and the same setting has a `/dt` command for people who prefer
+  typing. Where a setting is too fiddly for a command (long lists, colours, positions), the brief
+  says so and names the one place it lives: no setting exists only in one of the two by accident.
+- **Every automatic action is described where it's switched on** (Naowh lesson, 9 Nov).
+- **The rebuild (Tim, 10 Nov):** *"thinking a proper rebuild approach with the framework idea in
+  mind for robustness"*. The rc3 walk's defects are its first requirements:
+  1. **One character key from the full name.** Forever names have a surname: `UnitName` =
+     `"Stromham"`, `GetUnitName("player", true)` = `"Stromham Hamson"`, addon senders arrive as the
+     full form. Build every key (own, senders, targets) from the full form; merge old short-name
+     entries. (rc3: you appear as your own alt.)
+  2. **Realm comparison that agrees across clients.** On Liliac's client Tim's realm showed as
+     foreign. Read `GetRealmName`/`GetNormalizedRealmName` on two accounts before choosing.
+  3. **No taint on the chat path.** rc3 blocks the "allow scripts" confirmation for anyone running
+     it (Liliac). The command router must not touch Blizzard's chat edit box or slash tables
+     beyond registering `/dt`.
+  4. **Probe every name function** (player, target, guild sender) on day one of any new client.
+  Source: `docs/UAT_dt_fixes3_results.md`.
+
 ## Ruled 9 Nov (for `dt_fixes3`)
 R-1 lockdown only (flag recorded, never gates); AUD-10 retry then drop (3 tries); AUD-06 one
 normalised realm key with a one-time migration; held line "The dead are gagged for this fight.
