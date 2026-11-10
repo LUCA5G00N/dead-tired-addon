@@ -62,7 +62,16 @@ and do not widen them. A new exception needs its own ruling in a brief.
 
 ## Code rules
 - Lua 5.1 (what WoW runs). One SavedVariables table: `DeadTiredDB` (account-wide). Character keys
-  are `Realm-Name`.
+  are `RealmKey-Full Name`: the realm normalised (AUD-06) and the **full** name with its surname
+  (`GetUnitName(unit, true)`; Forever names have one). Messages carry the sender's own key
+  (framework round, 2026-11-10).
+- **Libraries** (ruled 2026-11-10): bundle only LibStub, CallbackHandler-1.0, LibDataBroker-1.1,
+  LibDBIcon-1.0, LibSharedMedia-3.0, AceComm-3.0 + ChatThrottleLib, LibSerialize and LibDeflate, in
+  `DeadTired/Libs/`, unmodified, each with its licence and a line in `Libs/README.md`. Another
+  library needs a ruling. DT keeps its own module core.
+- **Never assign a Blizzard global or hook Blizzard's chat, slash or popup code.** The router sets
+  only `SLASH_DEADTIRED*` and `SlashCmdList["DEADTIRED"]` (rc3's `SlashCmdList = SlashCmdList or {}`
+  tainted every slash command). A static test enforces it.
 - Each feature is a module registered through `ns.DT.module{...}` (the pattern in
   `reference/wizardry/Forever/Core.lua`): its own frame, its own error key, handler failures
   recorded and re-raised.
