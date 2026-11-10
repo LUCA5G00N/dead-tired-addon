@@ -199,6 +199,12 @@ normalised realm key with a one-time migration; held line "The dead are gagged f
 Your message goes when it's over."; recruit nudge once after a post (`/dt recruit nudge off`);
 WizardryLogPrompt retired. Brief: `docs/COWORK_BRIEF_dt_fixes3.md`.
 
+## Ruled 10 Nov (rebuild)
+Fresh addon on the framework, cards ported next round; the small library set with DT's own core;
+launcher bar on by default with a one-line intro, standing back for Titan-style hosts; two skins
+(Forever + Dead Tired), Tim curates. Brief: `docs/COWORK_BRIEF_dt_framework.md`. Taint cause found:
+rc3 `Core.lua:305` `SlashCmdList = SlashCmdList or {}`.
+
 ## Rulings needed (draft as questions; Tim decides)
 Ruled already: R-1, AUD-06, AUD-10, held wording, recruit nudge, WizardryLogPrompt (9 Nov), MIT
 (9 Nov). Still open, each asked when its round comes:
