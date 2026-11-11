@@ -237,8 +237,7 @@ Ruled already: R-1, AUD-06, AUD-10, held wording, recruit nudge, WizardryLogProm
 Framework (above) · cards 1, 3, 4, 6, 7 ported · recruit + nudge · card 2's directory · guild
 armory + DT score · achievements + leaderboard · the Restless Dead Pilgrimage · travel quiz +
 timer · level-up card · recipe tracking + crafting board · bounty board · Rise! roll call.
-Optional in the first pass: loot toast, auto junk/repair. Parked: guild gambling (fun; needs rules:
-`/roll` only, no gold through the addon), Raid-Helper into the calendar (the bot's job), Discord
+Optional in the first pass: loot toast, auto junk/repair. Guild gambling moves into the plan (below). Parked: Raid-Helper into the calendar (the bot's job), Discord
 bridge (the bot's job), guild builds.
 
 ## Ruled 11 Nov (for Port 1)
@@ -270,6 +269,31 @@ continues, so **Port 1 ships as 0.2.0**, Port 2 as 0.3.0, later rounds 0.4.0, 0.
 same unless Tim decides otherwise; CurseForge/Wago later, with the BigWigs packager set up in that
 round so each release after is one tag.
 
+### Guild gambling (Tim, 11 Nov; Liliac's idea, 4 Nov)
+Modelled on **CrossGambling** (ideas only; our own code): a host starts a round, announced in chat;
+everyone in it `/roll`s to the stake (e.g. `/roll 100`); **lowest pays highest the difference**; a
+**Final call** button closes entries after ~20 s and the result is announced. DT reads the game's own
+`/roll` results from the system messages; no gold moves through the addon (players trade by hand).
+Plus a guild leaderboard (won/lost over time), which is where the achievements round can hook in.
+**Ruled (Tim, 11 Nov): runs over addon messages, not chat.** CrossGambling ran everything through
+party chat and got spammy; DT keeps the round in its own window: start, join, rolls, Final call and
+the result travel by addon message to everyone running DT in the round. Nothing is posted to chat
+by default (an optional one-click "Announce" for the host is a later nicety, not required).
+**Honesty of rolls (to settle in the round's brief):** an addon can't make a trusted random number,
+so the roll is still the game's own `/roll` (RandomRoll); DT reads the result from the system
+message. The game shows a `/roll` result only to the roller's party/raid (or people nearby), so
+either everyone in a round joins one party/raid (each client then sees every roll itself), or each
+client reports its own roll by addon message (simpler, but trust-based). Proposal: a round needs a
+party/raid, and each client checks the rolls it saw against those reported.
+**Still to rule when its round comes:**
+1. **Scope of a round** (guild-wide by addon message, or party/raid only, which the roll check needs).
+2. *(Settled by the ruling above: no timed chat post.)* **The timed announcement.** Starting a round and pressing Final call are clicks; announcing the
+   result *after* the 20 s timer would be a post from a timer. Options: the result is shown to
+   everyone running DT by addon message (no chat post), and the host gets an **Announce** button
+   (one click) to post it to chat; or a ruled exception for one result line per round in guild/party
+   chat (never a public channel).
+3. Stakes cap and whether the leaderboard is opt-in.
+
 ## Proposed order (rounds kept few: every round costs plan usage)
 Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **framework round**
 (0.2.0-fw1, walked 10-11 Nov with four players on three realms: **8 of 8 pass**,
@@ -289,7 +313,8 @@ Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **
 5. **Guild armory + DT score.**
 6. **Achievements + leaderboard + bounty board + Rise!**
 7. **The Pilgrimage** (initiation route first).
-8. **Travel window:** flight timer + next stop + the quiz (Tim's mark, 10 Nov 15:16).
+8. **Guild gambling** (+ its leaderboard), after achievements.
+9. **Travel window:** flight timer + next stop + the quiz (Tim's mark, 10 Nov 15:16).
 Ideas waiting for a round: a dungeon-quest tracker built over ForeverDungeonJournal (Tim's mark,
 10 Nov 21:09).
 **Login reminders: talent points and legacy points** (Tim, 11 Nov). One line at login when either
