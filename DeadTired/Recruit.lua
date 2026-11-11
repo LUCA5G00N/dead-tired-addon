@@ -149,7 +149,7 @@ end
 local function rearm()
   local wait = left()
   local at = store().at
-  if wait and wait > 0 and type(at) == "number" and nudged ~= at then
+  if wait and wait > 0 and type(at) == "number" then
     schedule(at, wait)                                                -- guard: nudge re-armed (Port 2)
   end
 end

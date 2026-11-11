@@ -370,6 +370,16 @@ do
   r.printed = {}
   r:slash("recruit"); tick2(60); r:slash("recruit nudge on"); r.officer = false; tick2(900)
   check("Port 2: a re-armed nudge still checks the officer flag", r:count(NUDGE) == 0)
+  -- the timer can run a moment before the wall clock says the cooldown is over; a nudge on then
+  -- must not arm a second nudge for a post already nudged
+  r.officer = true
+  r.printed = {}
+  r.now = r.now + 900
+  r:slash("recruit"); w2:advance(901); r.now = r.now + 899      -- the timer fired; time() says 1 s left
+  check("Port 2: the nudge came", r:count(NUDGE) == 1)
+  r:slash("recruit nudge on"); tick2(5)                         -- (a typed command clears r.printed first)
+  check("Port 2: on just after it, with the clock 1 s behind: no second nudge for that post", r:count(NUDGE) == 0
+    and r:said("Nudge on.") ~= nil)
 end
 
 H.finish("recruit")
