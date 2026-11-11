@@ -286,13 +286,22 @@ Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **
 8. **Travel window:** flight timer + next stop + the quiz (Tim's mark, 10 Nov 15:16).
 Ideas waiting for a round: a dungeon-quest tracker built over ForeverDungeonJournal (Tim's mark,
 10 Nov 21:09).
-**Legacy point reminder** (Tim, 11 Nov): Forever's **Legacy Tree** is account-wide (points earned on
-any character are shared), so a one-line nudge at login when points are unspent, e.g. *"2 legacy
-points lie unspent. The ancestors are restless."* It's a new *prints unasked* exception (needs a
-ruling), switchable, once per login. Likely readable through retail's trait API (`C_Traits`,
-on the beta spec: `GetConfigsByType`, `GetConfigInfo`, `GetTreeCurrencyInfo`), but the Legacy
-Tree's config/tree IDs are unknown: **probe first**. Fits round 3 beside the level-up card (both
-reminder cards).
+**Login reminders: talent points and legacy points** (Tim, 11 Nov). One line at login when either
+is unspent, e.g. *"1 talent point and 2 legacy points lie unspent. The ancestors are restless."*
+New *prints unasked* exception (needs a ruling); switchable; once per login. Round 3, beside the
+level-up card. Probed 11 Nov:
+- **Talent points: readable.** `C_Traits.GetConfigsByType(4)` gives the class config (rogue: config
+  4027355, tree 1111); `C_Traits.GetTreeCurrencyInfo(config, tree, false)` → currency 3820,
+  quantity 1, spent 0 (matched the 1 unspent point). `GetUnspentTalentPoints` is absent. Types 0-4
+  valid; 5 errors.
+- **Legacy points: not found yet.** Forever's own UI, `LegacySystemFrame` (part
+  `Blizzard_LegacySystem`; children `TreePage`, `ChallengesPage`, `RewardTrackPage`, tabs); window
+  shows "Legacy Points 3 / 65" (earned, account-wide) and "Available points: 2". No `C_*Legacy*`
+  namespace; no `C_*` function with "Legacy" in its name tied to it; `TreePage` holds no
+  config/tree value and has no `GetConfigID`/`GetTalentTreeID`. Type-3 config (rogue 4027358,
+  mage 5819305, both tree 1118) returns **no** currency. **The round's brief starts with a proper
+  probe** (e.g. export the interface code, or trace what `TreePage` calls); fallback: read the
+  "Available points" text, which works only after the window has been opened that session.
 
 **Port rule (11 Nov):** on Forever `UnitFullName` returns the **surname** as its second value
 (`"Stromham", "Hamson"`; target `"John", "Do"`), not the realm. Never read a realm from it.
