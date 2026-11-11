@@ -241,16 +241,73 @@ Optional in the first pass: loot toast, auto junk/repair. Parked: guild gambling
 `/roll` only, no gold through the addon), Raid-Helper into the calendar (the bot's job), Discord
 bridge (the bot's job), guild builds.
 
+## Ruled 11 Nov (for Port 1)
+1. **Raid prep: rebuilt as the officers' raid-night list** (card 5's `/dt prep` reshaped:
+   officers set the list; members check their own bags against it). Port 1 or Port 2 by size:
+   the brief decides, Port 1 at least keeps its data in the legacy move.
+2. **Nudge switch replies:** `/dt recruit nudge off` → *"Nudge off. The crypt keeps its own
+   counsel."*; `/dt recruit nudge on` → *"Nudge on. The crypt will knock."*
+3. **Bar contents: other addons off by default, an ordered list you curate.** DT's own buttons
+   (Dead Tired, DT: n online, recruit) show from the start. Every other addon the bar finds is
+   listed in the bar's settings card, **unticked**; tick to add it. The list is **ordered by
+   drag**: each row has a grip on its side to slide it up or down, and the bar follows that
+   order (DT's own buttons included). Order and ticks saved; `/dt bar add|remove <name>` and
+   `/dt bar move <name> <position>` as the typed path. A newly installed addon appears
+   unticked at the bottom.
+4. **Names shown without the realm** (Tim, 11 Nov: *"the actual realm these days shouldn't make a
+   difference to us playing on the same rule set"*). Lists show the full name only (`Vespera
+   Grimm`); the realm goes in the row's tooltip. Proposal: only if two people share a full name is
+   the realm added to tell them apart. **Keys keep the realm** (it's what keeps two same-named
+   players apart and what made the cross-realm walk work).
+
+## Versions and releases (Tim, 11 Nov)
+Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
+saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
+leading 0 means early. Test builds carry a suffix (`-fw1`, `-p1rc1`). Option A: the framework line
+continues, so **Port 1 ships as 0.2.0**, Port 2 as 0.3.0, later rounds 0.4.0, 0.5.0...; rc3's
+0.1.0 was never released.
+**Distribution:** Port 1 as a **GitHub release + the zip in Discord** (guild only). Port 2 the
+same unless Tim decides otherwise; CurseForge/Wago later, with the BigWigs packager set up in that
+round so each release after is one tag.
+
 ## Proposed order (rounds kept few: every round costs plan usage)
-Done: rulings round, `dt_fixes3` (rc3, walked 10 Nov: `UAT_dt_fixes3_results.md`).
-1. **Rebuild rulings** (no code): items 1-4 above.
-2. **Framework round:** module core, comms, keys, viewport + skins, settings cards, list widget,
-   launcher bar, toasts. Proved offline, then a small walk.
-3. **Port round:** cards 1, 3, 4, 6, 7 and recruit onto the framework, fixing the rc3 defects by
-   design. Walk (two players). **Release 0.1.0.**
-4. **Waypoint service + level-up card** (the waypointer's first user).
-5. **Card 2 + recipe tracking + crafting board** (probe `GetRecipeSchematic` first).
-6. **Guild armory + DT score.**
-7. **Achievements + leaderboard + bounty board + Rise!**
-8. **The Pilgrimage** (initiation route first).
-9. **Travel quiz + timer.**
+Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **framework round**
+(0.2.0-fw1, walked 10-11 Nov with four players on three realms: **8 of 8 pass**,
+`docs/UAT_dt_framework_results.md` on `claude/hopeful-thompson-4rpsrp`).
+1. **Port 1 → 0.2.0:** card 1 (guild gate, roster/who, alts), card 3 (Rest in Pieces: deaths,
+   graveyard, bedtime), **recruit with a button on the bar** (`/dt recruit` as backup) + nudge, the
+   `DeadTiredDB.legacy` migration for those cards (merge short/full-name duplicates; refile
+   connected-realm keys), and the fw1 walk's fixes (settings rows sized to their text; first
+   setting not under the search box; colour codes on the bar shown, not escaped; Who shows you,
+   marked as you, and an empty-state line; choose which addons show on the bar; DT info on the bar,
+   e.g. session stats), the bar list as ruled above, raid prep as the officers' list (if it fits;
+   else Port 2). Two-player walk. GitHub release + Discord.
+2. **Port 2 → 0.3.0:** card 4 (gank diary), card 6 (play time, stash, events), card 7 (logs
+   prompt), with their legacy data. Release as Port 1 (or CurseForge/Wago, Tim's call then).
+3. **Waypoint service + level-up card** (0.4.0).
+4. **Card 2 + recipe tracking + crafting board** (probe `GetRecipeSchematic` first).
+5. **Guild armory + DT score.**
+6. **Achievements + leaderboard + bounty board + Rise!**
+7. **The Pilgrimage** (initiation route first).
+8. **Travel window:** flight timer + next stop + the quiz (Tim's mark, 10 Nov 15:16).
+Ideas waiting for a round: a dungeon-quest tracker built over ForeverDungeonJournal (Tim's mark,
+10 Nov 21:09).
+**Login reminders: talent points and legacy points** (Tim, 11 Nov). One line at login when either
+is unspent, e.g. *"1 talent point and 2 legacy points lie unspent. The ancestors are restless."*
+New *prints unasked* exception (needs a ruling); switchable; once per login. Round 3, beside the
+level-up card. Probed 11 Nov:
+- **Talent points: readable.** `C_Traits.GetConfigsByType(4)` gives the class config (rogue: config
+  4027355, tree 1111); `C_Traits.GetTreeCurrencyInfo(config, tree, false)` → currency 3820,
+  quantity 1, spent 0 (matched the 1 unspent point). `GetUnspentTalentPoints` is absent. Types 0-4
+  valid; 5 errors.
+- **Legacy points: not found yet.** Forever's own UI, `LegacySystemFrame` (part
+  `Blizzard_LegacySystem`; children `TreePage`, `ChallengesPage`, `RewardTrackPage`, tabs); window
+  shows "Legacy Points 3 / 65" (earned, account-wide) and "Available points: 2". No `C_*Legacy*`
+  namespace; no `C_*` function with "Legacy" in its name tied to it; `TreePage` holds no
+  config/tree value and has no `GetConfigID`/`GetTalentTreeID`. Type-3 config (rogue 4027358,
+  mage 5819305, both tree 1118) returns **no** currency. **The round's brief starts with a proper
+  probe** (e.g. export the interface code, or trace what `TreePage` calls); fallback: read the
+  "Available points" text, which works only after the window has been opened that session.
+
+**Port rule (11 Nov):** on Forever `UnitFullName` returns the **surname** as its second value
+(`"Stromham", "Hamson"`; target `"John", "Do"`), not the realm. Never read a realm from it.
