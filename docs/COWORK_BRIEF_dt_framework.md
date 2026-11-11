@@ -12,6 +12,9 @@ Read first, in order:
    `reference/SPEC_forever_namespaces.md` (search it).
 
 **Draft-status: ratified by Tim 2026-11-10** (rebuild rulings 1-4, chosen in the 10 Nov session).
+**Amended 2026-11-11** after the first run stopped at Task 2 on LibDataBroker's licence (report on
+`claude/hopeful-thompson-4rpsrp`): libraries, the bar, branches. **Resume from Task 2**: Task 1 is done
+(taint cause confirmed; carry its finding into the new report by quoting the first run's).
 `main` head when written: `a250072` (plus PR #6, docs only).
 
 ## Origin
@@ -27,9 +30,12 @@ onto it in the next round.
 - **Scope:** a **fresh `DeadTired`** on a new branch. rc3's logic and tests may be copied where sound
   (say what in the report); its structure is not kept. Cards 1, 3, 4, 6, 7 and recruit are **not**
   ported in this round.
-- **Libraries:** bundle, inside `DeadTired/Libs/`, LibStub, CallbackHandler-1.0, LibDataBroker-1.1,
-  LibDBIcon-1.0, LibSharedMedia-3.0, AceComm-3.0 + ChatThrottleLib, LibSerialize, LibDeflate. DT keeps
-  its own module core. No AceDB, no AceAddon/AceConfig.
+- **Libraries (amended 2026-11-11):** bundle, inside `DeadTired/Libs/`, LibStub, CallbackHandler-1.0,
+  LibSharedMedia-3.0 (its file's LGPL 2.1 header is the explicit licence: ship it unmodified with the
+  LGPL text), AceComm-3.0 + ChatThrottleLib, LibSerialize, LibDeflate. **LibDataBroker-1.1: borrowed,
+  never bundled** (no licence in its source): DT uses it only if another addon loaded it
+  (`LibStub("LibDataBroker-1.1", true)`). **LibDBIcon: not used** (no minimap button). DT keeps its own
+  module core. No AceDB, no AceAddon/AceConfig. Sources and versions: as the first run's report table.
 - **Launcher bar:** **on by default**, with one intro line on the first login only:
   `DeadTired's bar has risen. /dt bar off to bury it.` (proposed wording: Tim rules on it at H2).
   Position remembered. If an LDB display addon is loaded (Titan Panel, ChocolateBar, Bazooka, or any
@@ -77,7 +83,7 @@ Branch **`card/dt_framework`** from `main`, carrying a fresh `DeadTired/` addon,
 | **Viewport frame** | One standard frame (title, close, body, optional search box), placed and kept (position saved, survives `/reload`), not closed by Escape, insecure (shown and used in combat). Copy the marks bar's visibility rules (Wizardry), not its code if it isn't in `reference/` |
 | **Skins** | One style table (colours, fonts, textures, spacing) every frame draws through; LibSharedMedia for fonts/textures; Forever + Dead Tired |
 | **List widget** | Scrollable rows with a search box, filtering as you type (case-insensitive) |
-| **Launcher bar** | An LDB host: shows DT's data objects and every other addon's LDB launcher/data source, in one row; drag to move; left-click opens, right-click its menu. The stand-back rule above. **It never hides or moves another addon's minimap button** (that would write their settings; a later ruling) |
+| **Launcher bar** | One row; drag to move; left-click opens, right-click its menu. DT's own buttons are DT objects with an LDB-shaped interface (`text`, `icon`, `OnClick`, `OnTooltipShow`). **When LibDataBroker-1.1 is loaded by another addon**, DT registers its objects there too and the bar also hosts every other addon's LDB launcher/data source. **When it isn't**, the bar shows DT's own buttons only, drawn natively. The stand-back rule above. **It never hides or moves another addon's minimap button** (that would write their settings; a later ruling) |
 | **Toasts** | One toast style; nothing toasts unless a module's setting is on (`/dt toast test` shows one) |
 | **Addon detection** | `DT.addonLoaded(name)` via `C_AddOns.IsAddOnLoaded` (guarded); used for the bar's stand-back |
 | **Entry points** | The game's Settings → AddOns page (a stub that opens DT's settings viewport) and the addon compartment line in the `.toc` |
@@ -92,10 +98,11 @@ Branch **`card/dt_framework`** from `main`, carrying a fresh `DeadTired/` addon,
 2. **Vendor the libraries** into `DeadTired/Libs/<Lib>/`, each with its upstream licence file and a
    line in `DeadTired/Libs/README.md` (name, version or commit, source URL, licence). Sources: the
    Ace3 repository (`github.com/WoWUIDev/Ace3`) for LibStub, CallbackHandler, AceComm and
-   ChatThrottleLib; `github.com/rossnichols/LibSerialize`; `github.com/SafeteeWoW/LibDeflate`; find the
-   canonical source of LibDataBroker-1.1, LibDBIcon-1.0 and LibSharedMedia-3.0 from their CurseForge
-   or WowAce pages. **Confirm LibDataBroker-1.1's licence and quote it** (FEATURES.md flags it).
-   Unmodified files only. Load order in the `.toc`.
+   ChatThrottleLib; `github.com/rossnichols/LibSerialize`; `github.com/SafeteeWoW/LibDeflate`;
+   `repos.wowace.com/wow/libsharedmedia-3-0/trunk` for LibSharedMedia (the versions the first run
+   recorded, or newer with the change noted). **Do not vendor LibDataBroker-1.1 or LibDBIcon-1.0.**
+   Unmodified files only. Load order in the `.toc`. Use the `dead-tired-addon` environment (it can
+   reach WowAce).
 3. **Module core, router, gate, welcome** with tests (registry, verbs, `help` built from the registry,
    disabled module registers nothing, guild gate silent outside the guild, error counting).
 4. **Keys** with tests: two-part names, own realm vs connected realm, display, case and spacing.
@@ -108,8 +115,10 @@ Branch **`card/dt_framework`** from `main`, carrying a fresh `DeadTired/` addon,
    `noVerb`; values typed and validated; saved.
 7. **Viewport, skins, list widget, toasts** (build under stubs; test the models: style resolution per
    skin, list filtering, toast gating by setting, viewport position save/restore).
-8. **Launcher bar + addon detection** with tests: DT's objects and a stub third-party LDB object both
-   shown; stand-back when a known display addon is loaded; intro line once only; `/dt bar on|off`.
+8. **Launcher bar + addon detection** with tests: **with** a stub LibDataBroker loaded by "another
+   addon", DT's objects registered there and a stub third-party object shown; **without** it, DT's own
+   buttons shown and nothing errors; no copy of LibDataBroker anywhere in `DeadTired/`; stand-back when
+   a known display addon is loaded; intro line once only; `/dt bar on|off`.
 9. **Taint guard (static test):** scan every `DeadTired/*.lua` (not `Libs/`) for an assignment to a
    global that isn't DT's own (`DeadTired*`, `DT`, `SLASH_DEADTIRED*`, `SlashCmdList["DEADTIRED"]`),
    for `hooksecurefunc`, and for any `Set*`, `Show`, `Hide`, `SetScript`, `SetParent` call on a
@@ -117,7 +126,7 @@ Branch **`card/dt_framework`** from `main`, carrying a fresh `DeadTired/` addon,
 10. **Who module** with tests (HELLO both ways, self never listed as other, rate limit, LDB count).
 11. **Guard proofs** (remove once, a check goes red, restore): the guild gate; the lockdown hold; the
     AUD-10 success test; the 3-refusal limit; the payload-key name match; the self-exclusion in Who;
-    the settings verb-or-`noVerb` rule; the bar's stand-back; the intro's once-only; the taint scan
+    the settings verb-or-`noVerb` rule; the bar's stand-back; the borrow-only LibDataBroker check (with no LDB loaded, DT must not create it); the intro's once-only; the taint scan
     (insert `SlashCmdList = SlashCmdList or {}` into a DT file: the scan goes red).
 12. **Package:** `tools/package.sh` (copy rc3's) builds `dist/DeadTired-0.2.0-fw1.zip`; `diff -r`
     against the branch; `run_all.sh` green. Push.
@@ -133,7 +142,8 @@ Porting cards 1, 3, 4, 6, 7, recruit or card 2; the waypoint service; every modu
 beyond Who; hiding or moving other addons' minimap buttons; merging to `main`; publishing.
 
 ## Stop conditions
-- A library can't be obtained from a source you can name, or its licence doesn't allow bundling → stop.
+- A bundled library can't be obtained from a source you can name, or its licence doesn't allow bundling → stop.
+- Building the bar without bundling LibDataBroker turns out to need LibDataBroker's code copied into DT → stop.
 - Meeting AUD-10 or R-1 needs a change inside a vendored library → stop.
 - The taint scan can't be written without false positives in DT's own code → stop and report the cases.
 - A function the brief relies on isn't in `reference/SPEC_forever_namespaces.md` and has no guarded

@@ -6,9 +6,12 @@ evidence in its report; **[H]** = Tim, in game, with `dist/DeadTired-0.2.0-fw1.z
 
 **Before the walk:** move rc3's `Interface\AddOns\DeadTired` to `Interface\AddOns_parked\DeadTired-rc3`,
 install fw1 in its place, and back up `WTF\...\SavedVariables\DeadTired.lua`. Swap back after the walk.
+**For H5, disable WizardryLedger** (and other Wizardry addons): it carries the same
+`SlashCmdList = SlashCmdList or {}` line rc3 copied, so it taints `/run` by itself (first run, Task 1).
 
 ## Offline [G]
-- [ ] G1 Libraries vendored unmodified, each with licence and source; LibDataBroker's licence quoted.
+- [ ] G1 Libraries vendored unmodified, each with licence and source. No LibDataBroker or LibDBIcon in
+      `DeadTired/`; DT borrows LibDataBroker only when another addon loaded it.
 - [ ] G2 rc3 taint cause confirmed or corrected, with the line.
 - [ ] G3 Module core: registry, verbs, help, disabled module silent, errors counted; guild gate silent.
 - [ ] G4 Keys: two-part names; own vs connected realm; display.
