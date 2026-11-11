@@ -254,6 +254,11 @@ bridge (the bot's job), guild builds.
    order (DT's own buttons included). Order and ticks saved; `/dt bar add|remove <name>` and
    `/dt bar move <name> <position>` as the typed path. A newly installed addon appears
    unticked at the bottom.
+4. **Names shown without the realm** (Tim, 11 Nov: *"the actual realm these days shouldn't make a
+   difference to us playing on the same rule set"*). Lists show the full name only (`Vespera
+   Grimm`); the realm goes in the row's tooltip. Proposal: only if two people share a full name is
+   the realm added to tell them apart. **Keys keep the realm** (it's what keeps two same-named
+   players apart and what made the cross-realm walk work).
 
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
@@ -267,7 +272,8 @@ round so each release after is one tag.
 
 ## Proposed order (rounds kept few: every round costs plan usage)
 Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **framework round**
-(0.2.0-fw1, walked 11 Nov: see its results log).
+(0.2.0-fw1, walked 10-11 Nov with four players on three realms: **8 of 8 pass**,
+`docs/UAT_dt_framework_results.md` on `claude/hopeful-thompson-4rpsrp`).
 1. **Port 1 → 0.2.0:** card 1 (guild gate, roster/who, alts), card 3 (Rest in Pieces: deaths,
    graveyard, bedtime), **recruit with a button on the bar** (`/dt recruit` as backup) + nudge, the
    `DeadTiredDB.legacy` migration for those cards (merge short/full-name duplicates; refile
