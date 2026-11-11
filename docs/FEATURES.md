@@ -286,6 +286,13 @@ Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **
 8. **Travel window:** flight timer + next stop + the quiz (Tim's mark, 10 Nov 15:16).
 Ideas waiting for a round: a dungeon-quest tracker built over ForeverDungeonJournal (Tim's mark,
 10 Nov 21:09).
+**Legacy point reminder** (Tim, 11 Nov): Forever's **Legacy Tree** is account-wide (points earned on
+any character are shared), so a one-line nudge at login when points are unspent, e.g. *"2 legacy
+points lie unspent. The ancestors are restless."* It's a new *prints unasked* exception (needs a
+ruling), switchable, once per login. Likely readable through retail's trait API (`C_Traits`,
+on the beta spec: `GetConfigsByType`, `GetConfigInfo`, `GetTreeCurrencyInfo`), but the Legacy
+Tree's config/tree IDs are unknown: **probe first**. Fits round 3 beside the level-up card (both
+reminder cards).
 
 **Port rule (11 Nov):** on Forever `UnitFullName` returns the **surname** as its second value
 (`"Stromham", "Hamson"`; target `"John", "Do"`), not the realm. Never read a realm from it.
