@@ -275,9 +275,19 @@ everyone in it `/roll`s to the stake (e.g. `/roll 100`); **lowest pays highest t
 **Final call** button closes entries after ~20 s and the result is announced. DT reads the game's own
 `/roll` results from the system messages; no gold moves through the addon (players trade by hand).
 Plus a guild leaderboard (won/lost over time), which is where the achievements round can hook in.
-**Rulings needed when its round comes:**
-1. **Which channel** a round announces in (guild, party/raid, or a DT channel).
-2. **The timed announcement.** Starting a round and pressing Final call are clicks; announcing the
+**Ruled (Tim, 11 Nov): runs over addon messages, not chat.** CrossGambling ran everything through
+party chat and got spammy; DT keeps the round in its own window: start, join, rolls, Final call and
+the result travel by addon message to everyone running DT in the round. Nothing is posted to chat
+by default (an optional one-click "Announce" for the host is a later nicety, not required).
+**Honesty of rolls (to settle in the round's brief):** an addon can't make a trusted random number,
+so the roll is still the game's own `/roll` (RandomRoll); DT reads the result from the system
+message. The game shows a `/roll` result only to the roller's party/raid (or people nearby), so
+either everyone in a round joins one party/raid (each client then sees every roll itself), or each
+client reports its own roll by addon message (simpler, but trust-based). Proposal: a round needs a
+party/raid, and each client checks the rolls it saw against those reported.
+**Still to rule when its round comes:**
+1. **Scope of a round** (guild-wide by addon message, or party/raid only, which the roll check needs).
+2. *(Settled by the ruling above: no timed chat post.)* **The timed announcement.** Starting a round and pressing Final call are clicks; announcing the
    result *after* the 20 s timer would be a post from a timer. Options: the result is shown to
    everyone running DT by addon message (no chat post), and the host gets an **Announce** button
    (one click) to post it to chat; or a ruled exception for one result line per round in guild/party
