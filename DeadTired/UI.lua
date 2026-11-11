@@ -60,7 +60,19 @@ end
 
 DT.viewports = {}
 
--- DT.viewport{ id, title, search = true|false, width, height, onSearch = fn(text), onShow = fn }
+-- The body's top, in pixels below the frame's top: under the title, and under the search box with a
+-- clear gap (the box's backdrop edge drawn outside it included).
+local TITLE_H, SEARCH_H, SEARCH_GAP = 22, 20, 10
+function DT.bodyTop(search)
+  local pad = DT.style("spacing.pad")
+  local top = pad + TITLE_H
+  if search then top = top + SEARCH_H + SEARCH_GAP + (DT.style("spacing.barEdge") or 0) / 2 end
+  return top
+end
+DT.SEARCH_H = SEARCH_H
+
+-- DT.viewport{ id, title, search = true|false, width, height, onSearch = fn(text), onShow = fn,
+--              footer = pixels kept free at the bottom (for a note line) }
 function DT.viewport(o)
   if DT.viewports[o.id] then return DT.viewports[o.id] end
   local vp = { id = o.id }
@@ -82,26 +94,27 @@ function DT.viewport(o)
   vp.close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
   vp.close:SetScript("OnClick", function() f:Hide() end)
 
-  local top = pad + 22
+  -- fw1 walk defect 2: the body starts a clear gap below the search box (DT.bodyTop).
+  local top = DT.bodyTop(o.search)
   if o.search then
     local e = CreateFrame("EditBox", nil, f, "BackdropTemplate")
     vp.search = e
     e:SetAutoFocus(false)
-    e:SetHeight(20)
-    e:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -top)
-    e:SetPoint("TOPRIGHT", f, "TOPRIGHT", -pad, -top)
+    e:SetHeight(SEARCH_H)
+    e:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -(pad + TITLE_H))
+    e:SetPoint("TOPRIGHT", f, "TOPRIGHT", -pad, -(pad + TITLE_H))
     e:SetTextInsets(6, 6, 0, 0)
     e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     e:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     e:SetScript("OnTextChanged", function(self)
       if o.onSearch then o.onSearch(self:GetText() or "") end
     end)
-    top = top + 26
   end
+  vp.top = top
 
   vp.body = CreateFrame("Frame", nil, f)
   vp.body:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -top)
-  vp.body:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -pad, pad)
+  vp.body:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -pad, pad + (o.footer or 0))
 
   f:SetScript("OnShow", function() if o.onShow then o.onShow(vp) end end)
 
@@ -147,8 +160,32 @@ function DT.listModel()
   return m
 end
 
+-- Text height: a font string's own wrapped height (GetStringHeight, once its width and text are
+-- set), else an estimate from its one-line width. Rows and settings cards are sized from it (fw1
+-- walk defects 1 and 4: long text overlapped the next row).
+local LINE_H = 14
+function DT.textHeight(fs, width)
+  if not fs then return LINE_H end
+  if fs.SetWidth and width then fs:SetWidth(width) end
+  local h = fs.GetStringHeight and fs:GetStringHeight()
+  if type(h) == "number" and h > 0 then return h end
+  local w = fs.GetStringWidth and fs:GetStringWidth()
+  if type(w) ~= "number" or w <= 0 then return LINE_H end
+  if not width or width <= 0 then return LINE_H end
+  return math.ceil(w / width) * LINE_H
+end
+
+-- A row's height: its tallest cell plus padding, never less than the minimum.
+function DT.rowHeight(heights, min, pad)
+  local tall = 0
+  for _, h in ipairs(heights) do if type(h) == "number" and h > tall then tall = h end end
+  return math.max(min or 0, tall + (pad or 0))
+end
+
 -- The view: `count` rows of columns, scrolled by the mouse wheel. opts = { columns = { { key, width,
--- colour } }, rowHeight, onClick = fn(row, button) }. list:refresh() redraws from the model.
+-- colour } }, rowHeight (the minimum), onClick = fn(row, button), tip = fn(row, tooltip),
+-- empty = text shown when nothing is listed, or fn(model, visible) -> text or nil }. list:refresh() redraws from the model; each row is
+-- as tall as its wrapped text.
 function DT.list(parent, model, opts)
   local L = { model = model, offset = 0, rows = {} }
   local rh = opts.rowHeight or DT.style("spacing.row")
@@ -156,27 +193,43 @@ function DT.list(parent, model, opts)
   L.frame = CreateFrame("Frame", nil, parent)
   L.frame:SetAllPoints(parent)
   L.frame:EnableMouseWheel(true)
+  if L.frame.SetClipsChildren then L.frame:SetClipsChildren(true) end
+  L.empty = L.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  L.empty:SetPoint("TOPLEFT", L.frame, "TOPLEFT", 4, -4)
+  L.empty:SetPoint("RIGHT", L.frame, "RIGHT", -4, 0)
+  L.empty:SetJustifyH("LEFT")
+  L.empty:Hide()
   for i = 1, count do
     local b = CreateFrame("Button", nil, L.frame)
     b:SetHeight(rh)
-    b:SetPoint("TOPLEFT", L.frame, "TOPLEFT", 0, -(i - 1) * rh)
-    b:SetPoint("TOPRIGHT", L.frame, "TOPRIGHT", 0, -(i - 1) * rh)
     b.bg = b:CreateTexture(nil, "BACKGROUND")
     b.bg:SetAllPoints(b)
     b.cells = {}
     local x = 4
     for c, col in ipairs(opts.columns) do
       local fs = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-      fs:SetPoint("LEFT", b, "LEFT", x, 0)
+      fs:SetPoint("TOPLEFT", b, "TOPLEFT", x, -2)
       fs:SetWidth(col.width)
       fs:SetJustifyH("LEFT")
+      if fs.SetWordWrap then fs:SetWordWrap(true) end
       b.cells[c] = fs
       x = x + col.width + 6
     end
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:SetScript("OnClick", function(_, button) if b.row and opts.onClick then opts.onClick(b.row, button) end end)
-    b:SetScript("OnEnter", function() b.bg:SetColorTexture(DT.colour("rowHover")) end)
-    b:SetScript("OnLeave", function() b.bg:SetColorTexture(DT.colour(i % 2 == 0 and "row" or "bg")) end)
+    b:SetScript("OnEnter", function()
+      b.bg:SetColorTexture(DT.colour("rowHover"))
+      if b.row and opts.tip then
+        local tt = DT.tooltip()
+        tt:SetOwner(b, "ANCHOR_RIGHT")
+        opts.tip(b.row, tt)
+        tt:Show()
+      end
+    end)
+    b:SetScript("OnLeave", function()
+      b.bg:SetColorTexture(DT.colour(i % 2 == 0 and "row" or "bg"))
+      if opts.tip and DT._tooltip then DT._tooltip:Hide() end
+    end)
     L.rows[i] = b
   end
   function L:refresh()
@@ -184,13 +237,40 @@ function DT.list(parent, model, opts)
     if self.model.query ~= self.lastQuery then self.offset = 0; self.lastQuery = self.model.query end
     local maxOff = math.max(0, #vis - count)
     if self.offset > maxOff then self.offset = maxOff end
+    local y = 0
     for i, b in ipairs(self.rows) do
       local r = vis[self.offset + i]
       b.row = r
+      local hs = {}
       for c, col in ipairs(opts.columns) do
         b.cells[c]:SetText(r and DT.safe(r[col.key], 64) or "")
+        hs[c] = r and DT.textHeight(b.cells[c], col.width) or 0
       end
-      if r then b:Show() else b:Hide() end
+      if r then
+        local h = DT.rowHeight(hs, rh, 4)                                -- guard: row fits its text
+        b:SetHeight(h)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -y)
+        b:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 0, -y)
+        b.top = y
+        y = y + h
+        b:Show()
+      else
+        b:Hide()
+      end
+    end
+    self.height = y
+    local e
+    if type(opts.empty) == "function" then e = opts.empty(self.model, vis)
+    elseif #vis == 0 then e = opts.empty end
+    if e then
+      self.empty:ClearAllPoints()
+      self.empty:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 4, -(y + 4))
+      self.empty:SetPoint("RIGHT", self.frame, "RIGHT", -4, 0)
+      self.empty:SetText(e)
+      self.empty:Show()
+    else
+      self.empty:Hide()
     end
   end
   L.frame:SetScript("OnMouseWheel", function(_, delta)
@@ -202,6 +282,7 @@ function DT.list(parent, model, opts)
       b.bg:SetColorTexture(DT.colour(i % 2 == 0 and "row" or "bg"))
       for c, col in ipairs(opts.columns) do DT.fontTo(b.cells[c], "body", col.colour) end
     end
+    DT.fontTo(L.empty, "body", "muted")
   end)
   return L
 end

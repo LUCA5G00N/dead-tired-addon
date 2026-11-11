@@ -125,6 +125,13 @@ function Frame:StopMovingOrSizing() self.moving = false end
 function Frame:SetText(t) self.text = t end
 function Frame:GetText() return self.text end
 function Frame:GetStringWidth() return #(tostring(self.text or "")) * 6 end
+-- Wrapped height (Port 1): 6 px a character, 12 px a line, wrapped at the width when one is set.
+function Frame:GetStringHeight()
+  local n = #(tostring(self.text or ""))
+  if n == 0 then return 0 end
+  if not self.w or self.w <= 0 then return 12 end
+  return math.ceil(n * 6 / self.w) * 12
+end
 function Frame:SetChecked(v) self.checked = v and true or false end
 function Frame:GetChecked() return self.checked end
 function Frame:GetName() return self._name end

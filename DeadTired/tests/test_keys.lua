@@ -43,11 +43,21 @@ check("splitKey / nameOf", select(1, DT.splitKey("CAMWOWEU4Realm4PvP-Lilbit High
 
 check("display: own realm shows the name only", DT.display("CAMWOWEU4Realm2PvP-Lilbit High") == "Lilbit High")
 check("display: own realm in another case still the name only", DT.display("camwoweu4realm2pvp-Lilbit High") == "Lilbit High")
-check("display: a connected realm shows Name (Realm)", DT.display("CAMWOWEU4Realm4PvP-Lilbit High")
-  == "Lilbit High (CAMWOWEU4Realm4PvP)")
+-- R-P5 (Port 1): the full name only, the realm only on a collision among the shown keys.
+check("R-P5: a connected realm shows the full name only", DT.display("CAMWOWEU4Realm4PvP-Lilbit High") == "Lilbit High")
+check("R-P5: the realm label for the tooltip", DT.realmLabel("CAMWOWEU4Realm4PvP-Lilbit High") == "CAMWOWEU4Realm4PvP")
 DT.realmNames["CAMWOWEU4Realm4PvP"] = "CAMWOW EU4 Realm 4 PvP"
-check("display: the realm's own spelling once a HELLO has told us", DT.display("CAMWOWEU4Realm4PvP-Lilbit High")
-  == "Lilbit High (CAMWOW EU4 Realm 4 PvP)")
+check("R-P5: the realm's own spelling once a HELLO has told us", DT.realmLabel("CAMWOWEU4Realm4PvP-Lilbit High")
+  == "CAMWOW EU4 Realm 4 PvP")
+local shown = { "CAMWOWEU4Realm4PvP-Lilbit High", "CAMWOWEU5Realm8PvP-Lilbit High", "CAMWOWEU4Realm2PvP-Echo Nightclaw" }
+local nm = DT.namer(shown)
+check("R-P5 collision: two shown entries sharing a full name both get (Realm)",
+  nm(shown[1]) == "Lilbit High (CAMWOW EU4 Realm 4 PvP)" and nm(shown[2]) == "Lilbit High (CAMWOWEU5Realm8PvP)")
+check("R-P5 collision: the others keep the plain name", nm(shown[3]) == "Echo Nightclaw")
+check("R-P5 collision: case and spacing don't hide one", DT.namer({ "R1-Lilbit High", "R2-lilbit  high" })("R1-Lilbit High") == "Lilbit High (R1)")
+check("R-P5: the same key twice is no collision", DT.namer({ "R1-Lilbit High", "R1-Lilbit High" })("R1-Lilbit High") == "Lilbit High")
+check("R-P5: display among a shown set", DT.display(shown[1], shown) == "Lilbit High (CAMWOW EU4 Realm 4 PvP)"
+  and DT.display(shown[1], { shown[1], shown[3] }) == "Lilbit High")
 check("display: UI escapes made safe (| doubled)", DT.display("Realm4-|cffff0000Red|r"):find("||cffff0000Red||r", 1, true) ~= nil)
 
 check("sameKey ignores case and spacing", DT.sameKey("CAMWOWEU4Realm2PvP-Stromham Hamson", "camwoweu4realm2pvp-stromham  hamson")

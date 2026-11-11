@@ -11,7 +11,7 @@ local GUARDS = {
   { "AUD-10 success test", "DeadTired/Comms.lua", "if not (didSend == true or didSend == 0) then item.failed = true end", "if false then item.failed = true end", "test_comms" },
   { "3-refusal limit (AUD-10)", "DeadTired/Comms.lua", "  if item.tries >= MAX_TRIES then", "  if false then", "test_comms" },
   { "payload-key name match", "DeadTired/Comms.lua", "return DT.fullName(kn):lower() == sn:lower()", "return true", "test_comms" },
-  { "self-exclusion in Who", "DeadTired/Who.lua", "    if isMe(key) then return end                                           -- guard: self never listed", "", "test_who" },
+  { "self-exclusion in Who (R-P6: own entry never doubled)", "DeadTired/Who.lua", "    if isMe(key) then return end                                           -- guard: self never listed", "", "test_who" },
   { "settings verb-or-noVerb rule", "DeadTired/Core.lua", 'if not DT.typed(s) and not (type(s.noVerb) == "string" and s.noVerb:match("%S")) then', "if false then", "test_settings" },
   { "bar stand-back", "DeadTired/Bar.lua", "  return DT.displayAddon() == nil", "  return true", "test_bar" },
   { "borrow-only LibDataBroker", "DeadTired/Bar.lua", '  if type(lib) ~= "table" then return nil end', "", "test_bar" },
@@ -34,6 +34,24 @@ local GUARDS = {
   { "skin base fallback", "DeadTired/Skins.lua", "  if v == nil then v = look(DT.skins[BASE]) end", "", "test_skins" },
   { "Who ask rate limit", "DeadTired/Who.lua", "if not lastAsk or t - lastAsk >= ASK_GAP then", "if true then", "test_who" },
   { "Who hello rate limit", "DeadTired/Who.lua", "if lastHello and t - lastHello < HELLO_GAP then return false end", "", "test_who" },
+  -- Port 1 (COWORK_BRIEF_dt_port1.md, Task 7)
+  { "recruit officer check (A1)", "DeadTired/Recruit.lua", "  if not isOfficer() then                                             -- guard: officer gate (A1)", "  if false then", "test_recruit" },
+  { "recruit cooldown", "DeadTired/Recruit.lua", "  if wait > 0 then                                                    -- guard: cooldown", "  if false then", "test_recruit" },
+  { "recruit click-only post (R1, R-P1)", "DeadTired/Recruit.lua", "  if not (DT.inCommand or clicking) then", "  if false then", "test_recruit" },
+  { "recruit General only (A1)", "DeadTired/Recruit.lua", 'return name == CHANNEL or name:sub(1, #CHANNEL + 3) == CHANNEL .. " - "', "return true", "test_recruit" },
+  { "death share opt-in (A2)", "DeadTired/Crypt.lua", 'if DT.get("crypt", "share") == true then', "if true then", "test_crypt" },
+  { "battleground rule", "DeadTired/Crypt.lua", 'if itype == "pvp" or itype == "arena" then hc = false end', "", "test_crypt" },
+  { "hardcore line once only", "DeadTired/Crypt.lua", "if not me or c.hcTold[me] then return end", "if not me then return end", "test_crypt" },
+  { "prep officers-only acceptance", "DeadTired/Prep.lua", "  if not senderIsOfficer(from) then", "  if false then", "test_prep" },
+  { "prep verdict only (no names or counts)", "DeadTired/Prep.lua", "short = tostring(math.min(#short, MAX_SHORT)) })", "short = tostring(math.min(#short, MAX_SHORT)), items = short[1] and short[1].e.name or nil })", "test_prep" },
+  { "prep officers set the list", "DeadTired/Prep.lua", "  if not isOfficer() then return DT.out(OFFICERS) end                 -- guard: officers set the list\n  local item", "  local item", "test_prep" },
+  { "migration runs once", "DeadTired/Migrate.lua", "  if M.port1 then return false end", "", "test_migrate" },
+  { "short->full merge: exactly one", "DeadTired/Migrate.lua", "if hits == 1 then map[k] = hit", "if hits >= 1 then map[k] = hit", "test_migrate" },
+  { "R-P5 collision rule", "DeadTired/Keys.lua", "if e and e.n > 1 then", "if false then", "test_keys" },
+  { "bar: others unticked by default (R-P4)", "DeadTired/Bar.lua", "b.on[name] = own and not offByDefault or false", "b.on[name] = true", "test_bar" },
+  { "bar: colour codes pass", "DeadTired/Bar.lua", "if colour then out[#out + 1] = colour; i = i + #colour; open = true", "if false then", "test_bar" },
+  { "list rows fit their text", "DeadTired/UI.lua", "local h = DT.rowHeight(hs, rh, 4)", "local h = rh", "test_ui" },
+  { "settings content follows the scroll", "DeadTired/SettingsView.lua", "  if scroll > maxS then scroll = maxS end\n  place()", "  if scroll > maxS then scroll = maxS end", "test_settingsview" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end
