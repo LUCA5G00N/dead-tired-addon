@@ -1,0 +1,34 @@
+## Interface: 16001
+## Title: Dead Tired
+## Notes: The guild addon for <DEAD TIRED>. Optional, quiet, guild-only. /dt
+## Author: DEAD TIRED
+## Version: 0.2.0-fw1
+## SavedVariables: DeadTiredDB
+## IconTexture: Interface\Icons\Spell_Shadow_RaiseDead
+## AddonCompartmentFunc: DeadTired_OnAddonCompartmentClick
+
+# WoW Forever (interface 16001, the beta's number). If the live client reports another number
+# (/dump select(4, GetBuildInfo())), change the Interface line above and nothing else.
+
+# Libraries (Libs/README.md). LibDataBroker-1.1 is borrowed from other addons, never bundled.
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\AceComm-3.0\ChatThrottleLib.lua
+Libs\AceComm-3.0\AceComm-3.0.lua
+Libs\LibSerialize\LibSerialize.lua
+Libs\LibDeflate\LibDeflate.lua
+Libs\LibSharedMedia-3.0\LibSharedMedia-3.0.lua
+
+# Dead Tired
+Config.lua
+Core.lua
+Keys.lua
+Guild.lua
+Comms.lua
+Settings.lua
+Skins.lua
+UI.lua
+SettingsView.lua
+Bar.lua
+Debug.lua
+Who.lua

@@ -1,0 +1,254 @@
+-- Dead Tired: the standard frames. One viewport frame every module draws into, one list widget,
+-- one toast, one tooltip. All drawn through the skin (Skins.lua). Every frame here is DT's own
+-- (named DeadTired*), insecure, so it shows and works in combat.
+--
+-- Viewport rules (FEATURES.md, the Wizardry marks bar's visibility rules; its code isn't in
+-- reference/, so only the rules are copied): placed and kept (dragged by the title, the place saved
+-- in DeadTiredDB.frames and restored after /reload), not closed by Escape (DT never touches
+-- UISpecialFrames or any other Blizzard table), no secure templates, so usable in combat.
+local ADDON, ns = ...
+local DT = ns.DT
+
+-- ---------------------------------------------------------------- places
+
+-- The saved place of frame id: { point, relPoint, x, y } or nil.
+function DT.place(id)
+  local p = DT.db().frames[id]
+  if type(p) == "table" and type(p[1]) == "string" and type(p[3]) == "number" and type(p[4]) == "number" then
+    return p
+  end
+  return nil
+end
+
+function DT.savePlace(frame, id)
+  local point, _, relPoint, x, y = frame:GetPoint(1)
+  if type(point) ~= "string" or type(x) ~= "number" or type(y) ~= "number" then return false end
+  DT.db().frames[id] = { point, relPoint or point, math.floor(x + 0.5), math.floor(y + 0.5) }
+  return true
+end
+
+function DT.restorePlace(frame, id, default)
+  local p = DT.place(id) or default
+  frame:ClearAllPoints()
+  frame:SetPoint(p[1], UIParent, p[2], p[3], p[4])
+end
+
+-- Drag to move, place saved on release.
+function DT.draggable(frame, id, handle)
+  handle = handle or frame
+  frame:SetMovable(true)
+  frame:SetClampedToScreen(true)
+  handle:EnableMouse(true)
+  handle:RegisterForDrag("LeftButton")
+  handle:SetScript("OnDragStart", function() frame:StartMoving() end)
+  handle:SetScript("OnDragStop", function()
+    frame:StopMovingOrSizing()
+    DT.savePlace(frame, id)
+  end)
+end
+
+-- ---------------------------------------------------------------- tooltip
+
+function DT.tooltip()
+  if not DT._tooltip then
+    DT._tooltip = CreateFrame("GameTooltip", "DeadTiredTooltip", UIParent, "GameTooltipTemplate")
+  end
+  return DT._tooltip
+end
+
+-- ---------------------------------------------------------------- the viewport
+
+DT.viewports = {}
+
+-- DT.viewport{ id, title, search = true|false, width, height, onSearch = fn(text), onShow = fn }
+function DT.viewport(o)
+  if DT.viewports[o.id] then return DT.viewports[o.id] end
+  local vp = { id = o.id }
+  local f = CreateFrame("Frame", "DeadTiredViewport_" .. o.id, UIParent, "BackdropTemplate")
+  vp.frame = f
+  f:SetSize(o.width or 360, o.height or 420)
+  f:SetFrameStrata("DIALOG")
+  f:SetToplevel(true)
+  f:Hide()
+  DT.restorePlace(f, "viewport." .. o.id, { "CENTER", "CENTER", 0, 0 })
+  DT.draggable(f, "viewport." .. o.id)
+
+  local pad = DT.style("spacing.pad")
+  vp.title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  vp.title:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -pad)
+  vp.title:SetText(o.title or o.id)
+
+  vp.close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  vp.close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+  vp.close:SetScript("OnClick", function() f:Hide() end)
+
+  local top = pad + 22
+  if o.search then
+    local e = CreateFrame("EditBox", nil, f, "BackdropTemplate")
+    vp.search = e
+    e:SetAutoFocus(false)
+    e:SetHeight(20)
+    e:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -top)
+    e:SetPoint("TOPRIGHT", f, "TOPRIGHT", -pad, -top)
+    e:SetTextInsets(6, 6, 0, 0)
+    e:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    e:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
+    e:SetScript("OnTextChanged", function(self)
+      if o.onSearch then o.onSearch(self:GetText() or "") end
+    end)
+    top = top + 26
+  end
+
+  vp.body = CreateFrame("Frame", nil, f)
+  vp.body:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -top)
+  vp.body:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -pad, pad)
+
+  f:SetScript("OnShow", function() if o.onShow then o.onShow(vp) end end)
+
+  DT.skin(function()
+    DT.paint(f)
+    DT.fontTo(vp.title, "title")
+    if vp.search then
+      DT.paint(vp.search, true)
+      vp.search:SetBackdropColor(DT.colour("input"))
+      local p, size, flags = DT.font("body")
+      vp.search:SetFont(p, size, flags)
+      vp.search:SetTextColor(DT.colour("text"))
+    end
+  end)
+
+  function vp:Show() if DT.isMember() then f:Show() end end
+  function vp:Hide() f:Hide() end
+  function vp:IsShown() return f:IsShown() and true or false end
+  function vp:Toggle() if self:IsShown() then self:Hide() else self:Show() end end
+  DT.viewports[o.id] = vp
+  return vp
+end
+
+-- ---------------------------------------------------------------- the list widget
+
+-- The model: rows (tables with .search, the text the filter looks in), a query, the visible rows.
+-- The filter is case-insensitive plain text, applied as you type.
+function DT.listModel()
+  local m = { rows = {}, shown = {}, query = "" }
+  function m:apply()
+    local q = (DT.trim(self.query) or ""):lower()
+    local out = {}
+    for _, r in ipairs(self.rows) do
+      local hay = tostring(r.search or r.text or ""):lower()
+      if q == "" or hay:find(q, 1, true) then out[#out + 1] = r end          -- guard: list filter
+    end
+    self.shown = out
+    return out
+  end
+  function m:set(rows) self.rows = rows or {}; return self:apply() end
+  function m:filter(q) self.query = tostring(q or ""); return self:apply() end
+  function m:visible() return self.shown end
+  return m
+end
+
+-- The view: `count` rows of columns, scrolled by the mouse wheel. opts = { columns = { { key, width,
+-- colour } }, rowHeight, onClick = fn(row, button) }. list:refresh() redraws from the model.
+function DT.list(parent, model, opts)
+  local L = { model = model, offset = 0, rows = {} }
+  local rh = opts.rowHeight or DT.style("spacing.row")
+  local count = opts.count or 16
+  L.frame = CreateFrame("Frame", nil, parent)
+  L.frame:SetAllPoints(parent)
+  L.frame:EnableMouseWheel(true)
+  for i = 1, count do
+    local b = CreateFrame("Button", nil, L.frame)
+    b:SetHeight(rh)
+    b:SetPoint("TOPLEFT", L.frame, "TOPLEFT", 0, -(i - 1) * rh)
+    b:SetPoint("TOPRIGHT", L.frame, "TOPRIGHT", 0, -(i - 1) * rh)
+    b.bg = b:CreateTexture(nil, "BACKGROUND")
+    b.bg:SetAllPoints(b)
+    b.cells = {}
+    local x = 4
+    for c, col in ipairs(opts.columns) do
+      local fs = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      fs:SetPoint("LEFT", b, "LEFT", x, 0)
+      fs:SetWidth(col.width)
+      fs:SetJustifyH("LEFT")
+      b.cells[c] = fs
+      x = x + col.width + 6
+    end
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnClick", function(_, button) if b.row and opts.onClick then opts.onClick(b.row, button) end end)
+    b:SetScript("OnEnter", function() b.bg:SetColorTexture(DT.colour("rowHover")) end)
+    b:SetScript("OnLeave", function() b.bg:SetColorTexture(DT.colour(i % 2 == 0 and "row" or "bg")) end)
+    L.rows[i] = b
+  end
+  function L:refresh()
+    local vis = self.model:visible()
+    if self.model.query ~= self.lastQuery then self.offset = 0; self.lastQuery = self.model.query end
+    local maxOff = math.max(0, #vis - count)
+    if self.offset > maxOff then self.offset = maxOff end
+    for i, b in ipairs(self.rows) do
+      local r = vis[self.offset + i]
+      b.row = r
+      for c, col in ipairs(opts.columns) do
+        b.cells[c]:SetText(r and DT.safe(r[col.key], 64) or "")
+      end
+      if r then b:Show() else b:Hide() end
+    end
+  end
+  L.frame:SetScript("OnMouseWheel", function(_, delta)
+    L.offset = math.max(0, L.offset - delta)
+    L:refresh()
+  end)
+  DT.skin(function()
+    for i, b in ipairs(L.rows) do
+      b.bg:SetColorTexture(DT.colour(i % 2 == 0 and "row" or "bg"))
+      for c, col in ipairs(opts.columns) do DT.fontTo(b.cells[c], "body", col.colour) end
+    end
+  end)
+  return L
+end
+
+-- ---------------------------------------------------------------- toasts
+
+-- One toast style. Nothing toasts unless the module's setting is on: DT.toast(module, settingKey,
+-- text) shows only while DT.get(module, settingKey) is true (and only inside the guild).
+-- /dt toast test shows one because it was asked for.
+local TEST_TOAST = "Dead Tired toasts look like this."
+local toastFrame, toastSeq = nil, 0
+
+local function showToast(text)
+  if not DT.isMember() then return false end
+  if not toastFrame then
+    toastFrame = CreateFrame("Frame", "DeadTiredToast", UIParent, "BackdropTemplate")
+    toastFrame:SetSize(280, 44)
+    toastFrame:SetFrameStrata("HIGH")
+    toastFrame:SetPoint("TOP", UIParent, "TOP", 0, -140)
+    toastFrame.text = toastFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    toastFrame.text:SetPoint("CENTER", toastFrame, "CENTER", 0, 0)
+    toastFrame.text:SetWidth(260)
+    DT.skin(function()
+      DT.paint(toastFrame)
+      DT.fontTo(toastFrame.text, "body")
+    end)
+  end
+  toastFrame.text:SetText(DT.safe(text, 120))
+  toastFrame:Show()
+  toastSeq = toastSeq + 1
+  local mine = toastSeq
+  DT.after(4, function() if mine == toastSeq then toastFrame:Hide() end end)
+  DT.toasted = (DT.toasted or 0) + 1
+  return true
+end
+
+function DT.toast(id, key, text)
+  if DT.get(id, key) ~= true then return false end                         -- guard: toast gate
+  return showToast(text)
+end
+
+DT.module({
+  id = "ui",
+  title = "Windows",
+  verbs = {
+    { verb = "toast test", usage = "toast test", fn = function() showToast(TEST_TOAST) end },
+  },
+})
+
+DT._ui = { TEST_TOAST = TEST_TOAST, toastFrame = function() return toastFrame end }
