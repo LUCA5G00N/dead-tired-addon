@@ -75,7 +75,9 @@ and do not widen them. A new exception needs its own ruling in a brief.
   Another library needs a ruling. DT keeps its own module core.
 - **Never assign a Blizzard global or hook Blizzard's chat, slash or popup code.** The router sets
   only `SLASH_DEADTIRED*` and `SlashCmdList["DEADTIRED"]` (rc3's `SlashCmdList = SlashCmdList or {}`
-  tainted every slash command). A static test enforces it.
+  tainted every slash command). A static test enforces it. One allowed touch (ruled 2026-11-11):
+  `table.insert(UISpecialFrames, <DT's own frame name>)` so Escape closes DT's panes; never remove
+  or replace anything there. No hook on any Blizzard function (`hooksecurefunc` included).
 - Each feature is a module registered through `ns.DT.module{...}` (the pattern in
   `reference/wizardry/Forever/Core.lua`): its own frame, its own error key, handler failures
   recorded and re-raised.
