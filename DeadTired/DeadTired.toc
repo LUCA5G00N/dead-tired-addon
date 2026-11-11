@@ -2,7 +2,7 @@
 ## Title: Dead Tired
 ## Notes: The guild addon for <DEAD TIRED>. Optional, quiet, guild-only. /dt
 ## Author: DEAD TIRED
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: DeadTiredDB
 ## IconTexture: Interface\Icons\Spell_Shadow_RaiseDead
 ## AddonCompartmentFunc: DeadTired_OnAddonCompartmentClick
@@ -38,4 +38,10 @@ RecruitLines.lua
 Recruit.lua
 Prep.lua
 Session.lua
+Gank.lua
+Played.lua
+Stash.lua
+EventsList.lua
+Events.lua
+Logs.lua
 Migrate.lua

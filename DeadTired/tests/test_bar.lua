@@ -218,7 +218,7 @@ do
   check("R-P4: /dt bar move <name> <n>", order() == "Prat-3.0+ who+ DeadTired+ session- AtlasLoot- BugSack-" and c:said("bar.who at 2"))
   check("R-P4: the bar follows the order", texts(c) == "|cff8080ff3.0|r | DT: 0 online | Dead Tired")
   c:slash("bar list")
-  check("R-P4: /dt bar list", c:said("bar.list: 1 Prat (Prat-3.0) [on], 2 DT: 0 online (who) [on], 3 Dead Tired (DeadTired) [on]") ~= nil)
+  check("R-P4: /dt bar list (Port 2: names, not live text)", c:said("bar.list: 1 Prat (Prat-3.0) [on], 2 Who [on], 3 Dead Tired (DeadTired) [on]") ~= nil)
   -- drag: the grip, dropped over row 1
   c:slash("settings")
   for i, sb in ipairs(card.subs) do sb.GetBottom = function() return 500 - i * 22 end end
@@ -240,6 +240,55 @@ do
   for _, e in ipairs(r.DT.barList()) do o2[#o2 + 1] = e.name .. (e.on and "+" or "-") end
   check("R-P4: order and ticks saved through /reload", table.concat(o2, " ") == "Prat-3.0+ BugSack- who+ DeadTired+ session+ AtlasLoot-")
   check("nothing errors", #c.errors == 0 and #r.errors == 0)
+end
+
+-- ---------------------------------------------------------------- Port 2: names, not live text; the grab hand
+do
+  local w = H.world()
+  local lib
+  local cursor = {}
+  local c = w:client({ guild = G, afterLibs = function(c0) lib = H.fakeLDB(c0) end, setup = function(c0)
+    rawset(c0.env, "C_GuildInfo", { IsGuildOfficer = function() return true end })
+    rawset(c0.env, "SetCursor", function(p) cursor[#cursor + 1] = "set:" .. tostring(p) end)
+    rawset(c0.env, "ResetCursor", function() cursor[#cursor + 1] = "reset" end)
+  end })
+  c:login()
+  lib:NewDataObject("BugSack", { type = "data source", text = "0" })
+  lib:NewDataObject("Prat-3.0", { type = "launcher", label = "Prat", text = "|cff8080ff3.0|r" })
+  local DT = c.DT
+  DT.update("recruit", "text", "Recruit 8:23")
+  DT.update("session", "text", "Session 1:05")
+  DT.update("who", "text", "DT: 3 online")
+  local labels = {}
+  for _, it in ipairs(DT.setting("bar", "objects").items()) do labels[#labels + 1] = it.label end
+  local L = table.concat(labels, ",")
+  check("Port 2: the list names each object, never its live text (BugSack, not 0; Recruit, not Recruit 8:23)",
+    L == "Dead Tired,Who,Recruit,Session,BugSack,Prat")
+  c:slash("settings")
+  local card
+  for _, r in ipairs(DT._settingsView.rows()) do if r.setting and r.setting.key == "objects" then card = r end end
+  local shown = {}
+  for _, sb in ipairs(card.subs) do if sb.item then shown[#shown + 1] = sb.label.text end end
+  check("Port 2: the settings card shows the names", table.concat(shown, ",") == L)
+  c:slash("bar list")
+  check("Port 2: /dt bar list shows the names", c:said("bar.list: 1 Dead Tired (DeadTired) [on], 2 Who [on], 3 Recruit [on], 4 Session [off], 5 BugSack [off], 6 Prat (Prat-3.0) [off]") ~= nil)
+  check("Port 2: the bar itself still shows the live text", (function()
+    for _, b in ipairs(DT._bar.buttons()) do if b.shown and b.entry and b.entry.name == "recruit" then return b.text.text == "Recruit 8:23" end end
+  end)())
+  c:slash("bar add bugsack")
+  check("Port 2: typed by its name", c:said("bar.BugSack = on") ~= nil)
+  c:slash("bar remove 0")
+  check("Port 2: not by its text", c:said("bar.list: no 0") ~= nil)
+  -- the grab hand (the Port 1 walk's request 3)
+  c:slash("settings")
+  local grip = card.subs[5].grip
+  grip.scripts.OnDragStart(grip)
+  check("Port 2: dragging a row by its grip shows the grab hand", cursor[1] == "set:Interface\\CURSOR\\openhand")
+  grip.scripts.OnDragStop(grip)
+  check("Port 2: dropping it puts the cursor back", cursor[2] == "reset")
+  rawset(c.env, "SetCursor", nil); rawset(c.env, "ResetCursor", nil)
+  local ok = pcall(function() grip.scripts.OnDragStart(grip); grip.scripts.OnDragStop(grip) end)
+  check("Port 2: a client without SetCursor/ResetCursor: the drag still works, no error", ok and #c.errors == 0)
 end
 
 -- ---------------------------------------------------------------- colour codes (fw1 walk defect 3)

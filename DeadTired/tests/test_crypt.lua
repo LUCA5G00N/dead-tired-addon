@@ -233,8 +233,12 @@ do
   d[#d + 1] = { who = "CAMWOWEU4Realm4PvP-Lilbit High", lvl = 0, zone = "Duskwood", hc = true, at = "2026-11-02 21:00:00" }
   d[#d + 1] = { who = "CAMWOWEU5Realm8PvP-Lilbit High", lvl = 22, zone = "Ashenvale", hc = false, at = "2026-11-03 21:00:00" }
   local rows = g.DT.graveRows()
-  check("newest first, date, name, level, zone, (HC) on hardcore", rows[1].day == "2026-11-03" and rows[2].zone == "Duskwood (HC)"
+  check("newest first, date, name, level, zone, (HC) on hardcore", rows[1].day == "3 Nov" and rows[2].zone == "Duskwood (HC)"
     and rows[2].lvl == "??" and rows[3].name == "Old One")
+  -- Port 2 (the Port 1 walk's defect 4): the date column fits on one line; the full date in the tooltip
+  check("Port 2: the date column is short (\"3 Nov\"), the full date kept for the tooltip", rows[1].day == "3 Nov"
+    and rows[1].full == "2026-11-03 21:00:00" and rows[3].day == "1 Nov")
+  check("Port 2: the search still finds the full date", rows[1].search:find("2026-11-03", 1, true) ~= nil)
   check("R-P5 in the graveyard: two of one name both carry the realm", rows[1].name == "Lilbit High (CAMWOWEU5Realm8PvP)"
     and rows[2].name == "Lilbit High (CAMWOWEU4Realm4PvP)" and rows[3].name == "Old One")
   g:slash("graveyard")
@@ -243,6 +247,14 @@ do
   local shown = 0
   for _, f in ipairs(g.frames) do if f._type == "Button" and f.row and f.shown and f.row.day then shown = shown + 1 end end
   check("the graveyard is searchable", shown == 1)
+  local one, tipped
+  for _, f in ipairs(g.frames) do if f._type == "Button" and f.row and f.shown and f.row.day then one = f end end
+  one.scripts.OnEnter(one)
+  tipped = g.DT._tooltip.lines or {}
+  check("Port 2: a row's tooltip carries the full date", tipped[#tipped] == "2026-11-03 21:00:00")
+  local dayCell = one.cells[1]
+  check("Port 2: the date cell is one line at its width (\"10 Nov\" fits)", dayCell:GetStringHeight() <= 12
+    and (function() dayCell:SetText("10 Nov"); return dayCell:GetStringHeight() <= 12 end)())
   check("not empty: no empty line", not L.empty.shown)
   for i = 1, 120 do d[#d + 1] = { who = "R-X" .. i, lvl = 1, zone = "z", at = "x" } end
   g.DT.crypt()

@@ -325,4 +325,51 @@ do
   check("the nudge is a settings card with a typed path", s.DT.setting("recruit", "nudge").verb == "recruit nudge on|off")
 end
 
+-- ---------------------------------------------------------------- Port 2: off then on keeps the nudge
+do
+  local NUDGE = "The crypt door creaks open: you can recruit again (/dt recruit)."
+  local w2 = H.world()
+  local s = mk(w2, { name = "Stromham" })
+  s:login()
+  local function tick(d) w2:advance(d); s.now = s.now + d end
+  s:slash("recruit")
+  check("Port 2 baseline: the post goes", #s.posts == 1)
+  tick(240)
+  s:slash("recruit nudge off")
+  tick(60)
+  s:slash("recruit nudge on")
+  tick(500)
+  check("Port 2: off, then on, with the cooldown running: nothing early", s:count(NUDGE) == 0)
+  tick(101)
+  check("Port 2: ...the nudge still comes, once, when the cooldown ends (15 min after the post)", s:count(NUDGE) == 1)
+  tick(1200)
+  check("Port 2: ...and only once (the first arming and the re-arming don't both fire)", s:count(NUDGE) == 1)
+  -- on twice, or off and on again, still once
+  s.printed = {}
+  s:slash("recruit")
+  tick(100); s:slash("recruit nudge on"); tick(100); s:slash("recruit nudge off"); s:slash("recruit nudge on")
+  s.DT.set("recruit", "nudge", true)
+  tick(1000)
+  check("Port 2: on, off, on and the card again: one nudge", s:count(NUDGE) == 1)
+  -- on after the cooldown is over: nothing re-armed, nothing said
+  s.printed = {}
+  s:slash("recruit nudge off"); s:slash("recruit nudge on"); tick(1000)
+  check("Port 2: on with no cooldown running arms nothing", s:count(NUDGE) == 0)
+  -- a /reload with the cooldown running, then off and on: the nudge comes (re-armed from the saved post)
+  s.printed = {}
+  s:slash("recruit"); tick(300)
+  local r = s:reload()
+  r.now = s.now
+  local function tick2(d) w2:advance(d); r.now = r.now + d end
+  r:slash("recruit nudge off"); r:slash("recruit nudge on")
+  tick2(599)
+  check("Port 2: after a /reload, off then on re-arms for the time left", r:count(NUDGE) == 0)
+  tick2(2)
+  check("Port 2: ...and it comes once at 15 min", r:count(NUDGE) == 1)
+  -- still an officer and nothing posted since
+  r.printed = {}
+  r:slash("recruit"); tick2(60); r:slash("recruit nudge on"); r.officer = false; tick2(900)
+  check("Port 2: a re-armed nudge still checks the officer flag", r:count(NUDGE) == 0)
+end
+
 H.finish("recruit")

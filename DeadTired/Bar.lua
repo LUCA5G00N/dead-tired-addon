@@ -19,6 +19,9 @@
 -- non-officers) is neither drawn nor listed.
 -- Text: other addons' colour codes are shown, not escaped (fw1 walk defect 3). DT.barText keeps
 -- colour codes, textures and hyperlinks, and escapes every other "|" sequence.
+-- Port 2 (the Port 1 walk's defect 2): the list (settings card, /dt bar list) names each object by
+-- its name, never its live text: an object's label if it has one (DT's own carry their module's
+-- title), else its registered name ("BugSack", not "0").
 local ADDON, ns = ...
 local DT = ns.DT
 
@@ -187,15 +190,23 @@ local function entries()
   return out
 end
 
--- A name as typed ("atlasloot", "Dead Tired", "who"): the object's name, else its plain label.
+-- An object's name for the list: its label (plain), else its registered name. Never its text.
 local function plain(t) return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+local function nameOf(e)
+  local l = type(e.obj.label) == "string" and DT.trim(plain(e.obj.label)) or ""
+  if l ~= "" then return l end                                             -- guard: the list shows names, not text
+  return e.name
+end
+DT.barName = nameOf
+
+-- A name as typed ("atlasloot", "Dead Tired", "who"): the object's name, else its plain label.
 function DT.barFind(typed)
   typed = (DT.trim(typed) or ""):lower()
   if typed == "" then return nil end
   local list = DT.barList()
   for _, e in ipairs(list) do if e.name:lower() == typed then return e, list end end
   for _, e in ipairs(list) do
-    if plain(e.obj.label or e.obj.text):lower() == typed then return e, list end
+    if nameOf(e):lower() == typed then return e, list end
   end
   return nil, list
 end
@@ -361,7 +372,7 @@ local function barVerb(args)
   return DT.out("bar.mode = " .. w)
 end
 
-local function label(e) return DT.safe(plain(e.obj.label or e.obj.text or e.name), 32) end
+local function label(e) return DT.safe(nameOf(e), 32) end
 
 local function listLine()
   local parts = {}
@@ -417,7 +428,7 @@ DT.module({
     { verb = "bar remove", usage = "bar remove <name>", fn = tickVerb(false) },
     { verb = "bar move", usage = "bar move <name> <n>", fn = moveVerb } },
   init = function()
-    DT.object("DeadTired", { type = "launcher", text = "Dead Tired", icon = ICON,
+    DT.object("DeadTired", { type = "launcher", text = "Dead Tired", label = "Dead Tired", icon = ICON,
       OnClick = function(_, which) DT.openSettings(which == "RightButton" and "bar" or nil) end,
       OnTooltipShow = function(tt) tt:AddLine("Dead Tired"); tt:AddLine("/dt help", 1, 1, 1) end })
   end,
@@ -432,7 +443,10 @@ DT.listen("member", function() evaluate() end)
 DT.barRefresh = function() if refresh then refresh() end end
 DT.listen("loaded", function()
   for _, m in ipairs(DT.modules) do
-    if m.ldb then DT.object(m.id, m.ldb) end
+    if m.ldb then
+      if m.ldb.label == nil then m.ldb.label = m.title end
+      DT.object(m.id, m.ldb)
+    end
   end
 end)
 

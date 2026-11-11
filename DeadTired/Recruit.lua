@@ -13,6 +13,9 @@
 --     line when the cooldown ends, once, only if still an officer and a member and nothing was
 --     posted since. It prints; it never posts. Setting recruit.nudge (account-wide, default on);
 --     /dt recruit nudge off|on answers with R-P2's two lines.
+--     Port 2 (the Port 1 walk's defect 1): /dt recruit nudge on while a post's cooldown is still
+--     running arms the nudge for the time left, so off then on keeps it; it still comes once (a
+--     new arming replaces the old, and a nudge already said for that post is never said again).
 -- R-P1: the Recruit object on the bar (officers only): text "Recruit" or "Recruit m:ss" while the
 --     cooldown runs; left-click posts exactly as /dt recruit; right-click its settings; the tooltip
 --     shows the next line. A 1 s ticker redraws the text while the cooldown runs; it never posts.
@@ -124,17 +127,31 @@ end
 -- ---------------------------------------------------------------- the nudge
 
 local posts = 0
+local nudged = nil            -- the post (its recruit.at) whose nudge was said
 local function nudgeOn() return DT.get("recruit", "nudge") ~= false end
 
-local function schedule()
+-- Arm the nudge for the post stamped `at`, due in `delay` seconds. The latest arming wins.
+local function schedule(at, delay)
   posts = posts + 1
   local mine = posts
-  DT.after(COOLDOWN, function()
+  DT.after(delay, function()
     if mine ~= posts then return end                                  -- guard: nothing posted since (nudge)
+    if store().at ~= at or nudged == at then return end               -- guard: once per post (nudge)
     if not nudgeOn() then return end                                  -- guard: nudge switched off
     if not DT.isMember() or not isOfficer() then return end           -- guard: still an officer (nudge)
+    nudged = at
     DT.out(NUDGE)
   end)
+end
+
+-- Port 2: nudge on (typed, /dt set or the card) with a post's cooldown still running re-arms it
+-- for the time left.
+local function rearm()
+  local wait = left()
+  local at = store().at
+  if wait and wait > 0 and type(at) == "number" and nudged ~= at then
+    schedule(at, wait)                                                -- guard: nudge re-armed (Port 2)
+  end
 end
 
 -- ---------------------------------------------------------------- the post
@@ -175,7 +192,7 @@ local function post()
   r.at = now
   r.next = i % COUNT + 1
   DT.out("Posted line " .. i .. " of " .. COUNT .. " to " .. CHANNEL .. ".")
-  schedule()
+  schedule(now, COOLDOWN)
   tickText()
   return true
 end
@@ -224,6 +241,7 @@ DT.module({
   title = "Recruit",
   settings = {
     { key = "nudge", type = "bool", default = true, label = "Nudge", verb = "recruit nudge on|off",
+      onChange = function(on) if on then rearm() end end,
       desc = "After you post, one line in chat when the 15 minutes are up. It never posts anything itself." },
   },
   verbs = { { verb = "recruit", usage = "recruit [next]", fn = verb } },

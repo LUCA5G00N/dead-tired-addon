@@ -52,7 +52,7 @@ do
   check("the second hears the first's answer", names(b) == "Stromham Hamson/this session")
   check("the first hears the second's login hello", names(a) == "Lilbit High/this session")
   check("each lists the other once, never itself", #others(a) == 1 and #others(b) == 1)
-  check("version shown", others(a)[1].v == "0.2.0")
+  check("version shown", others(a)[1].v == "0.3.0")
   check("the bar object: DT: 1 online", a.DT.objects[2].obj.text == "DT: 1 online" and a.DT.whoCount() == 1)
   check("no reply storm: one login hello and one answer from the first", kinds(a).HELLO == 2 and kinds(b).HELLO == 1)
 end
@@ -172,7 +172,7 @@ do
   a:login()
   local rows = a.DT.whoRows()
   check("R-P6: you are listed first, marked (you)", rows[1] and rows[1].you and rows[1].name == "Stromham Hamson (you)"
-    and rows[1].v == "0.2.0")
+    and rows[1].v == "0.3.0")
   local mine = 0
   for _, r in ipairs(rows) do if a.DT.sameKey(r.key, a:key()) then mine = mine + 1 end end
   check("R-P6: your own entry exactly once, saved copies of you never doubled", mine == 1 and #rows == 1)

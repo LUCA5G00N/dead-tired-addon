@@ -1,5 +1,6 @@
 -- Offline checks for UI.lua: the list model (filtering as you type), the list view, the viewport
--- (position saved and restored, not closed by Escape, insecure), toasts gated by a setting.
+-- (position saved and restored, insecure; Port 2, R-P2-2: closed by Escape through UISpecialFrames,
+-- insert only), toasts gated by a setting, the short date.
 -- lua5.1 DeadTired/tests/test_ui.lua
 local dir = (arg and arg[0] or ""):match("^(.*)[/\\][^/\\]+$") or "."
 local H = dofile(dir .. "/harness.lua")
@@ -45,6 +46,51 @@ do
   check("search box: Escape only drops focus", vp.search.scripts.OnEscapePressed ~= nil)
 end
 
+-- ---------------------------------------------------------------- R-P2-2: Escape closes DT's panes
+do
+  local w = H.world()
+  local blizz = { "GameMenuFrame", "CharacterFrame", "WizardryMarksBar_NotThis" }
+  local c = w:client({ guild = G, setup = function(c0)
+    rawset(c0.env, "UISpecialFrames", blizz)
+    rawset(c0.env, "C_DateAndTime", { GetServerTimeLocal = function() return 1793491200 end })
+    rawset(c0.env, "date", function(f, t) if f == "!*t" then return os.date("!*t", t) end return "2026-11-11 21:00:00" end)
+  end })
+  c:login()
+  c:slash("who"); c:slash("settings"); c:slash("graveyard"); c:slash("ganks"); c:slash("slowest"); c:slash("events")
+  c.DT.viewport({ id = "pinned", title = "Pinned", sticky = true })
+  c.DT.viewport({ id = "who", title = "again" })
+  local want = { "DeadTiredViewport_who", "DeadTiredViewport_settings", "DeadTiredViewport_crypt", "DeadTiredViewport_gank",
+    "DeadTiredViewport_slowest", "DeadTiredViewport_events" }
+  local t = c.env.UISpecialFrames
+  check("R-P2-2: the table itself is the client's, not replaced", t == blizz)
+  check("R-P2-2: what was there stays, in its order, untouched", t[1] == "GameMenuFrame" and t[2] == "CharacterFrame"
+    and t[3] == "WizardryMarksBar_NotThis")
+  local added = {}
+  for i = 4, #t do added[#added + 1] = t[i] end
+  check("R-P2-2: each DT viewport adds its own frame name once, at the end, at creation (Who, settings, graveyard, gank board, slowest board, events)",
+    table.concat(added, ",") == table.concat(want, ","))
+  local own = true
+  for _, n in ipairs(added) do if not n:match("^DeadTired") then own = false end end
+  check("R-P2-2: only DT's own names are inserted", own)
+  check("R-P2-2: a sticky viewport is left out (the opt-out)", not table.concat(t, ","):find("pinned", 1, true))
+  check("R-P2-2: a name that isn't DT's is refused", c.DT.closeOnEscape("GameTooltip") == false and #t == 3 + #want)
+  check("R-P2-2: inserting the same name twice is refused", c.DT.closeOnEscape("DeadTiredViewport_who") == false and #t == 3 + #want)
+  -- what the client's Escape does with it: hides each frame named there (CloseSpecialWindows)
+  c:slash("graveyard")
+  local vp = c.DT.viewports.crypt
+  for _, n in ipairs(t) do local f = c.env[n]; if type(f) == "table" and f.Hide then f:Hide() end end
+  check("R-P2-2: Escape (the client hiding each named frame) closes the graveyard", not vp:IsShown())
+end
+
+-- ---------------------------------------------------------------- the short date
+do
+  local w = H.world()
+  local c = w:client({ guild = G })
+  local D = c.DT.shortDate
+  check("shortDate: a stamp becomes \"10 Nov\"", D("2026-11-10 21:00:00") == "10 Nov" and D("2026-01-03") == "3 Jan")
+  check("shortDate: anything else is kept, made safe and short", D("x|y") == "x||y" and D(nil) == "?" and #D(string.rep("z", 30)) <= 13)
+end
+
 -- ---------------------------------------------------------------- the viewport
 do
   local w = H.world()
@@ -60,7 +106,8 @@ do
   check("viewport: title, close button, body, search", vp.title.text == "The Crypt" and vp.close and vp.body and vp.search)
   vp.close.scripts.OnClick(vp.close)
   check("viewport: the close button hides it", not vp:IsShown())
-  check("viewport: Escape doesn't close it (nothing added to UISpecialFrames)", rawget(c.env, "UISpecialFrames") == nil)
+  check("viewport: with no UISpecialFrames on the client, nothing is made (no Blizzard global written)",
+    rawget(c.env, "UISpecialFrames") == nil)
   check("viewport: movable, clamped, dragged by the frame", f.scripts.OnDragStart and f.scripts.OnDragStop)
   -- drag: the frame moves, the place is saved on release
   f.scripts.OnDragStart(f)
