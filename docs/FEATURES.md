@@ -241,6 +241,20 @@ Optional in the first pass: loot toast, auto junk/repair. Parked: guild gambling
 `/roll` only, no gold through the addon), Raid-Helper into the calendar (the bot's job), Discord
 bridge (the bot's job), guild builds.
 
+## Ruled 11 Nov (for Port 1)
+1. **Raid prep: rebuilt as the officers' raid-night list** (card 5's `/dt prep` reshaped:
+   officers set the list; members check their own bags against it). Port 1 or Port 2 by size:
+   the brief decides, Port 1 at least keeps its data in the legacy move.
+2. **Nudge switch replies:** `/dt recruit nudge off` → *"Nudge off. The crypt keeps its own
+   counsel."*; `/dt recruit nudge on` → *"Nudge on. The crypt will knock."*
+3. **Bar contents: other addons off by default, an ordered list you curate.** DT's own buttons
+   (Dead Tired, DT: n online, recruit) show from the start. Every other addon the bar finds is
+   listed in the bar's settings card, **unticked**; tick to add it. The list is **ordered by
+   drag**: each row has a grip on its side to slide it up or down, and the bar follows that
+   order (DT's own buttons included). Order and ticks saved; `/dt bar add|remove <name>` and
+   `/dt bar move <name> <position>` as the typed path. A newly installed addon appears
+   unticked at the bottom.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
@@ -260,7 +274,8 @@ Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **
    connected-realm keys), and the fw1 walk's fixes (settings rows sized to their text; first
    setting not under the search box; colour codes on the bar shown, not escaped; Who shows you,
    marked as you, and an empty-state line; choose which addons show on the bar; DT info on the bar,
-   e.g. session stats). Two-player walk. GitHub release + Discord.
+   e.g. session stats), the bar list as ruled above, raid prep as the officers' list (if it fits;
+   else Port 2). Two-player walk. GitHub release + Discord.
 2. **Port 2 → 0.3.0:** card 4 (gank diary), card 6 (play time, stash, events), card 7 (logs
    prompt), with their legacy data. Release as Port 1 (or CurseForge/Wago, Tim's call then).
 3. **Waypoint service + level-up card** (0.4.0).
