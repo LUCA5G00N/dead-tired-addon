@@ -241,16 +241,36 @@ Optional in the first pass: loot toast, auto junk/repair. Parked: guild gambling
 `/roll` only, no gold through the addon), Raid-Helper into the calendar (the bot's job), Discord
 bridge (the bot's job), guild builds.
 
+## Versions and releases (Tim, 11 Nov)
+Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
+saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
+leading 0 means early. Test builds carry a suffix (`-fw1`, `-p1rc1`). Option A: the framework line
+continues, so **Port 1 ships as 0.2.0**, Port 2 as 0.3.0, later rounds 0.4.0, 0.5.0...; rc3's
+0.1.0 was never released.
+**Distribution:** Port 1 as a **GitHub release + the zip in Discord** (guild only). Port 2 the
+same unless Tim decides otherwise; CurseForge/Wago later, with the BigWigs packager set up in that
+round so each release after is one tag.
+
 ## Proposed order (rounds kept few: every round costs plan usage)
-Done: rulings round, `dt_fixes3` (rc3, walked 10 Nov: `UAT_dt_fixes3_results.md`).
-1. **Rebuild rulings** (no code): items 1-4 above.
-2. **Framework round:** module core, comms, keys, viewport + skins, settings cards, list widget,
-   launcher bar, toasts. Proved offline, then a small walk.
-3. **Port round:** cards 1, 3, 4, 6, 7 and recruit onto the framework, fixing the rc3 defects by
-   design. Walk (two players). **Release 0.1.0.**
-4. **Waypoint service + level-up card** (the waypointer's first user).
-5. **Card 2 + recipe tracking + crafting board** (probe `GetRecipeSchematic` first).
-6. **Guild armory + DT score.**
-7. **Achievements + leaderboard + bounty board + Rise!**
-8. **The Pilgrimage** (initiation route first).
-9. **Travel quiz + timer.**
+Done: rulings, `dt_fixes3` (rc3, walked 10 Nov), rebuild rulings (10-11 Nov), **framework round**
+(0.2.0-fw1, walked 11 Nov: see its results log).
+1. **Port 1 → 0.2.0:** card 1 (guild gate, roster/who, alts), card 3 (Rest in Pieces: deaths,
+   graveyard, bedtime), **recruit with a button on the bar** (`/dt recruit` as backup) + nudge, the
+   `DeadTiredDB.legacy` migration for those cards (merge short/full-name duplicates; refile
+   connected-realm keys), and the fw1 walk's fixes (settings rows sized to their text; first
+   setting not under the search box; colour codes on the bar shown, not escaped; Who shows you,
+   marked as you, and an empty-state line; choose which addons show on the bar; DT info on the bar,
+   e.g. session stats). Two-player walk. GitHub release + Discord.
+2. **Port 2 → 0.3.0:** card 4 (gank diary), card 6 (play time, stash, events), card 7 (logs
+   prompt), with their legacy data. Release as Port 1 (or CurseForge/Wago, Tim's call then).
+3. **Waypoint service + level-up card** (0.4.0).
+4. **Card 2 + recipe tracking + crafting board** (probe `GetRecipeSchematic` first).
+5. **Guild armory + DT score.**
+6. **Achievements + leaderboard + bounty board + Rise!**
+7. **The Pilgrimage** (initiation route first).
+8. **Travel window:** flight timer + next stop + the quiz (Tim's mark, 10 Nov 15:16).
+Ideas waiting for a round: a dungeon-quest tracker built over ForeverDungeonJournal (Tim's mark,
+10 Nov 21:09).
+
+**Port rule (11 Nov):** on Forever `UnitFullName` returns the **surname** as its second value
+(`"Stromham", "Hamson"`; target `"John", "Do"`), not the realm. Never read a realm from it.
