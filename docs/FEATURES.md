@@ -237,7 +237,7 @@ Ruled already: R-1, AUD-06, AUD-10, held wording, recruit nudge, WizardryLogProm
 Framework (above) · cards 1, 3, 4, 6, 7 ported · recruit + nudge · card 2's directory · guild
 armory + DT score · achievements + leaderboard · the Restless Dead Pilgrimage · travel quiz +
 timer · level-up card · recipe tracking + crafting board · bounty board · Rise! roll call.
-Optional in the first pass: loot toast, auto junk/repair. Guild gambling moves into the plan (below). Parked, Raid-Helper into the calendar (the bot's job), Discord
+Optional in the first pass: loot toast, auto junk/repair. Guild gambling moves into the plan (below). Parked: Raid-Helper into the calendar (the bot's job), Discord
 bridge (the bot's job), guild builds.
 
 ## Ruled 11 Nov (for Port 1)
