@@ -111,4 +111,28 @@ do
   check("toast: outside the guild, nothing", DT.toast("t", "toasty", "x") == false)
 end
 
+-- ---------------------------------------------------------------- Port 1: rows fit wrapped text; empty line
+do
+  local w2 = H.world()
+  local c2 = w2:client({ guild = "DEAD TIRED" })
+  c2:login()
+  local D = c2.DT
+  check("rowHeight: the tallest cell plus padding", D.rowHeight({ 12, 36, 24 }, 18, 4) == 40)
+  check("rowHeight: never under the minimum", D.rowHeight({ 2 }, 18, 4) == 18 and D.rowHeight({}, 18, 4) == 18)
+  local fs = c2.env.UIParent:CreateFontString()
+  fs:SetText(string.rep("x", 50))
+  check("textHeight: wrapped at the width", D.textHeight(fs, 100) == 36 and D.textHeight(fs, 400) == 12)
+  local m = D.listModel()
+  local vp = D.viewport({ id = "t2", title = "T", search = true })
+  local L = D.list(vp.body, m, { count = 4, empty = "Nothing here.", columns = { { key = "a", width = 60 } } })
+  m:set({}); L:refresh()
+  check("empty: the line shows when nothing is listed", L.empty.shown and L.empty.text == "Nothing here.")
+  m:set({ { a = "short", search = "short" }, { a = string.rep("long ", 8), search = "long" }, { a = "x", search = "x" } }); L:refresh()
+  check("empty: hidden once rows show", not L.empty.shown)
+  local r1, r2, r3 = L.rows[1], L.rows[2], L.rows[3]
+  check("rows: a long cell makes its row taller", r2.h > r1.h)
+  check("rows: each row starts below the one above (no overlap)", r2.top == r1.top + r1.h and r3.top == r2.top + r2.h)
+  check("viewport: the body starts under the search box with a gap", vp.top >= D.style("spacing.pad") + 22 + D.SEARCH_H + 6)
+end
+
 H.finish("ui")

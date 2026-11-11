@@ -18,7 +18,7 @@ ns = ns or {}
 local DT = {}
 ns.DT = DT
 DT.ADDON = ADDON
-DT.VERSION = "0.2.0-fw1"
+DT.VERSION = "0.2.0"
 DT.SCHEMA = 3
 DT.Config = ns.Config or {}
 
@@ -150,16 +150,24 @@ end
 
 -- ---------------------------------------------------------------- settings registry
 
--- A setting: { key, label, desc, type, default, choices, min, max, maxLen, noVerb, onChange, verb }
---   type: "bool" | "number" | "choice" | "string" | "position"
+-- A setting: { key, label, desc, type, default, choices, min, max, maxLen, noVerb, onChange, verb,
+--              validate }
+--   type: "bool" | "number" | "choice" | "string" | "position" | "list"
+--   validate (optional, Port 1): fn(value) -> true, value | false, reason, run after the type's own
+--     parse (e.g. a bedtime "HH:MM").
+--   "list" (Port 1): a list the settings card draws as rows (the bar's objects, the raid-prep list):
+--     items = fn() -> { { name, label, on, tip } ... }; toggle = fn(name, on) (a tick box per row);
+--     move = fn(name, n) (a drag grip per row); remove = fn(name) (a remove button per row);
+--     empty = the line shown when there are no rows. A list is never /dt set: its own verbs are its
+--     typed path, named in noVerb.
 -- Every setting can be typed with /dt set <module> <key> <value>, except a "position" (or one
 -- declared typed = false). One that can't be typed must carry noVerb = "<reason>", which names the
 -- one place it lives (FEATURES.md, General requirements). DT.module refuses one without it.
 DT.settings = {}     -- [moduleId] = { list = { setting... }, by = { [key] = setting } }
 
-function DT.typed(s) return s.type ~= "position" and s.typed ~= false end
+function DT.typed(s) return s.type ~= "position" and s.type ~= "list" and s.typed ~= false end
 
-local TYPES = { bool = true, number = true, choice = true, string = true, position = true }
+local TYPES = { bool = true, number = true, choice = true, string = true, position = true, list = true }
 
 local function declare(id, s)
   if type(s) ~= "table" or type(s.key) ~= "string" or not s.key:match("^[%a][%w]*$") then
@@ -206,7 +214,17 @@ end
 -- it is already typed. Returns true, value | false, reason.
 local ON = { on = true, ["true"] = true, yes = true, ["1"] = true }
 local OFF = { off = false, ["false"] = false, no = false, ["0"] = false }
+local parseType
 function DT.parse(s, raw)
+  local ok, v = parseType(s, raw)
+  if ok and type(s.validate) == "function" then
+    local okv, vv = s.validate(v)
+    if not okv then return false, vv end
+    v = vv
+  end
+  return ok, v
+end
+parseType = function(s, raw)
   if s.type == "bool" then
     if type(raw) == "boolean" then return true, raw end
     local w = type(raw) == "string" and raw:lower() or ""
@@ -230,7 +248,7 @@ function DT.parse(s, raw)
     local t = DT.trim(raw):gsub("[%z\1-\31|]", "")
     if #t > (s.maxLen or 64) then return false, "expects at most " .. (s.maxLen or 64) .. " characters" end
     return true, t
-  elseif s.type == "position" then
+  elseif s.type == "position" or s.type == "list" then
     if type(raw) ~= "table" then return false, "can't be typed: " .. tostring(s.noVerb) end
     return true, raw
   end
@@ -258,6 +276,7 @@ end
 function DT.format(s, v)
   if s.type == "bool" then return v and "on" or "off" end
   if s.type == "position" then return "(placed by dragging)" end
+  if s.type == "list" then return "(a list: " .. tostring(s.noVerb) .. ")" end
   return tostring(v)
 end
 

@@ -8,6 +8,9 @@ ns.Config = {
   -- Addon message prefix (registered with C_ChatInfo through AceComm) and wire protocol version.
   PREFIX = "DEADTIRED",
   PROTOCOL = 2,
+  -- Raid prep (Prep.lua): the list is taken only from a guild officer, read as a guild rank index
+  -- at most this (0 is the Guild Master). Set it to the guild's lowest officer rank.
+  OFFICER_MAX_RANK = 1,
   -- LDB display addons (folder names). When one is loaded, DT's own bar stands back.
   DISPLAY_ADDONS = { "Titan", "ChocolateBar", "Bazooka", "ButtonBin", "Fortress", "DockingStation",
     "StatBlockCore", "NinjaPanel", "Broker2FuBar", "Carbonite" },

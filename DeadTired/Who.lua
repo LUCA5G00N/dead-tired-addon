@@ -8,12 +8,19 @@
 -- before" (kept in DeadTiredDB.who.seen). Your own key is never listed as someone else. Only
 -- guildies who run Dead Tired can show, and the window says so. The bar object reads
 -- "DT: <n> online", n being the guildies heard from this session.
+-- Port 1: R-P6, your own entry is listed first, marked "(you)", exactly once (still never as
+-- someone else); R-P5, names without realm (the realm in the row's tooltip, or shown only to tell
+-- two same-named apart); rows as tall as their wrapped name; an empty-state line. Other modules add
+-- fields to HELLO with DT.helloField(name, fn) (Alts: the main; Prep: the list's version) and read
+-- them with their own DT.on("HELLO") handler.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
 
 local HELLO_GAP, ASK_GAP, LOGIN_WAIT = 10, 30, 5
 local NOTE = "Only guildies running Dead Tired show here."
+local EMPTY = "Just you so far. The rest are still in their coffins."
+local YOU = " (you)"
 local ICON = [[Interface\Icons\Spell_Shadow_AnimateDead]]
 
 local session = {}          -- [key] = { v, rn, t }
@@ -34,22 +41,41 @@ local function isMe(key)
 end
 
 function DT.whoRows()
-  local rows, done = {}, {}
+  local rows, done, keys = {}, {}, {}
   local function add(key, e, here)
     if done[key] then return end
     done[key] = true
     if isMe(key) then return end                                           -- guard: self never listed
-    local name = DT.display(key)
-    rows[#rows + 1] = { key = key, name = name, v = DT.safe(e.v or "?", 16),
-      when = here and "this session" or "seen before", search = name .. " " .. key }
+    keys[#keys + 1] = key
+    rows[#rows + 1] = { key = key, v = DT.safe(e.v or "?", 16), when = here and "this session" or "seen before" }
   end
   for key, e in pairs(session) do add(key, e, true) end
   for key, e in pairs(seen()) do add(key, e, false) end
+  local me = DT.myKey()
+  if me then keys[#keys + 1] = me end
+  local name = DT.namer(keys)
+  for _, r in ipairs(rows) do
+    r.name = name(r.key)
+    r.search = r.name .. " " .. r.key
+  end
   table.sort(rows, function(a, b)
     if (a.when == "this session") ~= (b.when == "this session") then return a.when == "this session" end
     return a.name:lower() < b.name:lower()
   end)
+  if me then                                                               -- R-P6: you first, once
+    local n = name(me)
+    table.insert(rows, 1, { key = me, you = true, name = n .. YOU, v = DT.safe(DT.VERSION, 16), when = "you",
+      search = n .. " you " .. me })
+  end
   return rows
+end
+
+-- A row's tooltip: the full name and the realm (R-P5).
+local function tip(row, tt)
+  local _, n = DT.splitKey(row.key)
+  tt:AddLine(DT.safe(n or row.key, 48) .. (row.you and YOU or ""))
+  tt:AddLine(DT.realmLabel(row.key), 1, 1, 1)
+  tt:AddLine("Dead Tired " .. row.v, 0.7, 0.7, 0.7)
 end
 
 function DT.whoCount()
@@ -74,13 +100,24 @@ local function record(key, d)
   redraw()
 end
 
+-- Fields other modules add to every HELLO: name -> fn() returning a plain value (or nil).
+local extra = {}
+function DT.helloField(name, fn) extra[name] = fn end
+
 local function hello(login)
   if not DT.get("who", "hello") then return false end
   local t = DT.now()
   if lastHello and t - lastHello < HELLO_GAP then return false end         -- guard: hello rate limit
   lastHello = t
-  return DT.send("HELLO", { v = DT.VERSION, rn = clean((try(GetRealmName))), login = login or nil })
+  local d = { v = DT.VERSION, rn = clean((try(GetRealmName))), login = login or nil }
+  for k, fn in pairs(extra) do
+    local ok, v = pcall(fn)
+    if ok and v ~= nil and d[k] == nil then d[k] = v end
+  end
+  return DT.send("HELLO", d)
 end
+-- A fresh HELLO now (Alts: after /dt main), past the 10 s limit only once a gap has passed.
+function DT.sayHello() lastHello = nil; return hello(false) end
 
 local function answer()
   DT.after(1 + math.random() * 2, function() if DT.enabled("who") then hello(false) end end)
@@ -113,17 +150,21 @@ function DT.openWho()
   if not vp then
     model = DT.listModel()
     vp = DT.viewport({ id = "who", title = "Who runs Dead Tired", search = true, width = 380, height = 400,
-      onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+      footer = 16, onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
     local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
     note:SetText(NOTE)
     DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 16, columns = {
+    list = DT.list(vp.body, model, { count = 16, tip = tip, empty = function(m)
+        if (DT.trim(m.query) or "") ~= "" or #m.rows > 1 then return nil end
+        return EMPTY
+      end, columns = {
       { key = "name", width = 180 }, { key = "v", width = 70, colour = "muted" }, { key = "when", width = 80, colour = "muted" } } })
   end
   model:set(DT.whoRows())
   list:refresh()
   vp:Show()
+  DT.whoListShown = list
 end
 
 local function loginHello()
@@ -151,5 +192,8 @@ DT.module({
 -- After the welcome (Guild.lua: once per login, inside the guild), the login hello.
 DT.listen("greeted", function() greeted = true; loginHello() end)
 
-DT._who = { NOTE = NOTE, session = function() return session end, record = record,
+DT.keySource(function() return session end)
+DT.keySource(function() return seen() end)
+
+DT._who = { NOTE = NOTE, EMPTY = EMPTY, list = function() return list end, session = function() return session end, record = record,
   reset = function() lastHello, lastAsk = nil, nil end }

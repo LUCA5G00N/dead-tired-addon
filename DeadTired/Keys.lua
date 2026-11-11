@@ -6,7 +6,7 @@
 --   Full Name: the name with its surname, as GetUnitName(unit, true) gives it on Forever
 --             ("Stromham Hamson"), trimmed, inner runs of spaces made one. Case kept as given.
 -- A realm key has no hyphen, so the first "-" in a key always ends the realm.
--- DT.display(key): the name alone on your own realm, else "Name (Realm)".
+-- DT.display(key): the full name; the realm only to tell two same-named characters apart (R-P5).
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -79,10 +79,72 @@ end
 -- Realm display names learnt from HELLOs (Who.lua): realmKey -> "CAMWOW EU4 Realm 4 PvP".
 DT.realmNames = {}
 
-function DT.display(key)
-  local r, n = DT.splitKey(key)
-  if not r then return DT.safe(key, 48) end
-  local mine = DT.realmKey()
-  if mine and r:lower() == mine:lower() then return DT.safe(n, 48) end
-  return DT.safe(n, 48) .. " (" .. DT.safe(DT.realmNames[r] or r, 40) .. ")"
+-- The realm as people read it, for tooltips: the display name a HELLO taught us, else the key.
+function DT.realmLabel(key)
+  local r = DT.splitKey(key)
+  if not r then return "?" end
+  return DT.safe(DT.realmNames[r] or r, 40)
+end
+
+-- Every key DT knows of, for the collision rule when no shown set is given. Modules add a source:
+-- DT.keySource(fn), fn() -> a table whose keys (or, for an array, whose values) are character keys.
+DT.keySources = {}
+function DT.keySource(fn) DT.keySources[#DT.keySources + 1] = fn end
+
+function DT.knownKeys()
+  local out, done = {}, {}
+  local function add(k)
+    if type(k) == "string" and DT.splitKey(k) and not done[k] then done[k] = true; out[#out + 1] = k end
+  end
+  for _, fn in ipairs(DT.keySources) do
+    local ok, t = pcall(fn)
+    if ok and type(t) == "table" then
+      for k, v in pairs(t) do
+        if type(k) == "number" then add(v) else add(k) end
+      end
+    end
+  end
+  add(DT.myKey())
+  return out
+end
+
+-- R-P5 (Port 1, ruled 11 Nov): a name is shown as the full name only ("Vespera Grimm"); the realm
+-- goes in the tooltip (DT.realmLabel). Only when two shown entries share a full name on different
+-- realms do both get "(Realm)". Keys keep the realm.
+-- DT.namer(keys) -> fn(key): the display of each key among that shown set.
+function DT.namer(keys)
+  local realms = {}                     -- lower full name -> { [lower realm] = true }, count
+  for _, k in ipairs(keys or {}) do
+    local r, n = DT.splitKey(k)
+    if r then
+      local ln = n:lower():gsub("%s+", " ")
+      local e = realms[ln]
+      if not e then e = { n = 0, seen = {} }; realms[ln] = e end
+      local lr = r:lower()
+      if not e.seen[lr] then e.seen[lr] = true; e.n = e.n + 1 end
+    end
+  end
+  return function(key)
+    local r, n = DT.splitKey(key)
+    if not r then return DT.safe(key, 48) end
+    local e = realms[n:lower():gsub("%s+", " ")]
+    if e and e.n > 1 then                                                  -- guard: R-P5 collision
+      return DT.safe(n, 48) .. " (" .. DT.realmLabel(key) .. ")"
+    end
+    return DT.safe(n, 48)
+  end
+end
+
+-- DT.display(key [, among]): the full name; "(Realm)" added only on a collision among `among`
+-- (the keys shown with it), or among every key DT knows of when `among` isn't given.
+function DT.display(key, among)
+  local list = among or DT.knownKeys()
+  local found = false
+  for _, k in ipairs(list) do if k == key then found = true break end end
+  if not found then
+    local copy = { key }
+    for _, k in ipairs(list) do copy[#copy + 1] = k end
+    list = copy
+  end
+  return DT.namer(list)(key)
 end

@@ -11,6 +11,14 @@
 -- addon loaded (Config.DISPLAY_ADDONS): DT stands back for Titan-style hosts unless /dt bar on.
 -- One intro line the first time it shows, ever. Dragged to move; the place is kept. It never hides
 -- or moves another addon's minimap button.
+-- R-P4 (Port 1): what the bar shows is an ordered list, saved in DeadTiredDB.bar ({ order = {names},
+-- on = {[name] = bool} }). DT's own objects are ticked from the start (one declared offByDefault,
+-- the Session object, waits to be ticked); every other addon's object is listed unticked, a newly
+-- seen one at the bottom. The bar follows the order. Settings card (tick, drag by the grip) and
+-- /dt bar add|remove|move|list. An object with visible = fn answering false (Recruit, for
+-- non-officers) is neither drawn nor listed.
+-- Text: other addons' colour codes are shown, not escaped (fw1 walk defect 3). DT.barText keeps
+-- colour codes, textures and hyperlinks, and escapes every other "|" sequence.
 local ADDON, ns = ...
 local DT = ns.DT
 
@@ -29,15 +37,18 @@ local refresh
 
 -- ---------------------------------------------------------------- objects
 
+local known                       -- fn(name, own, offByDefault): the name in the saved order
+
 function DT.object(name, def)
   local o = byName[name]
   if not o then
     o = {}
     byName[name] = o
-    DT.objects[#DT.objects + 1] = { name = name, obj = o }
+    DT.objects[#DT.objects + 1] = { name = name, obj = o, own = true }
   end
   for k, v in pairs(def) do o[k] = v end
   o.type = o.type or "launcher"
+  if known then known(name, true, o.offByDefault) end
   if ldb and not proxies[name] then
     proxies[name] = ldb:NewDataObject(OWN .. name, def)
   end
@@ -64,6 +75,7 @@ local function addOther(name, obj)
   if t ~= "launcher" and t ~= "data source" then return end
   otherByName[name] = obj
   others[#others + 1] = { name = name, obj = obj }
+  if known then known(name, false) end
 end
 
 -- Bind to LibDataBroker if another addon loaded it. Returns the library or nil.
@@ -114,13 +126,139 @@ end
 
 -- ---------------------------------------------------------------- the bar
 
-local function entries()
+-- ---------------------------------------------------------------- the list (R-P4)
+
+local function store()
+  local db = DT.db()
+  if type(db.bar) ~= "table" then db.bar = {} end
+  local b = db.bar
+  if type(b.order) ~= "table" then b.order = {} end
+  if type(b.on) ~= "table" then b.on = {} end
+  return b
+end
+
+-- Put a name in the saved order (at the bottom) the first time it is seen, with its default tick:
+-- on for DT's own (unless offByDefault), off for every other addon's.
+known = function(name, own, offByDefault)
+  if not DT.loaded then return end
+  local b = store()
+  for _, n in ipairs(b.order) do if n == name then return end end
+  b.order[#b.order + 1] = name
+  if b.on[name] == nil then
+    b.on[name] = own and not offByDefault or false                       -- guard: others unticked by default
+  end
+end
+
+local function entryOf(name)
+  local o = byName[name]
+  if o then return { name = name, obj = o, own = true } end
+  local x = otherByName[name]
+  if x then return { name = name, obj = x, own = false } end
+  return nil
+end
+
+local function shownToMe(e)
+  local v = e.obj.visible
+  if type(v) ~= "function" then return true end
+  local ok, yes = pcall(v)
+  return ok and yes == true
+end
+
+-- Every object present this session, in the saved order: { name, obj, own, on }.
+function DT.barList()
+  local b = store()
+  for _, e in ipairs(DT.objects) do known(e.name, true, e.obj.offByDefault) end
+  for _, e in ipairs(others) do known(e.name, false) end
   local list = {}
-  for _, e in ipairs(DT.objects) do list[#list + 1] = e end
-  for _, e in ipairs(others) do list[#list + 1] = e end
+  for _, name in ipairs(b.order) do
+    local e = entryOf(name)
+    if e and shownToMe(e) then
+      e.on = b.on[name] == true
+      list[#list + 1] = e
+    end
+  end
   return list
 end
+
+-- What the bar draws: the ticked ones, in order.
+local function entries()
+  local out = {}
+  for _, e in ipairs(DT.barList()) do if e.on then out[#out + 1] = e end end
+  return out
+end
+
+-- A name as typed ("atlasloot", "Dead Tired", "who"): the object's name, else its plain label.
+local function plain(t) return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+function DT.barFind(typed)
+  typed = (DT.trim(typed) or ""):lower()
+  if typed == "" then return nil end
+  local list = DT.barList()
+  for _, e in ipairs(list) do if e.name:lower() == typed then return e, list end end
+  for _, e in ipairs(list) do
+    if plain(e.obj.label or e.obj.text):lower() == typed then return e, list end
+  end
+  return nil, list
+end
+
+function DT.barTick(name, on)
+  local b = store()
+  b.on[name] = on and true or false
+  if refresh then refresh() end
+  DT.signal("barlist")
+  return true
+end
+
+-- Move name to position n (1 = leftmost) among the objects present this session.
+function DT.barMove(name, n)
+  local list = DT.barList()
+  local from
+  for i, e in ipairs(list) do if e.name == name then from = i end end
+  if not from then return false end
+  n = math.floor(tonumber(n) or from)
+  if n < 1 then n = 1 end
+  if n > #list then n = #list end
+  local e = table.remove(list, from)
+  table.insert(list, n, e)
+  local b, order, present = store(), {}, {}
+  for _, x in ipairs(list) do order[#order + 1] = x.name; present[x.name] = true end
+  for _, old in ipairs(b.order) do if not present[old] then order[#order + 1] = old end end
+  b.order = order
+  if refresh then refresh() end
+  DT.signal("barlist")
+  return true, n
+end
+
 DT.barEntries = entries
+
+-- Text from another addon, for a bar button: its colour codes (|cAARRGGBB, |r), textures (|T..|t)
+-- and hyperlinks (|H..|h..|h) are kept; any other "|" is escaped; control bytes go. At most `max`
+-- visible characters; an open colour is closed.
+function DT.barText(s, max)
+  s = tostring(s == nil and "" or s):gsub("[%z\1-\31]", "")
+  max = max or 40
+  local out, i, shown, n, open = {}, 1, 0, #s, false
+  while i <= n and shown < max do
+    local ch = s:sub(i, i)
+    if ch ~= "|" then
+      out[#out + 1] = ch; shown = shown + 1; i = i + 1
+    else
+      local nx = s:sub(i + 1, i + 1)
+      local colour = s:match("^|c%x%x%x%x%x%x%x%x", i)
+      local tex = nx == "T" and s:match("^|T[^|]*|t", i)
+      local link = nx == "H" and s:match("^|H[^|]*|h[^|]*|h", i)
+      if colour then out[#out + 1] = colour; i = i + #colour; open = true   -- guard: colour codes pass
+      elseif nx == "r" then out[#out + 1] = "|r"; i = i + 2; open = false
+      elseif tex then out[#out + 1] = tex; i = i + #tex; shown = shown + 1
+      elseif link then out[#out + 1] = link; i = i + #link; shown = shown + 1
+      elseif nx == "|" then out[#out + 1] = "||"; i = i + 2; shown = shown + 1
+      else out[#out + 1] = "||"; i = i + 1; shown = shown + 1 end          -- anything else: escaped
+    end
+  end
+  local t = table.concat(out)
+  if i <= n then t = t .. "..." end
+  if open then t = t .. "|r" end
+  return t
+end
 
 local function button(i)
   local b = buttons[i]
@@ -137,6 +275,7 @@ local function button(i)
     local o = self.entry and self.entry.obj
     if o and type(o.OnClick) == "function" then o.OnClick(self, which) end
   end)
+  b.isBarButton = true
   b:SetScript("OnEnter", function(self)
     local o = self.entry and self.entry.obj
     if not o then return end
@@ -181,7 +320,7 @@ refresh = function()
     b.entry = e
     local o = e.obj
     b.icon:SetTexture(o.icon or ICON)
-    b.text:SetText(DT.safe(o.text or o.label or e.name, 40))
+    b.text:SetText(e.own and DT.safe(o.text or o.label or e.name, 40) or DT.barText(o.text or o.label or e.name, 40))
     DT.fontTo(b.text, "small")
     local w = 24 + math.max(8, (b.text:GetStringWidth() or 40))
     b:SetWidth(w)
@@ -222,6 +361,34 @@ local function barVerb(args)
   return DT.out("bar.mode = " .. w)
 end
 
+local function label(e) return DT.safe(plain(e.obj.label or e.obj.text or e.name), 32) end
+
+local function listLine()
+  local parts = {}
+  for i, e in ipairs(DT.barList()) do
+    parts[#parts + 1] = i .. " " .. label(e) .. (label(e):lower() ~= e.name:lower() and (" (" .. DT.safe(e.name, 32) .. ")") or "")
+      .. (e.on and " [on]" or " [off]")
+  end
+  return "bar.list: " .. (#parts > 0 and table.concat(parts, ", ") or "nothing")
+end
+
+local function tickVerb(on)
+  return function(args)
+    local e = DT.barFind(args)
+    if not e then return DT.out("bar.list: no " .. DT.safe(args, 32) .. ". /dt bar list") end
+    DT.barTick(e.name, on)
+    return DT.out("bar." .. DT.safe(e.name, 32) .. " = " .. (on and "on" or "off"))
+  end
+end
+
+local function moveVerb(args)
+  local name, n = (args or ""):match("^(.-)%s+(%d+)$")
+  local e = name and DT.barFind(name)
+  if not e then return DT.out("/dt bar move <name> <position>. /dt bar list") end
+  local _, at = DT.barMove(e.name, tonumber(n))
+  return DT.out("bar." .. DT.safe(e.name, 32) .. " at " .. at)
+end
+
 DT.module({
   id = "bar",
   title = "Launcher bar",
@@ -229,10 +396,26 @@ DT.module({
     { key = "mode", type = "choice", choices = { "auto", "on", "off" }, default = "auto", label = "Bar",
       verb = "bar on|off|auto", onChange = function() evaluate() end,
       desc = "The Dead Tired bar: Dead Tired's buttons, and other addons' when their library is loaded. Auto hides it while Titan Panel or another bar addon is loaded." },
+    { key = "objects", type = "list", label = "On the bar",
+      desc = "What the bar shows, left to right as listed here. Dead Tired's own are ticked; other addons' wait unticked until you tick them. Drag a row by its grip to move it.",
+      noVerb = "typed as /dt bar add|remove|move|list",
+      items = function()
+        local out = {}
+        for _, e in ipairs(DT.barList()) do
+          out[#out + 1] = { name = e.name, label = label(e), on = e.on, tip = e.own and "Dead Tired" or e.name }
+        end
+        return out
+      end,
+      toggle = function(name, on) DT.barTick(name, on) end,
+      move = function(name, n) DT.barMove(name, n) end },
     { key = "place", type = "position", label = "Bar place", desc = "Where the bar sits. Kept through reloads.",
       noVerb = "drag the bar to move it" },
   },
-  verbs = { { verb = "bar", usage = "bar on|off|auto", fn = barVerb } },
+  verbs = { { verb = "bar", usage = "bar on|off|auto", fn = barVerb },
+    { verb = "bar list", usage = "bar list", fn = function() DT.out(listLine()) end },
+    { verb = "bar add", usage = "bar add <name>", fn = tickVerb(true) },
+    { verb = "bar remove", usage = "bar remove <name>", fn = tickVerb(false) },
+    { verb = "bar move", usage = "bar move <name> <n>", fn = moveVerb } },
   init = function()
     DT.object("DeadTired", { type = "launcher", text = "Dead Tired", icon = ICON,
       OnClick = function(_, which) DT.openSettings(which == "RightButton" and "bar" or nil) end,
@@ -246,6 +429,7 @@ DT.module({
 })
 
 DT.listen("member", function() evaluate() end)
+DT.barRefresh = function() if refresh then refresh() end end
 DT.listen("loaded", function()
   for _, m in ipairs(DT.modules) do
     if m.ldb then DT.object(m.id, m.ldb) end
@@ -253,4 +437,5 @@ DT.listen("loaded", function()
 end)
 
 DT._bar = { INTRO = INTRO, frame = function() return bar end, others = function() return others end,
-  proxies = function() return proxies end, buttons = function() return buttons end }
+  proxies = function() return proxies end, buttons = function() return buttons end,
+  store = function() return store() end }

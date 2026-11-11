@@ -63,14 +63,21 @@ do
   c:login()
   check("with LDB: DT's objects registered there too", lib:GetDataObjectByName("DeadTired_who") ~= nil
     and lib:GetDataObjectByName("DeadTired_DeadTired") ~= nil)
-  check("with LDB: the bar hosts other addons' launchers and data sources", texts(c) == "Dead Tired | DT: 0 online | AtlasLoot | DPS 0"
+  check("R-P4: other addons' objects are listed but unticked: the bar shows DT's own only",
+    texts(c) == "Dead Tired | DT: 0 online" and #c.DT.barList() == 5)
+  c:slash("bar add AtlasLoot"); c:slash("bar add recount")
+  check("with LDB: ticked, the bar hosts other addons' launchers and data sources", texts(c) == "Dead Tired | DT: 0 online | AtlasLoot | DPS 0"
     or texts(c) == "Dead Tired | DT: 0 online | DPS 0 | AtlasLoot")
   check("other LDB types left out", not texts(c):find("skip me", 1, true))
   check("DT's own LDB objects not drawn twice", select(2, texts(c):gsub("DT: 0 online", "")) == 1)
   c.DT.update("who", "text", "DT: 2 online")
   check("DT's text change reaches its LDB object (for Titan and friends)", lib:GetDataObjectByName("DeadTired_who").text == "DT: 2 online")
   lib:NewDataObject("Leatrix", { type = "launcher", text = "Leatrix" })
-  check("an LDB object made later joins the bar", texts(c):find("Leatrix", 1, true) ~= nil)
+  local bl = c.DT.barList()
+  check("R-P4: an LDB object made later is listed at the bottom, unticked", bl[#bl].name == "Leatrix" and not bl[#bl].on
+    and texts(c):find("Leatrix", 1, true) == nil)
+  c:slash("bar add leatrix")
+  check("an LDB object made later joins the bar once ticked", texts(c):find("Leatrix", 1, true) ~= nil)
   lib:GetDataObjectByName("Recount").text = "DPS 9000"
   check("another addon's text change redraws", texts(c):find("DPS 9000", 1, true) ~= nil)
   local atlas
@@ -89,7 +96,8 @@ do
   lib:NewDataObject("BugSack", { type = "launcher", text = "BugSack" })
   c:fire("ADDON_LOADED", "BugSack")
   check("LDB loaded by a later addon: DT binds then, registers its objects", lib:GetDataObjectByName("DeadTired_who") ~= nil)
-  check("and shows the later addon's launcher", texts(c):find("BugSack", 1, true) ~= nil)
+  c:slash("bar add BugSack")
+  check("and shows the later addon's launcher once ticked", texts(c):find("BugSack", 1, true) ~= nil)
 end
 
 -- ---------------------------------------------------------------- stand-back
@@ -161,6 +169,92 @@ do
   local c = w:client({ guild = "Elsewhere" })
   c:login()
   check("outside the guild: no bar", not (c:frame("DeadTiredBar") and c:frame("DeadTiredBar").shown) and #c.printed == 0)
+end
+
+-- ---------------------------------------------------------------- Port 1: R-P4, the bar list
+do
+  local w = H.world()
+  local lib
+  local c = w:client({ guild = G, afterLibs = function(c0) lib = H.fakeLDB(c0) end })
+  c:login()
+  -- made after DT bound the library, so they arrive in this order (the iterator's order is pairs')
+  lib:NewDataObject("AtlasLoot", { type = "launcher", text = "AtlasLoot" })
+  lib:NewDataObject("Prat-3.0", { type = "launcher", label = "Prat", text = "|cff8080ff3.0|r" })
+  lib:NewDataObject("BugSack", { type = "data source", text = "0 bugs" })
+  local DT = c.DT
+  local function order() local o = {} for _, e in ipairs(DT.barList()) do o[#o + 1] = e.name .. (e.on and "+" or "-") end return table.concat(o, " ") end
+  check("R-P4: unticked by default: every other addon's object, DT's own ticked, Session waits",
+    order() == "DeadTired+ who+ session- AtlasLoot- Prat-3.0- BugSack-")
+  check("R-P4: the bar shows the ticked ones only", texts(c) == "Dead Tired | DT: 0 online")
+  -- tick from the settings card
+  c:slash("settings")
+  local card
+  for _, r in ipairs(DT._settingsView.rows()) do if r.setting and r.setting.key == "objects" then card = r end end
+  check("R-P4: the bar's settings card lists every object, in order", card and #card.subs == 6 and card.subs[4].label.text == "AtlasLoot"
+    and card.subs[1].grip ~= nil and card.subs[1].tick ~= nil)
+  local sub = card.subs[4]
+  sub.tick:SetChecked(true); sub.tick.scripts.OnClick(sub.tick)
+  check("R-P4: tick adds it to the bar", texts(c) == "Dead Tired | DT: 0 online | AtlasLoot")
+  -- typed verbs
+  c:slash("bar add prat")
+  check("R-P4: /dt bar add <label> ticks it", texts(c):find("Prat", 1, true) == nil and DT.barList()[5].on
+    and c:said("bar.Prat-3.0 = on"))
+  check("colour codes: another addon's colour code is shown, not escaped", texts(c):find("|cff8080ff3.0|r", 1, true) ~= nil
+    and texts(c):find("||cff", 1, true) == nil)
+  c:slash("bar remove AtlasLoot")
+  check("R-P4: /dt bar remove unticks it", texts(c) == "Dead Tired | DT: 0 online | |cff8080ff3.0|r" and c:said("bar.AtlasLoot = off"))
+  c:slash("bar add nothing-here")
+  check("R-P4: an unknown name says so", c:said("bar.list: no nothing-here") ~= nil)
+  -- move: the model
+  DT.barMove("Prat-3.0", 1)
+  check("R-P4 move: to position 1", order():sub(1, 9) == "Prat-3.0+" and texts(c):sub(1, 14) == "|cff8080ff3.0|")
+  DT.barMove("Prat-3.0", 2)
+  check("R-P4 move: down one", order() == "DeadTired+ Prat-3.0+ who+ session- AtlasLoot- BugSack-")
+  DT.barMove("Prat-3.0", 1)
+  check("R-P4 move: up one", order() == "Prat-3.0+ DeadTired+ who+ session- AtlasLoot- BugSack-")
+  DT.barMove("who", 99)
+  check("R-P4 move: past the end goes last", order() == "Prat-3.0+ DeadTired+ session- AtlasLoot- BugSack- who+")
+  c:slash("bar move who 2")
+  check("R-P4: /dt bar move <name> <n>", order() == "Prat-3.0+ who+ DeadTired+ session- AtlasLoot- BugSack-" and c:said("bar.who at 2"))
+  check("R-P4: the bar follows the order", texts(c) == "|cff8080ff3.0|r | DT: 0 online | Dead Tired")
+  c:slash("bar list")
+  check("R-P4: /dt bar list", c:said("bar.list: 1 Prat (Prat-3.0) [on], 2 DT: 0 online (who) [on], 3 Dead Tired (DeadTired) [on]") ~= nil)
+  -- drag: the grip, dropped over row 1
+  c:slash("settings")
+  for i, sb in ipairs(card.subs) do sb.GetBottom = function() return 500 - i * 22 end end
+  c.env.GetCursorPosition = function() return 0, 470 end          -- inside the second row
+  local grip
+  for _, sb in ipairs(card.subs) do if sb.item and sb.item.name == "BugSack" then grip = sb.grip end end
+  grip.scripts.OnDragStart(grip); grip.scripts.OnDragStop(grip)
+  check("R-P4 drag: a row dragged by its grip lands where it's dropped", order() == "Prat-3.0+ BugSack- who+ DeadTired+ session- AtlasLoot-")
+  -- Session ticked on
+  c:slash("bar add session")
+  check("R-P4: Session can be ticked on", texts(c):find("Session 0:00", 1, true) ~= nil)
+  -- saved
+  local r = c:reload()
+  -- the other addons load again and make their objects again (in another order this time)
+  lib:NewDataObject("BugSack", { type = "data source", text = "0 bugs" })
+  lib:NewDataObject("AtlasLoot", { type = "launcher", text = "AtlasLoot" })
+  lib:NewDataObject("Prat-3.0", { type = "launcher", label = "Prat", text = "|cff8080ff3.0|r" })
+  local o2 = {}
+  for _, e in ipairs(r.DT.barList()) do o2[#o2 + 1] = e.name .. (e.on and "+" or "-") end
+  check("R-P4: order and ticks saved through /reload", table.concat(o2, " ") == "Prat-3.0+ BugSack- who+ DeadTired+ session+ AtlasLoot-")
+  check("nothing errors", #c.errors == 0 and #r.errors == 0)
+end
+
+-- ---------------------------------------------------------------- colour codes (fw1 walk defect 3)
+do
+  local w = H.world()
+  local c = w:client({ guild = G })
+  local T = c.DT.barText
+  check("barText: a colour code and |r pass", T("|cff8080ff3.0|r") == "|cff8080ff3.0|r")
+  check("barText: an open colour is closed", T("|cffff0000red") == "|cffff0000red|r")
+  check("barText: a texture passes", T("|TInterface\\Icons\\x:16|t 5") == "|TInterface\\Icons\\x:16|t 5")
+  check("barText: a hyperlink passes", T("|Hitem:1|h[Thing]|h") == "|Hitem:1|h[Thing]|h")
+  check("barText: any other escape is escaped", T("a|Kq1|kb") == "a||Kq1||kb" and T("|cffxyz") == "||cffxyz")
+  check("barText: control bytes go", T("a\nb") == "ab")
+  check("barText: long text cut, codes don't count", T("|cff00ff00" .. string.rep("x", 50), 40) == "|cff00ff00" .. string.rep("x", 40) .. "...|r")
+  check("DT's own text still goes through DT.safe", c.DT.safe("|cff") == "||cff")
 end
 
 H.finish("bar")

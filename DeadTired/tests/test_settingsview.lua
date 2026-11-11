@@ -96,4 +96,60 @@ o:login()
 o.env.DeadTired_OnAddonCompartmentClick()
 check("outside the guild: the compartment opens nothing", o:frame("DeadTiredViewport_settings") == nil)
 
+-- ---------------------------------------------------------------- Port 1: rows fit their text; first setting clear
+do
+  local w2 = H.world()
+  local c2 = w2:client({ guild = G })
+  c2:login()
+  local D = c2.DT
+  c2:slash("settings")
+  local V = D._settingsView
+  local rows2, setting = V.rows(), {}
+  for _, r in ipairs(rows2) do if r.setting then setting[#setting + 1] = r end end
+  -- defect 1: each row as tall as its label, wrapped description and hint; none overlaps the next
+  local fits, overlap, prev = true, false, nil
+  for _, r in ipairs(setting) do
+    if r.frame.shown then
+      local need = 2 + D.textHeight(r.label, nil) + 2 + D.textHeight(r.desc, nil) + 2 + D.textHeight(r.hint, nil) + 6
+      if r.frame.h < need then fits = false; print("  too short: " .. r.setting.module .. "." .. r.setting.key .. " " .. r.frame.h .. " < " .. need) end
+      if prev and r.top < prev.top + prev.frame.h then overlap = true end
+      prev = r
+    end
+  end
+  check("defect 1: every settings row is at least as tall as its wrapped text", fits)
+  check("defect 1: no row starts inside the one above", not overlap)
+  local long, short
+  for _, r in ipairs(setting) do
+    if r.setting.module == "crypt" and r.setting.key == "share" then long = r end
+    if r.setting.module == "core" and r.setting.key == "windows" then short = r end
+  end
+  check("defect 1: a long description makes a taller row than a short one", long.frame.h > short.frame.h)
+  check("defect 1: the description wraps at its width (not cut)", long.desc.w > 0 and D.textHeight(long.desc, long.desc.w) > 12)
+  check("the row height model", D.settingsRowHeight(12, 36, 12, 0) == 72 and D.settingsRowHeight(1, 1, 1, 0) == 30
+    and D.settingsRowHeight(12, 12, 12, 2) == 92)
+  -- defect 2: the first setting is clear of the search box
+  local vp2 = V.vp()
+  local first = setting[1]
+  local searchBottom = D.style("spacing.pad") + 22 + D.SEARCH_H
+  check("defect 2: the body starts below the search box with a gap", vp2.top >= searchBottom + 6)
+  check("defect 2: the first setting (the welcome line) is the first row, clear of the body's top",
+    first.setting.module == "guild" and first.setting.key == "welcome" and first.top > 0 and first.frame.shown)
+  -- the cause found: a scroll left over moved the content above the body; a search or reopen now puts it back
+  vp2.body.h = 100
+  vp2.body.scripts.OnMouseWheel(vp2.body, -3)
+  local _, _, _, _, y = V.vp().content:GetPoint(1)
+  check("scrolling moves the content", V.scroll() > 0 and y == V.scroll())
+  vp2.frame:Hide()
+  c2:slash("settings")
+  _, _, _, _, y = V.vp().content:GetPoint(1)
+  check("defect 2: reopened, the content is back at the top (the first setting visible)", V.scroll() == 0 and y == 0)
+  vp2.body.scripts.OnMouseWheel(vp2.body, -3)
+  vp2.search:SetText("welcome"); vp2.search.scripts.OnTextChanged(vp2.search)
+  _, _, _, _, y = V.vp().content:GetPoint(1)
+  check("defect 2: a search after a scroll starts at the top too", V.scroll() == 0 and y == 0)
+  -- skins: both
+  c2:slash("skin forever")
+  check("the gap holds in the Forever skin", D.bodyTop(true) >= D.style("spacing.pad") + 22 + D.SEARCH_H + 6)
+end
+
 H.finish("settingsview")

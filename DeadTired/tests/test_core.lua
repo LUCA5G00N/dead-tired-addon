@@ -12,7 +12,7 @@ do
   local DT = c.DT
   local ids = {}
   for _, m in ipairs(DT.modules) do ids[#ids + 1] = m.id end
-  check("modules registered in .toc order", table.concat(ids, ",") == "guild,comms,core,ui,settingsview,bar,debug,who")
+  check("modules registered in .toc order", table.concat(ids, ",") == "guild,comms,core,ui,settingsview,bar,debug,who,alts,crypt,recruit,prep,session,migrate")
   check("each module has its own frame", DT.byId.who.frame ~= DT.byId.bar.frame and DT.byId.who.frame ~= nil)
   local help = DT.helpLine()
   local missing = {}
@@ -21,9 +21,9 @@ do
   DT.verb({ verb = "zombie", usage = "zombie walk", fn = function() end })
   check("help is built from the registry: a new verb shows", DT.helpLine():find("zombie walk", 1, true) ~= nil)
   c:slash("")
-  check("/dt alone prints the help line", c:count("/dt ") == 1 and c:said("Dead Tired 0.2.0-fw1:"))
+  check("/dt alone prints the help line", c:count("/dt ") == 1 and c:said("Dead Tired 0.2.0:"))
   c:slash("nonsense verb")
-  check("an unknown verb prints the help line", c:said("Dead Tired 0.2.0-fw1:") ~= nil)
+  check("an unknown verb prints the help line", c:said("Dead Tired 0.2.0:") ~= nil)
   local got
   DT.verb({ verb = "debug", usage = "debug", fn = function(a) got = "debug:" .. a end })
   DT.verb({ verb = "echo", usage = "echo", fn = function(a) got = a end })
