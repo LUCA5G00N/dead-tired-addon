@@ -8,7 +8,8 @@ Owner: Tim (in game: Stromham). Built from briefs in `docs/` by cloud sessions; 
    (`docs/UAT_<slug>.md`). The brief is the authority for the round. Follow its task order,
    stop conditions and reporting exactly.
 2. Read `docs/ROADMAP.md` only for context. Never build a later card inside the current one.
-3. Work on the branch the brief names. Do not merge to `main`; Tim merges after his walk.
+3. Work on the branch the brief names. If the session can only push to its own branch, use that and
+   say so at the top of the report (ruled 2026-11-11). Do not merge to `main`; Tim merges after his walk.
 
 ## The client, and what that rules out
 - **WoW Forever** is classic content on **retail's addon API** (interface **16001** on the beta,
@@ -65,10 +66,13 @@ and do not widen them. A new exception needs its own ruling in a brief.
   are `RealmKey-Full Name`: the realm normalised (AUD-06) and the **full** name with its surname
   (`GetUnitName(unit, true)`; Forever names have one). Messages carry the sender's own key
   (framework round, 2026-11-10).
-- **Libraries** (ruled 2026-11-10): bundle only LibStub, CallbackHandler-1.0, LibDataBroker-1.1,
-  LibDBIcon-1.0, LibSharedMedia-3.0, AceComm-3.0 + ChatThrottleLib, LibSerialize and LibDeflate, in
-  `DeadTired/Libs/`, unmodified, each with its licence and a line in `Libs/README.md`. Another
-  library needs a ruling. DT keeps its own module core.
+- **Libraries** (ruled 2026-11-10, amended 2026-11-11): bundle only LibStub, CallbackHandler-1.0,
+  LibSharedMedia-3.0, AceComm-3.0 + ChatThrottleLib, LibSerialize and LibDeflate, in
+  `DeadTired/Libs/`, unmodified, each with its licence and a line in `Libs/README.md`.
+  **LibDataBroker-1.1 is borrowed, never bundled** (no licence in its source): use it only when
+  another addon has loaded it (`LibStub("LibDataBroker-1.1", true)`); otherwise DT draws its own
+  buttons. **No LibDBIcon** (DT has no minimap button: the bar and the addon compartment instead).
+  Another library needs a ruling. DT keeps its own module core.
 - **Never assign a Blizzard global or hook Blizzard's chat, slash or popup code.** The router sets
   only `SLASH_DEADTIRED*` and `SlashCmdList["DEADTIRED"]` (rc3's `SlashCmdList = SlashCmdList or {}`
   tainted every slash command). A static test enforces it.
