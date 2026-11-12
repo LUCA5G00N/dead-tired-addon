@@ -16,6 +16,10 @@
 -- Fix round 4 (R-F4-5): a master switch (optional = true, the framework's On card, default on).
 -- Off: no events (the framework), inbound messages ignored, nothing sent, nothing printed unasked,
 -- and each verb answers "played.enabled = off" and does nothing else. Off is not a withdrawal.
+-- Ruling (Tim, 12 Nov, on R-F4-5): the sharing toggle always withdraws. Switching played.share off
+-- (on the card or with /dt set) sends PLAYED {off=1} and removes your own entry even while the
+-- module is off: the only send Played makes while off. (The typed /dt slowest share off is a verb
+-- of Played's own, so while off it answers "played.enabled = off" like the others.)
 -- Fix round 4 (R-F4-7): /dt played with sharing off asks the client as before, then says how to
 -- share; nothing is recorded or sent.
 local ADDON, ns = ...
@@ -217,8 +221,7 @@ end
 -- F9: switching sharing off (typed, /dt set or the card) withdraws this character's entry from
 -- guildies' boards: one message, queued as usual.
 local function shareChanged(on)
-  if on then return end
-  if not DT.enabled("played") then return end                          -- guard: off sends nothing (played)
+  if on then return end                                               -- (Tim, 12 Nov: withdraws even while Played is off)
   local me = DT.myKey()
   if me then board()[me] = nil end
   DT.send("PLAYED", { off = "1" })                                     -- guard: withdrawn when sharing off (F9)

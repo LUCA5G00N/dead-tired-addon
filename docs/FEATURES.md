@@ -277,6 +277,9 @@ Ratified by Tim, 12 Nov 14:26 (`docs/COWORK_BRIEF_dt_fixes4.md`).
 - **R-F4-5 Master switches** on Gank, Played, Stash, Events, Logs: the framework's `On` card,
   default on. Off: no events, inbound ignored, nothing sent, nothing printed unasked; a typed verb
   answers `<id>.enabled = off` and does nothing else. Off is not a withdrawal.
+  **Ruled (Tim, 12 Nov): the sharing toggle always withdraws.** Switching Played's sharing off
+  (the card or `/dt set`) sends the PLAYED withdrawal and removes your own entry even while Played
+  is switched off: the only send allowed while the module is off.
 - **R-F4-6 The nudge and `/reload`.** A `/reload` while a post's cooldown runs re-arms the nudge
   for the time left. A fresh login never does. No late line if the cooldown ended during the reload.
 - **R-F4-7 The hint.** `/dt played` with sharing off prints, after asking the client:

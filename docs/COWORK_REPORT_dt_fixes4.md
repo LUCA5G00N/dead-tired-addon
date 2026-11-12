@@ -6,13 +6,14 @@ allows it). Branch point: `main` at `3fbb61f` (merge of the brief, ratified 12 N
 commit this report is in. Nothing merged to `main`; Tim merges after his walk. No `_results.md`
 written.
 
-**Outcome:** every task done except one part of Task 11: the *What every module must do* section
-in `CLAUDE.md` is **not written**, because the design note it copies (`claude/14_addon_design_2026-11-12.md`,
-its *Module template*'s fourteen points) is not in this repository (question 1). No stop
-condition hit. `run_all.sh`: **ALL GREEN, 26 suites, 1319 checks** (baseline 25 suites, 1136).
+**Outcome:** every task done. No stop condition hit. **Follow-ups (Tim, 12 Nov, same branch):**
+(1) Task 11's *What every module must do* is now in `CLAUDE.md`, with the fourteen rules as Tim
+gave them (the design note itself is not in this repo); (2) Tim's ruling that the sharing toggle
+always withdraws: `Played.lua`'s `shareChanged` sends the withdrawal and removes your own entry
+even while Played is off (Task 9, the ruling section below). Report, guard table and zip updated. `run_all.sh`: **ALL GREEN, 26 suites, 1319 checks** (baseline 25 suites, 1136).
 **109 guards proved** (0.3.0's 74, one of them replaced because R-F4-1 reverses it, plus 35 new),
 every file restored byte for byte; two of the new ones needed their tests strengthened (test
-files only, diff below). `dist/DeadTired-0.3.1.zip`: 173,901 bytes, `diff -r` clean.
+files only, diff below). `dist/DeadTired-0.3.1.zip`: 174,053 bytes, `diff -r` clean.
 Nothing was copied from `reference/` this round.
 
 ## Task 1: baseline (G1)
@@ -224,8 +225,9 @@ at once when `DT.enabled(id)` is false; each verb prints `<id>.enabled = off` an
   the board with the grudges intact; inbound heard. The guildie's board keeps a grudge already sent.
 - **played:** `TIME_PLAYED_MSG` unregistered; `PLAYED` inbound (entries and withdrawals) ignored;
   `/dt slowest`, `/dt slowest share on|off`, `/dt slowest share`, `/dt played` answer the line (the
-  client not asked); switching `share` off on the card while off sends **no** withdrawal (question
-  2); the entry already shared stays. On again: events back, inbound heard, the board opens.
+  client not asked); switching Played off withdraws nothing: your own entry stays and no withdrawal
+  is sent. **But switching `share` off (the card or `/dt set`) withdraws even while Played is off**
+  (Tim's ruling, 12 Nov, below). On again: events back, inbound heard, the board opens.
 - **stash:** `PLAYER_ENTERING_WORLD`, `BAG_UPDATE_DELAYED`, `BANKFRAME_OPENED` unregistered;
   `STASHQ` and `STASH` ignored (a late answer not even recorded); an answer already waiting on its
   delay is not sent; the pending bag rescan's timer returns; the bags aren't read; `/dt stash`
@@ -262,6 +264,24 @@ tables, shared; no `fonts`, so the base's Friz Quadrata 14/12/10 apply); `deadti
 
 Run alone on a loaded store it changes `settings.core.skin` and `migrated.skin031` and nothing else
 (a dump compared). Silent: no chat line. A second run refuses.
+
+## Ruling (Tim, 12 Nov): the sharing toggle always withdraws
+Asked as question 2 of the first report. `shareChanged` in `Played.lua` no longer returns when the
+module is off: switching `played.share` off sends `PLAYED {off=1}` and removes your own entry from
+your board, whether Played is on or off. It is the only send Played makes while off. The typed
+`/dt slowest share off` is Played's own verb, so while off it still answers `played.enabled = off`
+and does nothing (R-F4-5); the card and `/dt set played share off` are the paths that withdraw.
+Said in Played's header comment and in `FEATURES.md` under R-F4-5.
+- Check (`test_played`): `played off: switching sharing off still withdraws (PLAYED off=1 sent, your
+  own entry removed)`. The check before it now reads `R-F4-5: off is not a withdrawal: your own
+  entry stays, no withdrawal sent` (switching the module off sends nothing), and `G10 played off:
+  nothing recorded from the client, nothing sent`. These replace the first build's `G10 played off:
+  sends nothing (sharing switched off on the card: no withdrawal sent)` and its `R-F4-5` check,
+  which asserted the opposite. `played` stays at 86 checks.
+- Guard (row 96 below): the gate `if not DT.enabled("played") then return end` put back after
+  `if on then return end` → **red**: the check above. It replaces the first build's guard `played off:
+  sends nothing (no withdrawal from the card)`, whose line is gone. Still 109 guards, all proved, all
+  files restored. 0.3.0's F9 guard (`played withdrawn when sharing off`) is still red too.
 
 ## Task 10: guard proofs (`lua5.1 tools/guard_proofs.lua`)
 Every guard: the line changed once, its suite run, the named checks that went red, the file restored
@@ -414,8 +434,8 @@ Test files only; re-proved, both red. The diff:
 | gank off: /dt gank sends nothing, does nothing else | `Gank.lua` | line removed | test_gank | **red**: G10 gank off: /dt gank prints gank.enabled = off and nothing else; G10 gank off: the verbs did nothing else: no target read, nothing logged, nothing sent, no board; G10 gank off: inbound ignored (+3 more) |
 | gank off: /dt ganks does nothing else | `Gank.lua` | line removed | test_gank | **red**: G10 gank off: /dt ganks prints gank.enabled = off and nothing else; G10 gank off: /dt ganks backstabz prints gank.enabled = off and nothing else; G10 gank off: the verbs did nothing else: no target read, nothing logged, nothing sent, no board |
 | played off: ignores inbound | `Played.lua` | line removed | test_played | **red**: G10 played off: inbound ignored (no entry added, none withdrawn) |
-| played off: sends nothing (no withdrawal from the card) | `Played.lua` | line removed | test_played | **red**: G10 played off: sends nothing (sharing switched off on the card: no withdrawal sent); G10 played off: nothing recorded from the client |
-| played off: /dt slowest does nothing else | `Played.lua` | line removed | test_played | **red**: G10 played off: /dt slowest prints played.enabled = off and nothing else; G10 played off: /dt slowest share off prints played.enabled = off and nothing else; G10 played off: /dt slowest share prints played.enabled = off and nothing else (+2 more) |
+| the sharing toggle withdraws even while Played is off (Tim, 12 Nov) | `Played.lua` | `if on then return end ⏎   if not DT.enabled("played") then return end` | test_played | **red**: played off: switching sharing off still withdraws (PLAYED off=1 sent, your own entry removed) |
+| played off: /dt slowest does nothing else | `Played.lua` | line removed | test_played | **red**: G10 played off: /dt slowest prints played.enabled = off and nothing else; G10 played off: /dt slowest share off prints played.enabled = off and nothing else; G10 played off: /dt slowest share prints played.enabled = off and nothing else (+5 more) |
 | played off: /dt played does nothing else (the client not asked) | `Played.lua` | line removed | test_played | **red**: G10 played off: /dt played prints played.enabled = off and nothing else |
 | stash off: ignores inbound searches | `Stash.lua` | line removed | test_stash | **red**: G10 stash off: inbound not even counted as bad |
 | stash off: ignores inbound answers | `Stash.lua` | line removed | test_stash | **red**: G10 stash off: a late answer is not even recorded |
@@ -432,9 +452,11 @@ Test files only; re-proved, both red. The diff:
 `every guard proved; every file restored`
 
 ## Task 11: docs
-- `CLAUDE.md`: the nudge line amended (R-F4-6). **The section *What every module must do* is not
-  written**: the design note's *Module template* is not in this repo and I won't invent fourteen
-  rules (question 1).
+- `CLAUDE.md`: the nudge line amended (R-F4-6). New section *What every module must do* (before
+  *Tests*): the sentence "New modules meet all of these; an existing module is brought into line
+  only where a brief says so." then the fourteen rules exactly as Tim gave them on 12 Nov (code
+  names in backticks), since the design note isn't in this repo.
+- `docs/FEATURES.md`: under R-F4-5, "Ruled (Tim, 12 Nov): the sharing toggle always withdraws..."
 - `docs/FEATURES.md`: the shell table's viewport row now reads "Escape closes it (R-P2-2, walked 12
   Nov)"; new section *Ruled 12 Nov (for `dt_fixes4`)* with R-F4-1 to R-F4-10 as ratified.
 - `docs/RELEASE_0.3.0.md`: the graveyard line under *Fixed* is now "The graveyard's dates are short
@@ -444,8 +466,8 @@ Test files only; re-proved, both red. The diff:
 
 ## Task 12: version and zip
 `DeadTired.toc` `## Version: 0.3.1`, `DT.VERSION = "0.3.1"`. `sh tools/package.sh` →
-**`dist/DeadTired-0.3.1.zip`, 173,901 bytes**, sha256
-`4f7ab0d0585729f6076d58318937cbcc4fbd8c5803459c1263415162a8bd92f8`, `diff -r: clean`. Older zips
+**`dist/DeadTired-0.3.1.zip`, 174,053 bytes** (rebuilt after the follow-ups), sha256
+`2fb64504930a50768ad97723a502c77998f09dd860bb8dbaeafa2f119ad32aac`, `diff -r: clean`. Older zips
 left in `dist/`. Files: `DeadTired/` with `DeadTired.toc`, `Config.lua`, `Core.lua`, `Keys.lua`,
 `Guild.lua`, `Comms.lua`, `Settings.lua`, `Skins.lua`, `UI.lua`, `SettingsView.lua`, `Bar.lua`,
 `Debug.lua`, `Who.lua`, `Alts.lua`, `Crypt.lua`, `RecruitLines.lua`, `Recruit.lua`, `Prep.lua`,
@@ -469,17 +491,14 @@ LibSerialize, LibDeflate, LibSharedMedia-3.0, each with its licence; `README.md`
 
 ## Anything in the brief that turned out wrong
 - "every guard 0.3.0 proved (75)": 74 (above).
-- Task 11's fourteen points: their source isn't in the repo.
+- Task 11's fourteen points: their source isn't in the repo (Tim supplied them in the follow-up).
 - Task 3's "Any other `DT.list` caller (Prep, the settings view's lists)": there are none.
 - Not wrong, worth knowing: R-F4-1 "re-measured when rows or skin change" needed the bar's painter to
   re-lay the bar too (0.3.0 re-fonted the buttons on a skin change but kept their old widths).
 
 ## Questions for Tim
-1. **The module template.** Paste or commit the fourteen points (`claude/14_addon_design_2026-11-12.md`,
-   *Module template*) and a session can add *What every module must do* to `CLAUDE.md` as Task 11 says.
-2. **Played switched off, then sharing switched off on the card:** R-F4-5's "sends nothing" won, so
-   no withdrawal goes out and the entry stays on guildies' boards until its 30 days. Should sharing
-   off withdraw even while the module is off?
+1. ~~The module template~~: answered (follow-up 1, Task 11).
+2. ~~Played off, then sharing off~~: ruled, the toggle always withdraws (the ruling section).
 3. **The five `On` cards' description** is the framework's default ("Switches <title> on or off. Off,
    it listens to nothing."). Keep it, or give each its own line (saying, say, that off isn't a
    withdrawal)?

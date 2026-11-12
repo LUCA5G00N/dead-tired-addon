@@ -85,6 +85,24 @@ and do not widen them. A new exception needs its own ruling in a brief.
 - `reference/` is **read-only reference**. Never load it from the `.toc`, never edit it.
   Copy patterns from it into `DeadTired/` and say in the report what you copied.
 
+## What every module must do
+New modules meet all of these; an existing module is brought into line only where a brief says so.
+1. Register the one way, through `DT.module`: own id, title and error key; failures recorded.
+2. Have a master switch (the On card). Off, it handles, sends, answers and prints nothing.
+3. Work only inside the guild.
+4. Stay quiet unless a ruling says otherwise.
+5. Make anything personal opt-in, off by default; switching the sharing off withdraws it.
+6. Give every setting a card with a typed equivalent and a description.
+7. Put every command through `/dt` and list it in `/dt help`.
+8. For every window: Escape closes it, its place is remembered, it has an empty-state line, and it
+   says "only guildies running the addon" where the list is shared.
+9. Make text fit (R-F4-1, through `DT.text`), tested.
+10. Show names without realm keys.
+11. Keep saved data under its own key, capped and migrated.
+12. Validate and cap inbound messages; count bad ones.
+13. Let any wait over a minute be shortened for a walk by a debug command, never saved.
+14. Ship offline tests, guard proofs, and a walk-sheet line for every visible thing.
+
 ## Tests
 - Every module has an offline test in `DeadTired/tests/test_<module>.lua`, run with
   `lua5.1 DeadTired/tests/test_<module>.lua` from the repo root. Tests stub the WoW API in the

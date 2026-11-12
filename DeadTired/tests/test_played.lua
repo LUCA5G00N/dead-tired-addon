@@ -367,12 +367,18 @@ do
       and a.requests == req and not (a.DT._played.vp() and a.DT._played.vp():IsShown()))
   end
   check("G10 played off: the typed verb changed nothing", a.DT.get("played", "share") == true)
+  a:fire("TIME_PLAYED_MSG", 999999, 3600)
+  w:advance(5)
+  check("G10 played off: nothing recorded from the client, nothing sent", a.DT.playedBoard()[a:key()] == boardBefore
+    and #sentKind(a, "PLAYED") == sent)
+  check("R-F4-5: off is not a withdrawal: your own entry stays, no withdrawal sent", boardBefore ~= nil
+    and a.DT.playedBoard()[a:key()] == boardBefore)
+  -- Tim, 12 Nov: the sharing toggle always withdraws, even with Played off (its only send while off)
   a.DT.set("played", "share", false)
   w:advance(5)
-  check("G10 played off: sends nothing (sharing switched off on the card: no withdrawal sent)", #sentKind(a, "PLAYED") == sent)
-  check("R-F4-5: off is not a withdrawal: the entry already shared stays", boardBefore ~= nil)
-  a:fire("TIME_PLAYED_MSG", 999999, 3600)
-  check("G10 played off: nothing recorded from the client", a.DT.playedBoard()[a:key()] == boardBefore)
+  local out = sentKind(a, "PLAYED")
+  check("played off: switching sharing off still withdraws (PLAYED off=1 sent, your own entry removed)",
+    #out == sent + 1 and out[#out].off == "1" and a.DT.playedBoard()[a:key()] == nil)
   a:slash("set played enabled on")
   check("G10 played on again: events back", m.frame.events.TIME_PLAYED_MSG)
   inject(a, K2 .. "Turtle Shell", { h = "93.7", lvl = "34" })
