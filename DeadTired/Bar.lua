@@ -279,7 +279,8 @@ local function button(i)
   b.icon = b:CreateTexture(nil, "ARTWORK")
   b.icon:SetSize(16, 16)
   b.icon:SetPoint("LEFT", b, "LEFT", 2, 0)
-  b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  -- fix round 4: a label (one line, unbounded): the button is sized from its text
+  b.text = DT.text(b, "label", { role = "small", inset = 22 })
   b.text:SetPoint("LEFT", b.icon, "RIGHT", 4, 0)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   b:SetScript("OnClick", function(self, which)
@@ -311,6 +312,7 @@ end
 
 local function build()
   bar = CreateFrame("Frame", "DeadTiredBar", UIParent, "BackdropTemplate")
+  bar.dtWindow = "bar"
   bar:SetHeight(DT.style("spacing.barHeight"))
   bar:SetFrameStrata("MEDIUM")
   bar:Hide()
@@ -318,7 +320,7 @@ local function build()
   DT.draggable(bar, "bar")
   DT.skin(function()
     DT.paint(bar, true)
-    for _, b in ipairs(buttons) do DT.fontTo(b.text, "small") end
+    if refresh then refresh() end         -- fix round 4: the buttons re-sized to the new lettering
   end)
 end
 
@@ -331,8 +333,8 @@ refresh = function()
     b.entry = e
     local o = e.obj
     b.icon:SetTexture(o.icon or ICON)
-    b.text:SetText(e.own and DT.safe(o.text or o.label or e.name, 40) or DT.barText(o.text or o.label or e.name, 40))
-    DT.fontTo(b.text, "small")
+    DT.setText(b.text, e.own and DT.safe(o.text or o.label or e.name, 40) or DT.barText(o.text or o.label or e.name, 40))
+    DT.fontTo(b.text, "small")            -- fonted before it is measured (the bar repaints before its labels)
     local w = 24 + math.max(8, (b.text:GetStringWidth() or 40))
     b:SetWidth(w)
     b:ClearAllPoints()
@@ -427,6 +429,10 @@ DT.module({
     { verb = "bar add", usage = "bar add <name>", fn = tickVerb(true) },
     { verb = "bar remove", usage = "bar remove <name>", fn = tickVerb(false) },
     { verb = "bar move", usage = "bar move <name> <n>", fn = moveVerb } },
+  fit = function()
+    if not bar then build() end
+    refresh()
+  end,
   init = function()
     DT.object("DeadTired", { type = "launcher", text = "Dead Tired", label = "Dead Tired", icon = ICON,
       OnClick = function(_, which) DT.openSettings(which == "RightButton" and "bar" or nil) end,

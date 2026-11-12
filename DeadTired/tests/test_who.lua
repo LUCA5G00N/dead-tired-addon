@@ -52,7 +52,7 @@ do
   check("the second hears the first's answer", names(b) == "Stromham Hamson/this session")
   check("the first hears the second's login hello", names(a) == "Lilbit High/this session")
   check("each lists the other once, never itself", #others(a) == 1 and #others(b) == 1)
-  check("version shown", others(a)[1].v == "0.3.0")
+  check("version shown", others(a)[1].v == "0.3.1")
   check("the bar object: DT: 1 online", a.DT.objects[2].obj.text == "DT: 1 online" and a.DT.whoCount() == 1)
   check("no reply storm: one login hello and one answer from the first", kinds(a).HELLO == 2 and kinds(b).HELLO == 1)
 end
@@ -172,7 +172,7 @@ do
   a:login()
   local rows = a.DT.whoRows()
   check("R-P6: you are listed first, marked (you)", rows[1] and rows[1].you and rows[1].name == "Stromham Hamson (you)"
-    and rows[1].v == "0.3.0")
+    and rows[1].v == "0.3.1")
   local mine = 0
   for _, r in ipairs(rows) do if a.DT.sameKey(r.key, a:key()) then mine = mine + 1 end end
   check("R-P6: your own entry exactly once, saved copies of you never doubled", mine == 1 and #rows == 1)
@@ -212,7 +212,18 @@ do
     if f.row.name:find("Bartholomew", 1, true) then tall = f end
     prev = f
   end
-  check("rows: a wrapped name makes its row taller", tall and tall.h > 18)
+  -- fix round 4 (R-F4-1): rows are one line and one height; a long name is cut with "…" and
+  -- shown in full in the row's tooltip (after the Who list's own lines)
+  local cell = tall and tall.cells[1]
+  local same = true
+  for _, f in ipairs(shownRows) do if f.h ~= shownRows[1].h then same = false end end
+  check("R-F4-1: a long name stays on one line, cut with \"…\"", cell and cell.text:sub(-3) == "\226\128\166"
+    and cell:GetStringWidth() <= cell.w and cell:GetStringHeight() <= 12)
+  check("R-F4-1: every row the same height", same and tall.h == 18)
+  tall.scripts.OnEnter(tall)
+  local tl = a.DT._tooltip.lines
+  check("R-F4-1: the cut name in full in the tooltip, after the list's own lines",
+    tl[#tl] == "Bartholomew Wolfgangus Featherstonehaughsmythe" and tl[#tl - 1] == "Dead Tired 0.2.0")
   check("rows: no row starts inside the one above", not overlap and #shownRows >= 4)
 end
 

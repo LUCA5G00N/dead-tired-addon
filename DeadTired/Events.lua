@@ -5,6 +5,9 @@
 -- event a row, "Times are server time." under it). EventsList.lua is rc3's, byte for byte.
 -- R4 (a ruled "prints unasked" exception): reminders print only once switched on: 30 minutes
 -- before an event, and at its start (up to 10 minutes late), once per occurrence.
+-- Fix round 4 (R-F4-5): a master switch (optional = true, the framework's On card, default on).
+-- Off: no events (the framework), inbound messages ignored, nothing sent, nothing printed unasked,
+-- and each verb answers "events.enabled = off" and does nothing else. Off is not a withdrawal.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -78,20 +81,20 @@ end
 
 local vp, list, model
 
+-- Fix round 4: "Times are server time." is the viewport's footer; "when" takes the rest of the
+-- width (cut with "…", in full in the row's tooltip, which this list has only for a cut row).
+local function build()
+  if vp then return end
+  model = DT.listModel()
+  vp = DT.viewport({ id = "events", title = "Events", search = true, width = 440, height = 260, footer = NOTE,
+    onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+  list = DT.list(vp.body, model, { count = 10,
+    empty = function(m) if #m.rows == 0 then return NONE end end,
+    columns = { { key = "name", width = 190 }, { key = "when", flex = true, colour = "muted" } } })
+end
+
 local function view(rows)
-  if not vp then
-    model = DT.listModel()
-    vp = DT.viewport({ id = "events", title = "Events", search = true, width = 440, height = 260, footer = 16,
-      onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-    local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
-    note:SetText(NOTE)
-    vp.note = note
-    DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 10,
-      empty = function(m) if #m.rows == 0 then return NONE end end,
-      columns = { { key = "name", width = 190 }, { key = "when", width = 200, colour = "muted" } } })
-  end
+  build()
   model:set(rows)
   list:refresh()
   vp:Show()
@@ -131,13 +134,23 @@ local function tick()
   end
 end
 
+-- The minute ticker. Off, its callback returns at once and the ticker stops; switching back on
+-- (or the next entering the world) starts it again.
+local looping, entered = false, false
 local function loop()
+  if not DT.enabled("events") then looping = false return end          -- guard: off, the reminder ticker stops (events)
   local ok, err = pcall(tick)
   if not ok then DT.fail("events", "tick", err) end
   DT.after(TICK, loop)
 end
+local function start()
+  if looping then return end
+  looping = true
+  DT.after(TICK, loop)
+end
 
 local function verb(args)
+  if not DT.enabled("events") then return DT.out("events.enabled = off") end   -- guard: off verbs do nothing else (events)
   local w = (args or ""):lower():gsub("%s+", " ")
   if w == "" then return show()
   elseif w == "remind on" then
@@ -152,10 +165,12 @@ local function verb(args)
   return DT.out("/dt events, or /dt events remind on/off")
 end
 
-local entered = false
 DT.module({
   id = "events",
   title = "Events",
+  optional = true,
+  onEnable = function() if entered then start() end end,
+  fit = function() build(); model:set(DT.eventRows() or {}); list:refresh() end,
   settings = {
     { key = "remind", type = "bool", default = false, label = "Reminders", verb = "events remind on|off",
       desc = "One line in chat 30 minutes before each event on the list, and one at its start. Off until you switch it on." },
@@ -163,9 +178,8 @@ DT.module({
   verbs = { { verb = "events", usage = "events [remind on/off]", fn = verb } },
   events = {
     PLAYER_ENTERING_WORLD = function()
-      if entered then return end
       entered = true
-      DT.after(TICK, loop)
+      start()
     end,
   },
 })

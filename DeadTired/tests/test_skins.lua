@@ -12,8 +12,28 @@ check("loads and logs in under the default skin without an error", okLoad)
 if not okLoad then print("  " .. tostring(errLoad)); H.finish("skins") end
 local DT = c.DT
 
-check("two skins ship: forever and deadtired", DT.skins.forever and DT.skins.deadtired and DT.skins.forever.title == "Forever")
-check("the default skin is deadtired", DT.skinName() == "deadtired")
+check("three skins ship: clean, deadtired and forever", DT.skins.forever and DT.skins.deadtired and DT.skins.clean
+  and DT.skins.forever.title == "Forever")
+-- fix round 4 (R-F4-3)
+check("R-F4-3: the default skin is clean (a fresh account, nothing saved)", DT.skinName() == "clean"
+  and DT.get("core", "skin") == "clean")
+check("R-F4-3: clean is shown as \"Dead Tired\", deadtired as \"Dead Tired Gothic\"", DT.skins.clean.title == "Dead Tired"
+  and DT.skins.deadtired.title == "Dead Tired Gothic")
+local same = true
+for _, part in ipairs({ "colours", "textures", "spacing" }) do
+  for k in pairs(DT.skins.deadtired[part]) do
+    if DT.style(part .. "." .. k, "clean") ~= DT.style(part .. "." .. k, "deadtired") then same = false end
+  end
+end
+check("R-F4-3: clean has deadtired's colours, textures and spacing", same)
+check("R-F4-3: clean names no fonts: the game's Friz Quadrata throughout, titles included", DT.skins.clean.fonts == nil
+  and (DT.font("title", "clean")) == [[Fonts\FRIZQT__.TTF]] and (DT.font("body", "clean")) == [[Fonts\FRIZQT__.TTF]]
+  and (DT.font("small", "clean")) == [[Fonts\FRIZQT__.TTF]])
+check("R-F4-3: the gothic skin keeps its Morpheus titles", (DT.font("title", "deadtired")) == [[Fonts\MORPHEUS_CYR.TTF]])
+local sk = DT.setting("core", "skin")
+check("R-F4-3: choices clean, deadtired, forever; typed /dt skin clean|deadtired|forever",
+  table.concat(sk.choices, ",") == "clean,deadtired,forever" and sk.verb == "skin clean|deadtired|forever")
+check("R-F4-8: the skin card's description", sk.desc == "How every Dead Tired window and the bar look: Dead Tired (the guild's colours, plain lettering), Dead Tired Gothic (the same, with gothic titles) or Forever (the game's stone and metal).")
 check("colours differ by skin", DT.style("colours.bg", "deadtired")[1] ~= DT.style("colours.bg", "forever")[1])
 local r, g, b = DT.colour("text", "deadtired")
 check("Dead Tired text is bone, not white", r < 1 and g < 1 and b < r)
@@ -51,6 +71,10 @@ check("its title font follows", vp.title.font[1] == [[Fonts\FRIZQT__.TTF]])
 c:slash("skin deadtired")
 check("and back", runs == 3 and vp.frame.backdrop.edgeFile == [[Interface\Buttons\WHITE8X8]]
   and vp.title.font[1] == [[Fonts\MORPHEUS_CYR.TTF]])
+c:slash("skin clean")
+check("R-F4-3: /dt skin clean: the guild's edges, plain titles", runs == 4 and vp.frame.backdrop.edgeFile == [[Interface\Buttons\WHITE8X8]]
+  and vp.title.font[1] == [[Fonts\FRIZQT__.TTF]] and c:said("core.skin = clean") ~= nil)
+runs = 3
 DT.skin(function() error("bad brush") end)
 c:slash("skin forever")
 check("a failing painter is counted, the others still run", runs == 4 and (c:db().errors.skin or 0) >= 1)

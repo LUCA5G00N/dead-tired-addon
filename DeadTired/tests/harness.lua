@@ -124,14 +124,21 @@ function Frame:StartMoving() self.moving = true end
 function Frame:StopMovingOrSizing() self.moving = false end
 function Frame:SetText(t) self.text = t end
 function Frame:GetText() return self.text end
-function Frame:GetStringWidth() return #(tostring(self.text or "")) * 6 end
--- Wrapped height (Port 1): 6 px a character, 12 px a line, wrapped at the width when one is set.
+-- Text metrics (fix round 4: font-aware). A character (a UTF-8 character, not a byte) is half the
+-- font's size wide, a line is the font's size tall; with no font set, 12 (so 6 px a character and
+-- 12 px a line, as before). A string with word wrap off is one line; otherwise it wraps at its
+-- width when one is set.
+local function chars(s) return #(s:gsub("[\128-\191]", "")) end
+local function fontSize(f) return (f.font and tonumber(f.font[2])) or 12 end
+function Frame:GetStringWidth() return chars(tostring(self.text or "")) * fontSize(self) / 2 end
 function Frame:GetStringHeight()
-  local n = #(tostring(self.text or ""))
+  local n = chars(tostring(self.text or ""))
   if n == 0 then return 0 end
-  if not self.w or self.w <= 0 then return 12 end
-  return math.ceil(n * 6 / self.w) * 12
+  local size = fontSize(self)
+  if self.wordWrap == false or not self.w or self.w <= 0 then return size end
+  return math.ceil(n * size / 2 / self.w) * size
 end
+function Frame:SetWordWrap(v) self.wordWrap = v and true or false end
 function Frame:SetChecked(v) self.checked = v and true or false end
 function Frame:GetChecked() return self.checked end
 function Frame:GetName() return self._name end

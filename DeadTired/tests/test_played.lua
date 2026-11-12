@@ -178,7 +178,7 @@ do
   local vp, L = a.DT._played.vp(), a.DT._played.list()
   check("no contenders: rc3's empty line printed, and in the board", a.printed[1] == P .. EMPTY and #a.printed == 1
     and vp:IsShown() and L.empty.shown and L.empty.text == EMPTY)
-  check("the closing line under the board", vp.note.text == CLOSING)
+  check("the closing line under the board", vp.footer.text == CLOSING)
   check("the board is a DT viewport: Escape closes it (R-P2-2)", vp.name == "DeadTiredViewport_slowest")
   local function ing(name, lvl, h) inject(a, K2 .. name, { h = h, lvl = tostring(lvl) }) end
   ing("Sloth Slow", 10, "50.0")      -- 5.0 h/level
@@ -287,6 +287,98 @@ do
   local db2 = { schema = 3, played = { badPlayed = 0, board = { [K2 .. "Old One"] = { lvl = 30, hours = 100, t = now - 31 * 86400 } } } }
   local x = mk(w, { name = "Wight", full = "Wight Pale", db = db2, setup = function(c) rawset(c.env, "time", function() error("no clock") end) end })
   check("F9: with no readable clock nothing is dropped", x.DT.playedBoard()[K2 .. "Old One"] ~= nil)
+end
+
+
+-- ---------------------------------------------------------------- fix round 4: the board's text (G5, G8)
+do
+  local w = H.world()
+  local a = mk(w, { name = "Stromham", full = "Stromham Hamson" })
+  a:login()
+  inject(a, K2 .. "Turtle Shell", { h = "93.7", lvl = "34" })
+  a:slash("slowest")
+  local vp, L = a.DT._played.vp(), a.DT._played.list()
+  local pad = a.DT.style("spacing.pad")
+  check("G5 the slowest board's footer wraps inside the window's width (defect 2)", vp.footer.w == 420 - 2 * pad
+    and vp.footer:GetStringWidth() > vp.footer.w and vp.footerH == 20 and a.DT.textRecord(vp.footer).boxH == 20)
+  local bottom
+  for _, p in ipairs(vp.body.points) do if p[1] == "BOTTOMRIGHT" then bottom = p[5] end end
+  check("G5 ...and the board ends above all of it", bottom == pad + 20)
+  local cols = {}
+  for _, c in ipairs(L.columns) do cols[c.key] = c end
+  check("defect 2: \"93.7 h played\" on one line, not cut", L.rows[1].cells[5].text == "93.7 h played"
+    and L.rows[1].cells[5]:GetStringWidth() <= cols.hoursText.w)
+  check("R-F4-1: n, rate, level and hours fixed; the name the one flex column", cols.n.fixed and cols.rateText.fixed
+    and cols.lvlText.fixed and cols.hoursText.fixed and cols.name.flex and cols.name.w >= 60)
+  local tt = a.DT.tooltip()
+  tt.lines = {}
+  L.rows[1].scripts.OnEnter(L.rows[1])
+  check("G8 the tooltip is the name only: no realm line (defect 4)", #tt.lines == 1 and tt.lines[1] == "Turtle Shell")
+end
+
+-- ---------------------------------------------------------------- fix round 4: the hint (R-F4-7)
+do
+  local HINT = "Sharing's off. /dt slowest share on"
+  local w = H.world()
+  local a = mk(w, { name = "Stromham", full = "Stromham Hamson" })
+  local b = mk(w, { name = "Echo", full = "Echo Nightclaw" })
+  a:login(); b:login(); w:advance(10)
+  check("R-F4-7: the line, exactly", a.DT._played.HINT == HINT)
+  local sent = #sentKind(a, "PLAYED")
+  dtPlayed(a, 360000, 3600)
+  w:advance(5)
+  check("G10 /dt played with sharing off: the client asked as now, then the hint", a.requests == 1 and #a.printed == 1
+    and a.printed[1] == P .. HINT)
+  check("G10 ...and nothing sent, nothing recorded", #sentKind(a, "PLAYED") == sent and next(a.DT.playedBoard()) == nil
+    and next(b.DT.playedBoard()) == nil)
+  a:slash("slowest share on")
+  dtPlayed(a, 360000, 3600)
+  check("R-F4-7: sharing on: no hint", a:count(HINT) == 0 and a.requests == 2)
+  local na = mk(w, { name = "Nob", full = "Nob Body", noRequest = true })
+  na:login()
+  na:slash("played")
+  check("R-F4-7: a client that won't say: its line, then the hint", na.printed[1] == P .. a.DT._played.NO_CLIENT
+    and na.printed[2] == P .. HINT)
+end
+
+-- ---------------------------------------------------------------- fix round 4: the master switch (R-F4-5, G10)
+do
+  local OFF = "played.enabled = off"
+  local w = H.world()
+  local a = mk(w, { name = "Stromham", full = "Stromham Hamson" })
+  a:login()
+  local m = a.DT.byId.played
+  check("G10 played: an On card, default on", m.optional and a.DT.setting("played", "enabled").label == "On"
+    and a.DT.enabled("played") and m.frame.events.TIME_PLAYED_MSG)
+  a:slash("slowest share on")
+  dtPlayed(a, 360000, 3600)
+  check("on: on the board", a.DT.playedBoard()[a:key()] ~= nil)
+  w:advance(5)
+  a:slash("set played enabled off")
+  check("G10 played off: registers no events", not m.frame.events.TIME_PLAYED_MSG)
+  local sent, boardBefore = #sentKind(a, "PLAYED"), a.DT.playedBoard()[a:key()]
+  inject(a, K2 .. "Turtle Shell", { h = "93.7", lvl = "34" })
+  inject(a, a:key(), { off = "1" })
+  check("G10 played off: inbound ignored (no entry added, none withdrawn)", a.DT.playedBoard()[K2 .. "Turtle Shell"] == nil)
+  for _, v in ipairs({ "slowest", "slowest share off", "slowest share", "played" }) do
+    local req = a.requests
+    a:slash(v)
+    check("G10 played off: /dt " .. v .. " prints " .. OFF .. " and nothing else", #a.printed == 1 and a.printed[1] == P .. OFF
+      and a.requests == req and not (a.DT._played.vp() and a.DT._played.vp():IsShown()))
+  end
+  check("G10 played off: the typed verb changed nothing", a.DT.get("played", "share") == true)
+  a.DT.set("played", "share", false)
+  w:advance(5)
+  check("G10 played off: sends nothing (sharing switched off on the card: no withdrawal sent)", #sentKind(a, "PLAYED") == sent)
+  check("R-F4-5: off is not a withdrawal: the entry already shared stays", boardBefore ~= nil)
+  a:fire("TIME_PLAYED_MSG", 999999, 3600)
+  check("G10 played off: nothing recorded from the client", a.DT.playedBoard()[a:key()] == boardBefore)
+  a:slash("set played enabled on")
+  check("G10 played on again: events back", m.frame.events.TIME_PLAYED_MSG)
+  inject(a, K2 .. "Turtle Shell", { h = "93.7", lvl = "34" })
+  a:slash("slowest")
+  check("G10 played on again: inbound heard, the board opens", a.DT.playedBoard()[K2 .. "Turtle Shell"] ~= nil
+    and a.DT._played.vp():IsShown() and not a:said(OFF))
 end
 
 H.finish("played")

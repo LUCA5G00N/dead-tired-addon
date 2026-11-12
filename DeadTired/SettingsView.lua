@@ -81,9 +81,9 @@ local function listSub(r, i)
     sub.grip = CreateFrame("Button", nil, sub)
     sub.grip:SetSize(14, ITEM_H - 4)
     sub.grip:SetPoint("LEFT", sub, "LEFT", 0, 0)
-    sub.grip.text = sub.grip:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sub.grip.text = DT.text(sub.grip, "line", { colour = "muted", width = 14, justify = "CENTER" })
     sub.grip.text:SetPoint("CENTER", sub.grip, "CENTER", 0, 0)
-    sub.grip.text:SetText("=")
+    DT.setText(sub.grip.text, "=")
     sub.grip:RegisterForDrag("LeftButton")
     sub.grip:SetScript("OnDragStart", function()
       r.dragging = sub.item and sub.item.name
@@ -110,10 +110,8 @@ local function listSub(r, i)
     end)
     x = x + 22
   end
-  sub.label = sub:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  sub.label = DT.text(sub, "line", { width = textWidth() - x })
   sub.label:SetPoint("LEFT", sub, "LEFT", x, 0)
-  sub.label:SetWidth(textWidth() - x)
-  sub.label:SetJustifyH("LEFT")
   if s.remove then
     sub.remove = CreateFrame("Button", nil, sub, "UIPanelButtonTemplate")
     sub.remove:SetSize(60, 18)
@@ -133,10 +131,6 @@ local function listSub(r, i)
     tt:Show()
   end)
   sub:SetScript("OnLeave", function() if DT._tooltip then DT._tooltip:Hide() end end)
-  DT.skin(function()
-    DT.fontTo(sub.label, "body")
-    if sub.grip then DT.fontTo(sub.grip.text, "body", "muted") end
-  end)
   r.subs[i] = sub
   return sub
 end
@@ -152,14 +146,16 @@ syncList = function(r)
     sub:ClearAllPoints()
     sub:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 0, -y)
     sub:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", 0, -y)
-    sub.label:SetText(DT.safe(it.label or it.name, 60))
+    DT.setText(sub.label, DT.safe(it.label or it.name, 60))
     if sub.tick then sub.tick:SetChecked(it.on and true or false) end
     sub:Show()
     y = y + ITEM_H
   end
   for i = #items + 1, #r.subs do r.subs[i].item = nil; r.subs[i]:Hide() end
   if r.empty then
-    if #items == 0 and s.empty then r.empty:SetText(s.empty); r.empty:Show() else r.empty:Hide() end
+    if #items == 0 and s.empty then
+      DT.setText(r.empty, s.empty); DT.textHeight(r.empty, textWidth()); r.empty:Show()
+    else r.empty:Hide() end
   end
   local n = #items
   if n == 0 and s.empty then n = 1 end
@@ -293,41 +289,30 @@ local function build()
     if reg and #reg.list > 0 then
       local h = { header = true, frame = CreateFrame("Frame", nil, content) }
       h.frame:SetHeight(CARD_H)
-      h.text = h.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+      h.text = DT.text(h.frame, "line", { role = "title", width = rowWidth() + 8 })
       h.text:SetPoint("LEFT", h.frame, "LEFT", 0, 0)
-      h.text:SetText(m.title)
-      DT.skin(function() DT.fontTo(h.text, "title") end)
+      DT.setText(h.text, m.title)
       rows[#rows + 1] = h
       local hi = #rows
       for _, s in ipairs(reg.list) do
         local r = { setting = s, headerIndex = hi, frame = CreateFrame("Frame", nil, content), subs = {}, items = 0 }
-        r.label = r.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        -- fix round 4: the label is a line, the description and the hint are blocks (R-F4-1)
+        r.label = DT.text(r.frame, "line", { width = textWidth() })
         r.label:SetPoint("TOPLEFT", r.frame, "TOPLEFT", 0, -2)
-        r.label:SetJustifyH("LEFT")
-        r.label:SetText(s.label)
-        r.desc = r.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        DT.setText(r.label, s.label)
+        r.desc = DT.text(r.frame, "block", { role = "small", colour = "muted", width = textWidth() })
         r.desc:SetPoint("TOPLEFT", r.label, "BOTTOMLEFT", 0, -2)
-        r.desc:SetJustifyH("LEFT")
-        if r.desc.SetWordWrap then r.desc:SetWordWrap(true) end
-        r.desc:SetText(s.desc)
-        r.hint = r.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        DT.setText(r.desc, s.desc)
+        r.hint = DT.text(r.frame, "block", { role = "small", colour = "accent", width = rowWidth() })
         r.hint:SetPoint("TOPLEFT", r.desc, "BOTTOMLEFT", 0, -2)
-        r.hint:SetJustifyH("LEFT")
-        if r.hint.SetWordWrap then r.hint:SetWordWrap(true) end
-        r.hint:SetText(hint(s))
+        DT.setText(r.hint, hint(s))
         if s.type == "list" then
-          r.empty = r.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+          r.empty = DT.text(r.frame, "block", { role = "small", colour = "muted", width = textWidth() })
           r.empty:SetPoint("TOPLEFT", r.hint, "BOTTOMLEFT", 0, -6)
           r.empty:Hide()
-          DT.skin(function() DT.fontTo(r.empty, "small", "muted") end)
         end
         r.control = control(r, r.frame)
         if r.control then r.control:SetPoint("TOPRIGHT", r.frame, "TOPRIGHT", -4, -2) end
-        DT.skin(function()
-          DT.fontTo(r.label, "body")
-          DT.fontTo(r.desc, "small", "muted")
-          DT.fontTo(r.hint, "small", "accent")
-        end)
         r.search = searchText(s)
         rows[#rows + 1] = r
         searchRows[#searchRows + 1] = r
@@ -335,6 +320,8 @@ local function build()
     end
   end
   model:set(searchRows)
+  -- fix round 4: a new skin re-measures every card (the text helper has re-fonted it first)
+  DT.skin(function() if content then layout() end end)
 end
 
 function DT.openSettings(query)
@@ -356,9 +343,11 @@ DT.listen("setting", function() if vp and vp:IsShown() then layout() end end)
 -- The game's Settings -> AddOns page: a stub that opens DT's own viewport.
 local function blizzardPage()
   local panel = CreateFrame("Frame", "DeadTiredSettingsPanel")
-  local t = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  panel.dtWindow = "settingspage"
+  -- the game's own page: its lettering stays the game's (fixedFont), one line as wide as the button
+  local t = DT.text(panel, "line", { fixedFont = true, template = "GameFontNormalLarge", width = 200 })
   t:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
-  t:SetText("Dead Tired")
+  DT.setText(t, "Dead Tired")
   local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   b:SetSize(200, 24)
   b:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, -12)
@@ -383,6 +372,7 @@ DT.module({
   id = "settingsview",
   title = "Settings window",
   init = blizzardPage,
+  fit = function() if not vp then build() end; layout() end,
   verbs = {
     { verb = "settings", usage = "settings", fn = function(args) DT.openSettings(args) end },
   },

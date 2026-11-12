@@ -44,9 +44,9 @@ DT.module({
   id = "core",
   title = "Dead Tired",
   settings = {
-    { key = "skin", type = "choice", choices = { "deadtired", "forever" }, default = "deadtired",
-      label = "Skin", verb = "skin forever|deadtired",
-      desc = "How every Dead Tired window and the bar look: Dead Tired (the guild's) or Forever (the game's stone and metal)." },
+    { key = "skin", type = "choice", choices = { "clean", "deadtired", "forever" }, default = "clean",
+      label = "Skin", verb = "skin clean|deadtired|forever",
+      desc = "How every Dead Tired window and the bar look: Dead Tired (the guild's colours, plain lettering), Dead Tired Gothic (the same, with gothic titles) or Forever (the game's stone and metal)." },
     { key = "windows", type = "position", label = "Window places",
       desc = "Each Dead Tired window stays where you drag it, through reloads.",
       noVerb = "drag a window by its title to move it" },
@@ -55,7 +55,7 @@ DT.module({
     { verb = "help", usage = "help", fn = function() DT.help() end },
     { verb = "set", usage = "set <module> <key> <value>", fn = setVerb },
     { verb = "get", usage = "get <module> [key]", fn = getVerb },
-    { verb = "skin", usage = "skin forever|deadtired", fn = function(args)
+    { verb = "skin", usage = "skin clean|deadtired|forever", fn = function(args)
         return setVerb("core skin " .. (args ~= "" and args or "?"))
       end },
   },

@@ -3,8 +3,10 @@
 -- LibSharedMedia key, so other addons' media can be used later; a raw path stands behind each one
 -- for when LibSharedMedia (or the key) is missing.
 --   forever:   the game's stone and metal: dark dialog stone, the dialog border, gold titles.
---   deadtired: gothic: deep green-black, bone text, a sickly green accent, Morpheus titles.
---              A first palette, for Tim to curate from screenshot marks.
+--   deadtired: shown as "Dead Tired Gothic": deep green-black, bone text, a sickly green accent,
+--              Morpheus titles. A first palette, for Tim to curate from screenshot marks.
+--   clean:     shown as "Dead Tired" (fix round 4, R-F4-3; the default): the deadtired colours,
+--              textures and spacing with the game's own lettering (Friz Quadrata) throughout.
 -- A skin need not name everything: what it leaves out comes from forever (the base).
 local ADDON, ns = ...
 local DT = ns.DT
@@ -15,6 +17,19 @@ if LSM then
   LSM:Register("background", "Dead Tired Flat", FLAT)
   LSM:Register("border", "Dead Tired Edge", FLAT)
 end
+
+local DT_COLOURS = {
+  bg = { 0.04, 0.07, 0.05, 0.94 }, border = { 0.42, 0.58, 0.20, 1 },
+  title = { 0.62, 0.80, 0.22, 1 }, text = { 0.89, 0.85, 0.74, 1 }, muted = { 0.60, 0.58, 0.50, 1 },
+  accent = { 0.62, 0.80, 0.22, 1 }, row = { 0.89, 0.85, 0.74, 0.05 }, rowHover = { 0.62, 0.80, 0.22, 0.18 },
+  input = { 0, 0, 0, 0.6 },
+}
+local DT_TEXTURES = {
+  background = { "Dead Tired Flat", FLAT },
+  border     = { "Dead Tired Edge", FLAT },
+  barBorder  = { "Dead Tired Edge", FLAT },
+}
+local DT_SPACING = { edge = 1, inset = 1, barEdge = 1, barInset = 1 }
 
 DT.skins = {
   forever = {
@@ -38,28 +53,28 @@ DT.skins = {
     spacing = { pad = 14, gap = 6, row = 18, edge = 24, inset = 6, barEdge = 12, barInset = 3, barHeight = 24 },
   },
   deadtired = {
-    title = "Dead Tired",
-    colours = {
-      bg = { 0.04, 0.07, 0.05, 0.94 }, border = { 0.42, 0.58, 0.20, 1 },
-      title = { 0.62, 0.80, 0.22, 1 }, text = { 0.89, 0.85, 0.74, 1 }, muted = { 0.60, 0.58, 0.50, 1 },
-      accent = { 0.62, 0.80, 0.22, 1 }, row = { 0.89, 0.85, 0.74, 0.05 }, rowHover = { 0.62, 0.80, 0.22, 0.18 },
-      input = { 0, 0, 0, 0.6 },
-    },
+    title = "Dead Tired Gothic",
+    colours = DT_COLOURS,
     fonts = {
       title = { "Morpheus", [[Fonts\MORPHEUS.TTF]], 16, "" },
     },
-    textures = {
-      background = { "Dead Tired Flat", FLAT },
-      border     = { "Dead Tired Edge", FLAT },
-      barBorder  = { "Dead Tired Edge", FLAT },
-    },
-    spacing = { edge = 1, inset = 1, barEdge = 1, barInset = 1 },
+    textures = DT_TEXTURES,
+    spacing = DT_SPACING,
+  },
+  -- no fonts table: the base's (Friz Quadrata) apply
+  clean = {
+    title = "Dead Tired",
+    colours = DT_COLOURS,
+    textures = DT_TEXTURES,
+    spacing = DT_SPACING,
   },
 }
 
 local BASE = "forever"
 
+-- DT.fitSkin: /dt debug fit's in-memory skin (UI.lua), set only while it checks; never saved.
 function DT.skinName()
+  if DT.fitSkin and DT.skins[DT.fitSkin] then return DT.fitSkin end
   local n = DT.get and DT.get("core", "skin")
   if type(n) == "string" and DT.skins[n] then return n end
   return BASE

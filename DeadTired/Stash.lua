@@ -12,6 +12,9 @@
 -- is sent except an answer to a guildie's search: matching items only, at most 4. A search term
 -- is matched as plain text, never as a Lua pattern. Switching sharing off deletes the list.
 -- Fix round 1: F8b, the search id is time() % 1000000; F6d, one search per asker per 30 s.
+-- Fix round 4 (R-F4-5): a master switch (optional = true, the framework's On card, default on).
+-- Off: no events (the framework), inbound messages ignored, nothing sent, nothing printed unasked,
+-- and each verb answers "stash.enabled = off" and does nothing else. Off is not a withdrawal.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -91,6 +94,7 @@ local function scan(ids)
 end
 
 local function canScan()
+  if not DT.enabled("stash") then return false end                               -- off: the bags aren't read
   if not sharing() then return false end                                         -- guard: share gate on scanning
   return DT.isMember()
 end
@@ -123,7 +127,11 @@ local function bagUpdate()
   if lastScan and t - lastScan < SCAN_GAP then
     if not pendingScan then
       pendingScan = true
-      DT.after(SCAN_GAP - (t - lastScan), function() pendingScan = false; lastScan = DT.now(); scanBags() end)
+      DT.after(SCAN_GAP - (t - lastScan), function()
+        pendingScan = false
+        if not DT.enabled("stash") then return end
+        lastScan = DT.now(); scanBags()
+      end)
     end
     return
   end
@@ -203,6 +211,7 @@ local function isTerm(s) return type(s) == "string" and #s >= 3 and #s <= 32 end
 local lastAsk = {}
 
 DT.on("STASHQ", function(from, f)
+  if not DT.enabled("stash") then return end                                     -- guard: off ignores inbound (stash)
   local s = store()
   if not isQ(f.q) or not isTerm(f.term) then s.badStash = s.badStash + 1 return end
   if not sharing() then return end                                               -- guard: share gate on answering (opt-in)
@@ -217,6 +226,7 @@ DT.on("STASHQ", function(from, f)
   answered[key] = true
   local q, term = f.q, f.term
   DT.after(DELAY_MIN + math.random() * DELAY_SPREAD, function()
+    if not DT.enabled("stash") then return end                                   -- guard: off sends nothing (stash)
     if not sharing() then return end                                             -- guard: share gate at answer time
     local hits = matches(term)
     if #hits == 0 then return end
@@ -245,6 +255,7 @@ local function parseHits(s)
 end
 
 DT.on("STASH", function(from, f)
+  if not DT.enabled("stash") then return end                                     -- guard: off ignores answers (stash)
   local hits = isQ(f.q) and isKey(f.to) and parseHits(f.hits)
   if not hits then                                                               -- guard: STASH validation
     local s = store()
@@ -280,24 +291,24 @@ end
 
 local vp, list, model
 
+-- Fix round 4: the closing line is the viewport's footer; the items take the rest of the width
+-- (cut with "…", in full in the tooltip).
+local function build()
+  if vp then return end
+  model = DT.listModel()
+  vp = DT.viewport({ id = "stash", title = "Who has it", search = true, width = 420, height = 300, footer = CLOSING,
+    onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+  list = DT.list(vp.body, model, { count = 12,
+    empty = function(m) if #m.rows == 0 then return NOBODY end end,
+    tip = function(row, tt)
+      tt:AddLine(row.holder)
+      tt:AddLine(DT.display(row.from), 1, 1, 1)
+    end,
+    columns = { { key = "holder", width = 130 }, { key = "items", flex = true, colour = "muted" } } })
+end
+
 local function view(rows)
-  if not vp then
-    model = DT.listModel()
-    vp = DT.viewport({ id = "stash", title = "Who has it", search = true, width = 420, height = 300, footer = 16,
-      onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-    local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
-    note:SetText(CLOSING)
-    vp.note = note
-    DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 12,
-      empty = function(m) if #m.rows == 0 then return NOBODY end end,
-      tip = function(row, tt)
-        tt:AddLine(row.holder)
-        tt:AddLine(DT.display(row.from), 1, 1, 1)
-      end,
-      columns = { { key = "holder", width = 130 }, { key = "items", width = 250, colour = "muted" } } })
-  end
+  build()
   model:set(rows)
   list:refresh()
   vp:Show()
@@ -306,7 +317,7 @@ end
 local function summary()
   local o = open
   open = nil
-  if not o then return end
+  if not o or not DT.enabled("stash") then return end
   view(answerRows(o))
 end
 
@@ -343,6 +354,7 @@ local function overview()
 end
 
 local function verb(args)
+  if not DT.enabled("stash") then return DT.out("stash.enabled = off") end       -- guard: off verbs do nothing else (stash)
   local raw = DT.trim(args) or ""
   local low = raw:lower():gsub("%s+", " ")
   if raw == "" then return overview() end
@@ -368,6 +380,8 @@ local entered = false
 DT.module({
   id = "stash",
   title = "Stash",
+  optional = true,
+  fit = function() build(); list:refresh() end,
   settings = {
     { key = "share", type = "bool", default = false, label = "Share my stash", verb = "stash share on|off",
       onChange = shareChanged,

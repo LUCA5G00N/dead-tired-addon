@@ -16,6 +16,9 @@
 --     Port 2 (the Port 1 walk's defect 1): /dt recruit nudge on while a post's cooldown is still
 --     running arms the nudge for the time left, so off then on keeps it; it still comes once (a
 --     new arming replaces the old, and a nudge already said for that post is never said again).
+--     Fix round 4 (R-F4-6): a /reload while a post's cooldown is still running re-arms it for the
+--     time left (PLAYER_ENTERING_WORLD's second argument exactly true); a fresh login never does,
+--     and a cooldown that ended during the reload gives no late line.
 -- R-P1: the Recruit object on the bar (officers only): text "Recruit" or "Recruit m:ss" while the
 --     cooldown runs; left-click posts exactly as /dt recruit; right-click its settings; the tooltip
 --     shows the next line. A 1 s ticker redraws the text while the cooldown runs; it never posts.
@@ -249,7 +252,12 @@ DT.module({
     OnTooltipShow = tooltip },
   init = function() store() end,
   events = {
-    PLAYER_ENTERING_WORLD = function() DT.barRefresh(); local w = left() if w and w > 0 then tickText() end end,
+    PLAYER_ENTERING_WORLD = function(_, isReload)
+      DT.barRefresh()
+      local w = left()
+      if w and w > 0 then tickText() end
+      if isReload == true then rearm() end                            -- guard: re-armed on a /reload (R-F4-6)
+    end,
     PLAYER_GUILD_UPDATE = function() DT.barRefresh() end,
     GUILD_ROSTER_UPDATE = function() DT.barRefresh() end,
   },

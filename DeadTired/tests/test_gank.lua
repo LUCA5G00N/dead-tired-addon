@@ -261,7 +261,7 @@ do
   local L = a.DT._gank.list()
   check("/dt ganks opens the board viewport", vp ~= nil and vp:IsShown())
   check("the empty board: rc3's empty line in it", L.empty.shown and L.empty.text == "No grudges yet. Go and make some.")
-  check("the closing line under the list", vp.note.text == CLOSING)
+  check("the closing line under the list", vp.footer.text == CLOSING)
   check("the board is a DT viewport: Escape closes it (R-P2-2)", vp.name == "DeadTiredViewport_gank")
   local function ing(who, from, day, cls, lvl, zone)
     w:advance(301)   -- F6b: one GANK per sender and enemy per 300 s
@@ -393,6 +393,43 @@ do
   w:advance(210)
   ing("Nethergarde-Backstabz Dagger", "Ghoul Grim")
   check("F6b: at 300 s the same sender and enemy is kept again", #logs(a) == 4)
+end
+
+
+-- ---------------------------------------------------------------- fix round 4: the master switch (R-F4-5, G10)
+do
+  local OFF = "gank.enabled = off"
+  local w = H.world()
+  local a = mk(w, { name = "Stromham", full = "Stromham Hamson" })
+  local b = mk(w, { name = "Echo", full = "Echo Nightclaw" })
+  a:login(); b:login(); w:advance(10)
+  check("G10 gank: an On card, default on", a.DT.byId.gank.optional and a.DT.setting("gank", "enabled").label == "On"
+    and a.DT.enabled("gank"))
+  a.tgt = rogue()
+  a:slash("gank")
+  w:advance(2)
+  check("on: logged and sent", #logs(a) == 1 and #ganksSent(a) == 1 and #logs(b) == 1)
+  a:slash("set gank enabled off")
+  local reads, sent, n = a.targetReads, #ganksSent(a), #logs(a)
+  a.tgt = rogue({ name = "Other", full = "Other One-Nethergarde" })
+  for _, v in ipairs({ "gank", "ganks", "ganks backstabz" }) do
+    a:slash(v)
+    check("G10 gank off: /dt " .. v .. " prints " .. OFF .. " and nothing else", #a.printed == 1 and a.printed[1] == P .. OFF)
+  end
+  w:advance(2)
+  check("G10 gank off: the verbs did nothing else: no target read, nothing logged, nothing sent, no board",
+    a.targetReads == reads and #logs(a) == n and #ganksSent(a) == sent and not (a.DT._gank.vp() and a.DT._gank.vp():IsShown()))
+  inject(a, K2 .. "Echo Nightclaw", { who = "CAMWOWEU4Realm4PvP-Some Body", cls = "MAGE", lvl = "20", zone = "Ashenvale" })
+  check("G10 gank off: inbound ignored", #logs(a) == n and a:db().gank.badGank == 0)
+  inject(a, K2 .. "Echo Nightclaw", { who = "", cls = "x" })
+  check("G10 gank off: not even counted as bad", a:db().gank.badGank == 0)
+  check("R-F4-5: off is not a withdrawal: the guildie's board keeps the grudge", #logs(b) == 1)
+  a:slash("set gank enabled on")
+  a:slash("ganks")
+  check("G10 gank on again: /dt ganks opens the board, the grudges intact", a.DT._gank.vp():IsShown() and #logs(a) == n
+    and not a:said(OFF))
+  inject(a, K2 .. "Echo Nightclaw", { who = "CAMWOWEU4Realm4PvP-Some Body", cls = "MAGE", lvl = "20", zone = "Ashenvale" })
+  check("G10 gank on again: inbound heard", #logs(a) == n + 1)
 end
 
 H.finish("gank")

@@ -688,4 +688,59 @@ do
     (b.combatRuns or 0) == 1 and b.combatLog == true)
 end
 
+
+-- ---------------------------------------------------------------- fix round 4: the dialogs' text (R-F4-1)
+do
+  local a = newClient(w, { guild = G })
+  a:login(); go(a, RFC)
+  local d = inst(a)
+  local D = a.DT
+  check("instance dialog: title and status are blocks (fixed font, not skinned)", D.textRecord(d.title).kind == "block"
+    and D.textRecord(d.status).kind == "block" and D.textRecord(d.status).fixedFont and d.status.font == nil)
+  check("defect 3: the status is bounded inside the box and wraps", d.status.w == 224 - 40 and d.status:GetStringHeight() > 12)
+  check("defect 3: the dialog's height comes from its text (the status's two lines), the buttons below",
+    d.h == D.logs.dialogHeight(d.title:GetStringHeight(), d.status:GetStringHeight()) and d.h > 104)
+  check("one line each: 0.3.0's 104", D.logs.dialogHeight(12, 10) == 104)
+  local li = newClient(w, { guild = G })
+  li:login(); li:slash("logs now")
+  local l = login(li)
+  check("login dialog: sized from its text too", l.h == D.logs.dialogHeight(l.title:GetStringHeight(), l.status:GetStringHeight()))
+end
+
+-- ---------------------------------------------------------------- fix round 4: the master switch (R-F4-5, G10)
+do
+  local OFF = "logs.enabled = off"
+  local P = "|cff7fa650Dead Tired|r "
+  local db = { schema = 3 }
+  local a = newClient(w, { guild = G, db = db })
+  counter(a)
+  a:login()
+  local m = a.DT.byId.logs
+  check("G10 logs: an On card, default on", m.optional and a.DT.setting("logs", "enabled").label == "On"
+    and a.DT.enabled("logs") and m.frame.events.PLAYER_ENTERING_WORLD)
+  a:slash("logs login on")
+  a:slash("set logs enabled off")
+  check("G10 logs off: registers no events", not m.frame.events.PLAYER_ENTERING_WORLD and not m.frame.events.ZONE_CHANGED_NEW_AREA
+    and not m.frame.events.PLAYER_REGEN_ENABLED)
+  for _, v in ipairs({ "logs", "logs now", "logs on", "logs login off" }) do
+    a:slash(v)
+    check("G10 logs off: /dt " .. v .. " prints " .. OFF .. " and nothing else", #a.printed == 1 and a.printed[1] == P .. OFF)
+  end
+  check("G10 logs off: the verbs changed nothing", a.DT.get("logs", "login") == true and a.DT.get("logs", "ask") == true)
+  go(a, RFC); go(a, WORLD); go(a, MC, true)
+  a:fire("PLAYER_REGEN_ENABLED")
+  a.DT.signal("member", true)
+  check("G10 logs off: no prompt, no login offer", a.instShows == 0 and a.loginShows == 0)
+  check("G10 logs off: never touches a client log", calls.argCalls == 0)
+  local a2 = newClient(w, { guild = G, db = db })
+  counter(a2)
+  a2:login(); go(a2, RFC)
+  check("G10 logs off: still off after a reload: no prompt at login or in a dungeon", a2.instShows == 0 and a2.loginShows == 0)
+  a2:slash("set logs enabled on")
+  go(a2, WORLD); go(a2, RFC)
+  check("G10 logs on again: the dungeon prompt is back", a2.instShows == 1)
+  a2:slash("logs")
+  check("G10 logs on again: /dt logs answers", a2:said("Asking in dungeons and raids: on") ~= nil)
+end
+
 H.finish("logs")

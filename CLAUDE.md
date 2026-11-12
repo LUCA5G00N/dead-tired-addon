@@ -50,8 +50,8 @@ and do not widen them. A new exception needs its own ruling in a brief.
   player sets a time (card 3), one line on a hardcore character's first login pointing at
   `/dt rip share on` (card 3, rulings round), event reminders once switched on (card 6 R4), the combat-log prompt on entering a dungeon or
   raid while the combat log is off (card 7, `dt_logs` R1; `/dt logs off` stops it), the recruit-ready nudge
-  once the cooldown ends after a post this session (card 5, fix round 3; `/dt recruit nudge off`
-  stops it).
+  once the cooldown ends after a post this session (a `/reload` keeps it) (card 5, fix round 3;
+  `/dt recruit nudge off` stops it).
 - **Reads another player:** your target's name, realm, class and level, only when you press
   `/dt gank` (card 4, `dt_pvp` R1).
 - **Posts to a public channel:** `/dt recruit`, one line per typed command or click, guild

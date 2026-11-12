@@ -166,26 +166,28 @@ redraw = function()
   if model then model:set(DT.graveRows()); list:refresh() end
 end
 
+-- Fix round 4: the closing line is the viewport's footer (wrapped, the body inset by its height);
+-- the date and level columns are as wide as their widest value, the zone takes the rest and is cut
+-- with "…" (its full text in the tooltip); the tooltip is the name and the date, no realm line
+-- (the Port 2 walk's defect 4, Tim's ruling).
+local function build()
+  if vp then return end
+  model = DT.listModel()
+  vp = DT.viewport({ id = "crypt", title = "Rest in Pieces", search = true, width = 440, height = 400, footer = CLOSING,
+    onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+  list = DT.list(vp.body, model, { count = 16,
+    empty = function(m) if #m.rows == 0 then return EMPTY end end,
+    tip = function(row, tt)
+      tt:AddLine(DT.safe(DT.nameOf(row.key), 48))
+      tt:AddLine(row.full, 0.8, 0.8, 0.8)
+    end,
+    columns = { { key = "day", fixed = true, colour = "muted" }, { key = "name", width = 160 },
+      { key = "lvl", fixed = true, colour = "muted" }, { key = "zone", flex = true, colour = "muted" } } })
+end
+
 function DT.graveyard()
   if not DT.isMember() then return end
-  if not vp then
-    model = DT.listModel()
-    vp = DT.viewport({ id = "crypt", title = "Rest in Pieces", search = true, width = 440, height = 400, footer = 16,
-      onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-    local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
-    note:SetText(CLOSING)
-    vp.note = note
-    DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 16,
-      empty = function(m) if #m.rows == 0 then return EMPTY end end,
-      tip = function(row, tt)
-        tt:AddLine(DT.safe(DT.nameOf(row.key), 48)); tt:AddLine(DT.realmLabel(row.key), 1, 1, 1)
-        tt:AddLine(row.full, 0.8, 0.8, 0.8)
-      end,
-      columns = { { key = "day", width = 46, colour = "muted" }, { key = "name", width = 160 },
-        { key = "lvl", width = 24, colour = "muted" }, { key = "zone", width = 150, colour = "muted" } } })
-  end
+  build()
   model:set(DT.graveRows())
   list:refresh()
   vp:Show()
@@ -303,6 +305,7 @@ DT.module({
     { verb = "bedtime", usage = "bedtime HH:MM/off", fn = bedtimeVerb },
   },
   init = function() crypt() end,
+  fit = function() build(); model:set(DT.graveRows()); list:refresh() end,
   events = {
     PLAYER_DEAD = onDead,
     PLAYER_ENTERING_WORLD = function()

@@ -29,6 +29,11 @@
 --     any logs button hides every other open logs prompt.
 -- The dialogs are not on Escape (R-P2-2 names the viewports): a frame holding secure buttons
 -- can't be hidden in combat, and Escape would try.
+-- Fix round 4: each dialog's title and status are wrapped blocks (DT.text, fixedFont: the dialogs
+-- keep the game's lettering, unskinned); the dialog's height comes from them, measured once at
+-- creation (always out of combat: a dialog is only built out of combat), the buttons below.
+-- R-F4-5: a master switch (optional = true, the On card, default on). Off: no events, no prompt,
+-- no login offer, never touches a client log; /dt logs answers "logs.enabled = off".
 
 local ADDON, ns = ...
 local DT = ns.DT
@@ -118,6 +123,10 @@ local UNKNOWN = {
 }
 
 local function finish(dlg, report)
+  if report then
+    local r = report
+    report = function() if DT.enabled("logs") then r() end end         -- off: no line after the click
+  end
   if inCombat() then
     pendingHide = true                -- a frame holding secure buttons can't hide in combat
   else
@@ -156,10 +165,20 @@ local function makeButton(dlg, key, text, x, onRan)
   return b
 end
 
-local function frame(name, w, title)
+local TEXT_TOP, TEXT_GAP, TEXT_SIDE = 14, 8, 20      -- the title's top, title to status, each side
+local BUTTON_H, BUTTON_BOTTOM, BUTTON_GAP = 24, 14, 22 -- the buttons' row and the room above it
+
+-- The dialog's height from its title and status (0.3.0's 104 for one line of each).
+function L.dialogHeight(titleH, statusH)
+  return TEXT_TOP + math.ceil(titleH) + TEXT_GAP + math.ceil(statusH) + BUTTON_GAP + BUTTON_H + BUTTON_BOTTOM
+end
+
+-- status: the text the status line is sized for (the instance dialog's line, or the login
+-- dialog's longest state line); set at creation, measured once with the title.
+local function frame(name, w, title, status)
   local dlg = CreateFrame("Frame", name, UIParent,
                           BackdropTemplateMixin and "BackdropTemplate" or nil)
-  dlg:SetSize(w, 104)
+  dlg.dtWindow = name
   dlg:SetPoint("TOP", UIParent, "TOP", 0, -140)
   dlg:SetFrameStrata("DIALOG")
   if dlg.SetBackdrop then
@@ -168,11 +187,16 @@ local function frame(name, w, title)
                       tile = true, tileSize = 32, edgeSize = 24,
                       insets = { left = 6, right = 6, top = 6, bottom = 6 } })
   end
-  dlg.title = dlg:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-  dlg.title:SetPoint("TOP", dlg, "TOP", 0, -14)
-  dlg.title:SetText(title)
-  dlg.status = dlg:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
-  dlg.status:SetPoint("TOP", dlg.title, "BOTTOM", 0, -8)
+  local tw = w - 2 * TEXT_SIDE
+  dlg.title = DT.text(dlg, "block", { fixedFont = true, layer = "ARTWORK", template = "GameFontNormal",
+    justify = "CENTER", width = tw })
+  dlg.title:SetPoint("TOP", dlg, "TOP", 0, -TEXT_TOP)
+  DT.setText(dlg.title, title)
+  dlg.status = DT.text(dlg, "block", { fixedFont = true, layer = "ARTWORK", template = "GameFontHighlightSmall",
+    justify = "CENTER", width = tw })
+  dlg.status:SetPoint("TOP", dlg.title, "BOTTOM", 0, -TEXT_GAP)
+  DT.setText(dlg.status, status)
+  dlg:SetSize(w, L.dialogHeight(DT.textHeight(dlg.title, tw), DT.textHeight(dlg.status, tw)))   -- guard: dialog sized from its text
   dlg.buttons = {}
   return dlg
 end
@@ -190,7 +214,8 @@ end
 
 local function buildLogin()
   if dialogs.login then return dialogs.login end
-  local dlg = frame("DeadTiredLogsLogin", 428, "The dead keep records. Turn them on?")
+  local dlg = frame("DeadTiredLogsLogin", 428, "The dead keep records. Turn them on?",
+    "combat log " .. word(false) .. "    chat log " .. word(false))
   local ran = function() finish(dlg, reportBoth) end
   dlg.buttons.combat  = makeButton(dlg, "Combat", "Combat log", 14, ran)
   dlg.buttons.chat    = makeButton(dlg, "Chat", "Chat log", 116, ran)
@@ -204,8 +229,7 @@ end
 
 local function buildInstance()
   if dialogs.instance then return dialogs.instance end
-  local dlg = frame("DeadTiredLogsInstance", 224, "Log this one?")
-  dlg.status:SetText("Combat log is off. Warcraft Logs needs it on.")
+  local dlg = frame("DeadTiredLogsInstance", 224, "Log this one?", "Combat log is off. Warcraft Logs needs it on.")
   dlg.buttons.logit = makeButton(dlg, "LogIt", "Log it", 14, function(self)
     finish(dlg, self.macro and reportCombat or nil)
   end)
@@ -248,7 +272,7 @@ function L.showLogin(force)
   arm(dlg.buttons.combat, p.combat)
   arm(dlg.buttons.chat, p.chat)
   arm(dlg.buttons.both, p.both)
-  dlg.status:SetText("combat log " .. word(c) .. "    chat log " .. word(h))
+  DT.setText(dlg.status, "combat log " .. word(c) .. "    chat log " .. word(h))
   dlg:Show()
   return "shown"
 end
@@ -343,6 +367,7 @@ local function onWorld(isLogin, isReload)
 end
 
 DT.listen("member", function(isMember)
+  if not DT.enabled("logs") then return end                                 -- guard: off, no prompt (logs)
   if not isMember or not entered then return end
   loginCheck()
   zoneCheck()
@@ -371,6 +396,7 @@ end
 local function onoff(v) return v and "on" or "off" end
 
 local function logs(args)
+  if not DT.enabled("logs") then return DT.out("logs.enabled = off") end    -- guard: off verbs do nothing else (logs)
   local rest = (args or ""):lower():gsub("%s+", " ")
   if rest == "on" then
     DT.set("logs", "ask", true)
@@ -402,6 +428,15 @@ end
 DT.module({
   id = "logs",
   title = "Logs",
+  optional = true,
+  -- off: an open prompt goes (out of combat; a frame holding secure buttons can't hide in combat)
+  onDisable = function()
+    pendingShow = nil
+    if inCombat() then return end
+    for _, d in pairs(dialogs) do d:Hide() end
+  end,
+  -- built hidden, never in combat
+  fit = function() if not inCombat() then buildLogin(); buildInstance() end end,
   settings = {
     { key = "ask", type = "bool", default = true, label = "Ask in dungeons and raids", verb = "logs on|off",
       desc = "Entering a dungeon or raid with the combat log off, one prompt to switch it on (Warcraft Logs needs it). Never in battlegrounds, arenas or the open world." },

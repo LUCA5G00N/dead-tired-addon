@@ -2,7 +2,7 @@
 ## Title: Dead Tired
 ## Notes: The guild addon for <DEAD TIRED>. Optional, quiet, guild-only. /dt
 ## Author: DEAD TIRED
-## Version: 0.3.0
+## Version: 0.3.1
 ## SavedVariables: DeadTiredDB
 ## IconTexture: Interface\Icons\Spell_Shadow_RaiseDead
 ## AddonCompartmentFunc: DeadTired_OnAddonCompartmentClick

@@ -21,9 +21,9 @@ do
   DT.verb({ verb = "zombie", usage = "zombie walk", fn = function() end })
   check("help is built from the registry: a new verb shows", DT.helpLine():find("zombie walk", 1, true) ~= nil)
   c:slash("")
-  check("/dt alone prints the help line", c:count("/dt ") == 1 and c:said("Dead Tired 0.3.0:"))
+  check("/dt alone prints the help line", c:count("/dt ") == 1 and c:said("Dead Tired 0.3.1:"))
   c:slash("nonsense verb")
-  check("an unknown verb prints the help line", c:said("Dead Tired 0.3.0:") ~= nil)
+  check("an unknown verb prints the help line", c:said("Dead Tired 0.3.1:") ~= nil)
   local got
   DT.verb({ verb = "debug", usage = "debug", fn = function(a) got = "debug:" .. a end })
   DT.verb({ verb = "echo", usage = "echo", fn = function(a) got = a end })

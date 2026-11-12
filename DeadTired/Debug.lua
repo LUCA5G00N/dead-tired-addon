@@ -2,6 +2,10 @@
 --   /dt debug names    the name functions for player and target (rebuild requirement 4)
 --   /dt debug senders  every distinct raw CHAT_MSG_ADDON sender string on DT's prefix (cap 50)
 --   /dt debug errors   the error counts each module has recorded, and the comms counters
+--   /dt debug fit      fix round 4: text that doesn't fit, under each skin (DT.fitCheck, UI.lua):
+--                      one line per fault, then "fit: <n> checked, <m> over, <k> rows cut,
+--                      measure failures <f>". Each window is built (hidden) with its current data;
+--                      each skin is applied in memory only; nothing is saved.
 -- Values are printed through DT.safe: as strings, never interpreted.
 local ADDON, ns = ...
 local DT = ns.DT
@@ -58,5 +62,6 @@ DT.module({
     { verb = "debug names", usage = "debug names", fn = names },
     { verb = "debug senders", usage = "debug senders", fn = senders },
     { verb = "debug errors", usage = "debug errors", fn = errors },
+    { verb = "debug fit", usage = "debug fit", fn = function() for _, l in ipairs(DT.fitCheck()) do DT.out(l) end end },
   },
 })

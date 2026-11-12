@@ -55,7 +55,7 @@ do
   local vp = a.DT._events.vp()
   check("/dt events opens the list; later this week: days, hours, minutes", vp:IsShown()
     and lines(a)[1] == EV .. ": Sunday 14:00 server time, in 6d 3h 30m." and #a.printed == 0)
-  check("'Times are server time.' under the list", vp.note.text == "Times are server time.")
+  check("'Times are server time.' under the list", vp.footer.text == "Times are server time.")
   check("the list is a DT viewport: Escape closes it (R-P2-2)", vp.name == "DeadTiredViewport_events")
   at(w, a, 0, "11:15"); a:slash("events")
   check("later today: zero days dropped", lines(a)[1] == EV .. ": Sunday 14:00 server time, in 2h 45m.")
@@ -152,6 +152,39 @@ do
   y:login(); y.printed = {}
   w5:advance(3600 * 2)
   check("no server clock: no reminder, no error", #y.printed == 0 and (y:db().errors.events or 0) == 0)
+end
+
+
+-- ---------------------------------------------------------------- fix round 4: the master switch (R-F4-5, G10)
+do
+  local OFF = "events.enabled = off"
+  local w = H.world()
+  local a = mk(w, { name = "Stromham" })
+  a:login()
+  local m = a.DT.byId.events
+  check("G10 events: an On card, default on", m.optional and a.DT.setting("events", "enabled").label == "On"
+    and a.DT.enabled("events") and m.frame.events.PLAYER_ENTERING_WORLD)
+  a:slash("events remind on")
+  at(w, a, 0, "13:20")                  -- 40 minutes before the Sunday 14:00 fishing
+  a:slash("set events enabled off")
+  check("G10 events off: registers no events", not m.frame.events.PLAYER_ENTERING_WORLD)
+  for _, v in ipairs({ "events", "events remind off", "events remind" }) do
+    a:slash(v)
+    check("G10 events off: /dt " .. v .. " prints " .. OFF .. " and nothing else", #a.printed == 1 and a.printed[1] == P .. OFF
+      and not (a.DT._events.vp() and a.DT._events.vp():IsShown()))
+  end
+  check("G10 events off: the verbs changed nothing", a.DT.get("events", "remind") == true)
+  a.printed = {}
+  w:advance(3600)
+  check("G10 events off: no reminder printed unasked (the ticker stops)", reminders(a) == 0)
+  -- on again: the ticker comes back
+  a:slash("set events enabled on")
+  a.printed = {}
+  at(w, a, 7, "13:20")
+  w:advance(3600)
+  check("G10 events on again: the reminders come back", reminders(a) == 2)
+  a:slash("events")
+  check("G10 events on again: /dt events opens the list", a.DT._events.vp():IsShown())
 end
 
 H.finish("events")

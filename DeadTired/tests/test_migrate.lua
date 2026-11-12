@@ -281,4 +281,57 @@ do
   check("Port 2, a fresh account: marked done, nothing moved", c:db().migrated.port2 == true and #c:db().gank.logs == 0)
 end
 
+
+-- ---------------------------------------------------------------- fix round 4: the skin move (R-F4-4, G11)
+do
+  -- 0.3.0's saved data (schema 3, Port 1 and Port 2 already done), with each kind of skin choice
+  local function saved(skin)
+    local db = { schema = 3, migrated = { port1 = true, port2 = true }, settings = { guild = { welcome = true } } }
+    if skin then db.settings.core = { skin = skin } end
+    return db
+  end
+  local function boot(db) local w = H.world(); local c = w:client({ guild = G, db = db }); c:login(); return c end
+  -- saved deadtired
+  local d1 = saved("deadtired")
+  local c1 = boot(d1)
+  check("G11 a saved deadtired becomes clean", d1.settings.core.skin == "clean" and c1.DT.skinName() == "clean")
+  check("G11 the move is flagged: migrated.skin031", d1.migrated.skin031 == true)
+  check("G11 silent: no chat line beyond the welcome", c1:count("skin") == 0 and c1:count("clean") == 0)
+  -- the move alone, on the loaded store: only core.skin and the flag change
+  d1.migrated.skin031 = nil
+  d1.settings.core.skin = "deadtired"
+  local snap = dump(d1)
+  c1.DT.migrateSkin()
+  d1.migrated.skin031 = nil
+  d1.settings.core.skin = "deadtired"
+  check("G11 it writes core.skin and its flag, nothing else", dump(d1) == snap
+    and d1.migrated.port1 == true and d1.migrated.port2 == true)
+  c1.DT.migrateSkin()
+  -- /dt skin deadtired afterwards sticks, through a reload
+  c1:slash("skin deadtired")
+  local c1b = c1:reload()
+  check("G11 the move runs once: /dt skin deadtired afterwards sticks after a /reload", d1.settings.core.skin == "deadtired"
+    and c1b.DT.skinName() == "deadtired")
+  -- saved forever
+  local d2 = saved("forever")
+  local c2 = boot(d2)
+  check("G11 a saved forever is left alone", d2.settings.core.skin == "forever" and c2.DT.skinName() == "forever"
+    and d2.migrated.skin031 == true)
+  -- none saved
+  local d3 = saved(nil)
+  local c3 = boot(d3)
+  check("G11 none saved becomes clean", d3.settings.core.skin == "clean" and c3.DT.skinName() == "clean")
+  -- a fresh install (no DeadTiredDB at all)
+  local w4 = H.world()
+  local c4 = w4:client({ guild = G })
+  c4:login()
+  check("G11 a fresh install: clean, flagged", c4:db().migrated.skin031 == true and c4.DT.skinName() == "clean")
+  -- clean already chosen: left
+  local d5 = saved("clean")
+  boot(d5)
+  check("G11 a saved clean stays clean", d5.settings.core.skin == "clean")
+  -- the move again by hand: refused once done
+  check("G11 the move refuses a second run", c3.DT.migrateSkin() == false)
+end
+
 H.finish("migrate")

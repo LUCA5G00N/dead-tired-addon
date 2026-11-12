@@ -306,4 +306,26 @@ do
   check("DT's own text still goes through DT.safe", c.DT.safe("|cff") == "||cff")
 end
 
+
+-- ---------------------------------------------------------------- fix round 4: the bar's text (R-F4-1)
+do
+  local w = H.world()
+  local c = w:client({ guild = "DEAD TIRED" })
+  c:login()
+  local D = c.DT
+  local b
+  for _, x in ipairs(D._bar.buttons()) do if x.shown and x.entry and x.entry.name == "DeadTired" then b = x end end
+  local rec = b and D.textRecord(b.text)
+  check("bar: each button's text is a label (one line, unbounded), in the small role", rec and rec.kind == "label"
+    and rec.role == "small" and b.text.wordWrap == false and rec.window == "bar")
+  check("bar: the button is sized from its text, as 0.3.0 did", b.w == 24 + b.text:GetStringWidth())
+  local before = b.w
+  D.skins.big = { fonts = { small = { "Friz Quadrata TT", [[Fonts\FRIZQT__.TTF]], 14, "" } } }
+  D.fitSkin = "big"; D.restyle()
+  check("bar: a skin with bigger lettering re-sizes the buttons (the painter re-lays the bar)", b.w > before
+    and b.w == 24 + b.text:GetStringWidth())
+  D.fitSkin = nil; D.restyle(); D.skins.big = nil
+  check("bar: and back", b.w == before)
+end
+
 H.finish("bar")

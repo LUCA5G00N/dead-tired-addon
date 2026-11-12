@@ -227,7 +227,7 @@ do
   g:slash("graveyard")
   local L = g.DT._crypt.list()
   check("empty graveyard: the empty line in the viewport", L.empty.shown and L.empty.text == "The graveyard's empty. Give it time.")
-  check("the closing line under the list", g.DT._crypt.vp().note.text == "Only guildies running the addon, and only deaths seen while you were online.")
+  check("the closing line under the list", g.DT._crypt.vp().footer.text == "Only guildies running the addon, and only deaths seen while you were online.")
   local d = g:db().crypt.deaths
   d[#d + 1] = { who = "CAMWOWEU4Realm2PvP-Old One", lvl = 10, zone = "Durotar", hc = false, at = "2026-11-01 20:00:00" }
   d[#d + 1] = { who = "CAMWOWEU4Realm4PvP-Lilbit High", lvl = 0, zone = "Duskwood", hc = true, at = "2026-11-02 21:00:00" }
@@ -251,11 +251,41 @@ do
   for _, f in ipairs(g.frames) do if f._type == "Button" and f.row and f.shown and f.row.day then one = f end end
   one.scripts.OnEnter(one)
   tipped = g.DT._tooltip.lines or {}
-  check("Port 2: a row's tooltip carries the full date", tipped[#tipped] == "2026-11-03 21:00:00")
+  -- fix round 4: the module's own lines come first (name, date), then any cut cell in full
+  local own = #tipped - #one.cut
+  check("Port 2: a row's tooltip carries the full date", tipped[own] == "2026-11-03 21:00:00")
+  -- fix round 4 (defect 4, Tim's ruling): the name and the date, no realm line
+  local realmLine = false
+  for _, l in ipairs(tipped) do if tostring(l):find("Realm", 1, true) and not tostring(l):find("(", 1, true) then realmLine = true end end
+  check("G8 the graveyard's tooltip: the name, then the date; no realm line", own == 2 and tipped[1] == "Lilbit High"
+    and tipped[2] == "2026-11-03 21:00:00" and not realmLine)
+  local cols = {}
+  for _, c in ipairs(g.DT._crypt.list().columns) do cols[c.key] = c end
+  check("R-F4-1: day and level fixed, name 160, the zone the one flex column", cols.day.fixed and cols.lvl.fixed
+    and cols.name.w == 160 and cols.zone.flex)
   local dayCell = one.cells[1]
   check("Port 2: the date cell is one line at its width (\"10 Nov\" fits)", dayCell:GetStringHeight() <= 12
     and (function() dayCell:SetText("10 Nov"); return dayCell:GetStringHeight() <= 12 end)())
   check("not empty: no empty line", not L.empty.shown)
+  -- fix round 4 (defect 1): "12 Nov" and "9 Nov" in one graveyard, both on one line, every row one height
+  d[#d + 1] = { who = "CAMWOWEU4Realm2PvP-Echo Nightclaw", lvl = 31, zone = "Excavation Site: Wetlands, the long way round", hc = false, at = "2026-11-12 00:12:33" }
+  d[#d + 1] = { who = "CAMWOWEU4Realm2PvP-Nine Lives", lvl = 9, zone = "Mulgore", hc = false, at = "2026-11-09 10:00:00" }
+  vp.search:SetText(""); vp.search.scripts.OnTextChanged(vp.search)
+  g:slash("graveyard")
+  local twelve, nine, heights = nil, nil, {}
+  for _, b in ipairs(L.rows) do
+    if b.shown and b.row then
+      heights[b.h] = true
+      if b.row.day == "12 Nov" then twelve = b elseif b.row.day == "9 Nov" then nine = b end
+    end
+  end
+  local nh = 0
+  for _ in pairs(heights) do nh = nh + 1 end
+  check("G3 defect 1: \"12 Nov\" and \"9 Nov\" each on one line, uncut", twelve and nine and twelve.cells[1].text == "12 Nov"
+    and nine.cells[1].text == "9 Nov" and twelve.cells[1]:GetStringWidth() <= twelve.cells[1].w)
+  check("G3 defect 1: every row in the graveyard the same height", nh == 1)
+  check("defect 1: a long zone ends in \"…\", in full in the tooltip", twelve.cells[4].text:sub(-3) == "\226\128\166"
+    and twelve.cut[1] == "Excavation Site: Wetlands, the long way round")
   for i = 1, 120 do d[#d + 1] = { who = "R-X" .. i, lvl = 1, zone = "z", at = "x" } end
   g.DT.crypt()
   local w3 = H.world()
