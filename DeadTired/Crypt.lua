@@ -139,6 +139,8 @@ end)
 -- ---------------------------------------------------------------- the graveyard (a viewport)
 
 -- Rows, newest first: day, name (R-P5 among the graveyard), level, zone (HC).
+-- Port 2 (the Port 1 walk's defect 4): the date column is short ("10 Nov", DT.shortDate) so it
+-- fits on one line; the full date and time are in the row's tooltip (full).
 function DT.graveRows()
   local list, keys = crypt().deaths, {}
   for _, e in ipairs(list) do if type(e) == "table" then keys[#keys + 1] = e.who end end
@@ -150,8 +152,9 @@ function DT.graveRows()
       local day = type(e.at) == "string" and (e.at:match("^(%d%d%d%d%-%d%d%-%d%d)") or e.at) or "?"
       local n = name(e.who)
       local z = DT.safe(e.zone, ZONE_MAX) .. (e.hc and " (HC)" or "")
-      rows[#rows + 1] = { key = e.who, day = DT.safe(day, 20), name = n, lvl = lvlText(e.lvl), zone = z,
-        search = table.concat({ day, n, tostring(e.who), lvlText(e.lvl), z }, " ") }
+      local short = DT.shortDate(e.at)
+      rows[#rows + 1] = { key = e.who, day = short, full = DT.safe(type(e.at) == "string" and e.at or day, 20), name = n,
+        lvl = lvlText(e.lvl), zone = z, search = table.concat({ day, short, n, tostring(e.who), lvlText(e.lvl), z }, " ") }
     end
   end
   return rows
@@ -176,8 +179,11 @@ function DT.graveyard()
     DT.skin(function() DT.fontTo(note, "small", "muted") end)
     list = DT.list(vp.body, model, { count = 16,
       empty = function(m) if #m.rows == 0 then return EMPTY end end,
-      tip = function(row, tt) tt:AddLine(DT.safe(DT.nameOf(row.key), 48)); tt:AddLine(DT.realmLabel(row.key), 1, 1, 1) end,
-      columns = { { key = "day", width = 76, colour = "muted" }, { key = "name", width = 130 },
+      tip = function(row, tt)
+        tt:AddLine(DT.safe(DT.nameOf(row.key), 48)); tt:AddLine(DT.realmLabel(row.key), 1, 1, 1)
+        tt:AddLine(row.full, 0.8, 0.8, 0.8)
+      end,
+      columns = { { key = "day", width = 46, colour = "muted" }, { key = "name", width = 160 },
         { key = "lvl", width = 24, colour = "muted" }, { key = "zone", width = 150, colour = "muted" } } })
   end
   model:set(DT.graveRows())

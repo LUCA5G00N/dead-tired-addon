@@ -57,6 +57,16 @@ function DT.nameOf(key)
   return n or "?"
 end
 
+-- A key from another client, or an old store, in the one spelling (realm normalised, the name
+-- tidied); nil if it isn't a key. Port 2 (the ported cards' inbound keys and the migration).
+function DT.normKey(key)
+  local r, n = DT.splitKey(key)
+  if not r then return nil end
+  local rk, fn = DT.realmKey(r), DT.fullName(n)
+  if not rk or not fn then return nil end
+  return rk .. "-" .. fn
+end
+
 -- Two keys for one character, ignoring case and spacing.
 function DT.sameKey(a, b)
   if type(a) ~= "string" or type(b) ~= "string" then return false end

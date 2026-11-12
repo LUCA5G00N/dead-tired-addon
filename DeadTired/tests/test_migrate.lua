@@ -1,4 +1,4 @@
--- Offline checks for Migrate.lua: the legacy move (Port 1), on a fixture built from Tim's real rc3
+-- Offline checks for Migrate.lua: the legacy move (Port 1, and Port 2's cards 4 and 6 at the end), on a fixture built from Tim's real rc3
 -- shape. Evidence for the shape: the rc3 walk (docs/UAT_dt_fixes3_results.md, H3/H4, 10 Nov):
 -- `/dt alts` on Stromham gave "main Stromham; alts (5): Gizzardthe, Jobbi, Marvella, St, Stromham
 -- Hamson" (rc3 keyed the account's own characters by the short name, UnitName, and its own HELLO
@@ -170,6 +170,115 @@ do
   c:login()
   check("an entry already in the new store: merged, the newest seen kept", c:db().alts.roster[K2 .. "Stromham Hamson"].seen >= "2026-11-11 09:00:00"
     and c:db().migrated.merged >= 1)
+end
+
+-- ---------------------------------------------------------------- Port 2: cards 4 and 6 (and card 7's settings)
+-- rc3's shapes (release/0.1.0-rc3: Gank.lua, Played.lua, Stash.lua, Events.lua, Logs.lua, after fix
+-- round 3's keysV = 2): gank[<guild>].logs = { who, cls, lvl, zone, by, at, t }; played.share and
+-- played[<guild>][key] = { lvl, hours, at, t }; stash.share and stash.chars[key] = { bags, bank, at,
+-- bankAt }; events.remind; logs.ask / .login / .visit.
+local NOW = 1794000000
+local function port2Legacy(L)
+  L.gank = { badGank = 0, keysV = 2, dropped = 1, ["dead tired"] = { logs = {
+    { who = "Nethergarde-Backstabz", cls = "ROGUE", lvl = 60, zone = "Duskwood", by = K2 .. "Stromham",
+      at = "2026-11-05 20:00:00", t = NOW - 6 * 86400 },
+    { who = K2 .. "Paladork", cls = "PALADIN", lvl = 40, zone = "Arathi Highlands", by = K2 .. "Lilbit High",
+      at = "2026-11-06 21:00:00" },
+    { who = "Nethergarde-Backstabz", cls = "ROGUE", lvl = 60, zone = "Hillsbrad Foothills", by = K2 .. "Jobbi",
+      at = "2026-11-07 22:00:00", t = NOW - 4 * 86400 } } } }
+  L.played = { share = true, badPlayed = 0, keysV = 2, ["dead tired"] = {
+    [K2 .. "Stromham"] = { lvl = 14, hours = 20.5, at = "2026-11-10 11:00:00", t = NOW - 86400 },
+    [K2 .. "Echo Nightclaw"] = { lvl = 30, hours = 90, at = "2026-11-10 12:00:00", t = NOW - 3600 } } }
+  L.stash = { share = true, badStash = 0, keysV = 2, chars = {
+    [K2 .. "Stromham"] = { bags = { [2589] = 20 }, bank = { [2592] = 9 }, at = "2026-11-05 10:00:00", bankAt = "2026-11-05 10:00:00" },
+    [K2 .. "Gizzardthe"] = { bags = { [4338] = 5 }, bank = {}, at = "2026-11-06 10:00:00" } } }
+  L.events = { remind = true }
+  L.logs = { ask = false, login = true, visit = "party:389" }
+  return L
+end
+-- Tim's store as 0.2.0 left it (Port 1 already ran), with rc3's card 4/6/7 data still in legacy.
+local function tim020()
+  local d = timFw1()
+  port2Legacy(d.legacy)
+  d.migrated = { port1 = true, at = "2026-11-11 18:00:00", unmatched = 4, merged = 5, mapped = 1 }
+  d.alts = { roster = { [K2 .. "Stromham Hamson"] = { v = "0.2.0", main = K2 .. "Stromham Hamson", seen = "2026-11-11 18:00:00", mine = true },
+    [K2 .. "Gizzardthe"] = { main = K2 .. "Stromham Hamson", seen = "2026-11-06 19:23:00", mine = true },
+    [K2 .. "Jobbi"] = { main = K2 .. "Stromham Hamson", seen = "2026-11-07 00:03:00", mine = true } }, main = K2 .. "Stromham Hamson" }
+  d.settings = { crypt = { rip = true }, recruit = { nudge = false } }
+  return d
+end
+do
+  local w2 = H.world()
+  local d = tim020()
+  local snap2 = dump(d.legacy)
+  local c = mk(w2, { name = "Stromham", full = "Stromham Hamson", db = d })
+  c:login(); w2:advance(5)
+  local M, DT = d.migrated, c.DT
+  check("Port 2: runs on 0.3.0's first load (Port 1 already done): migrated.port2 set", M.port2 == true and M.port1 == true)
+  check("Port 2: legacy untouched", dump(d.legacy) == snap2)
+  local g = d.gank.logs
+  check("Port 2 gank: the three rc3 logs moved, in order", #g == 3 and g[1].zone == "Duskwood" and g[3].zone == "Hillsbrad Foothills")
+  check("Port 2 gank: by re-keyed by Port 1's rule (Stromham -> Stromham Hamson: exactly one full key)",
+    g[1].by == K2 .. "Stromham Hamson" and g[2].by == K2 .. "Lilbit High")
+  check("Port 2 gank: no full key to merge into: kept as it is (Jobbi; the enemies' short names)", g[3].by == K2 .. "Jobbi"
+    and g[1].who == "Nethergarde-Backstabz" and g[2].who == K2 .. "Paladork")
+  local rows = DT.gankRows()
+  check("Port 2 gank: the board groups them (Backstabz x2 by 2 guildies)", rows[1].name == "Backstabz" and rows[1].by == "x2 by 2 guildies")
+  local b = DT.playedBoard()
+  check("Port 2 played: the board moved, Stromham re-keyed", b[K2 .. "Stromham Hamson"] and b[K2 .. "Stromham Hamson"].hours == 20.5
+    and b[K2 .. "Stromham"] == nil and b[K2 .. "Echo Nightclaw"].lvl == 30)
+  check("Port 2 played: share moved to the card", DT.get("played", "share") == true and d.settings.played.share == true)
+  local ch = d.stash.chars
+  check("Port 2 stash: Stromham's lists moved to the full key (bank kept)", ch[K2 .. "Stromham"] == nil
+    and ch[K2 .. "Stromham Hamson"] and ch[K2 .. "Stromham Hamson"].bank[2592] == 9)
+  check("Port 2 stash: Gizzardthe kept under its short key (no full key yet)", ch[K2 .. "Gizzardthe"] and ch[K2 .. "Gizzardthe"].bags[4338] == 5)
+  check("Port 2 stash: share moved to the card", DT.get("stash", "share") == true)
+  check("Port 2 events: reminders moved", DT.get("events", "remind") == true)
+  check("Port 2 logs: ask and login moved; the old visit not carried", DT.get("logs", "ask") == false and DT.get("logs", "login") == true
+    and (d.logs == nil or d.logs.visit == nil))
+  check("Port 2: the counts (1 mapped: Stromham; the unmatched kept and counted)", M.port2Mapped == 1 and M.port2Unmatched >= 3)
+  check("Port 2: Port 1's own work untouched (alts, crypt and recruit settings)", d.alts.main == K2 .. "Stromham Hamson"
+    and DT.get("recruit", "nudge") == false and DT.get("crypt", "rip") == true)
+  -- runs once: a second load copies nothing again, and the player's changes since stand
+  table.remove(d.gank.logs, 1)                          -- deleted since
+  DT.set("events", "remind", false)
+  local n = #d.gank.logs
+  local again = mk(w2, { name = "Stromham", full = "Stromham Hamson", db = d })
+  again:login()
+  check("Port 2 runs once: no second set of logs, no setting reset", #d.gank.logs == n and again.DT.get("events", "remind") == false
+    and dump(d.legacy) == snap2)
+end
+do
+  -- a setting already set in the new store is not overwritten; logs already made stay, after the old ones
+  local w2 = H.world()
+  local d = tim020()
+  d.settings.played = { share = false }
+  d.gank = { badGank = 0, logs = { { who = "Nethergarde-Newbie Gank", cls = "MAGE", lvl = 20, zone = "Durotar", by = K2 .. "Stromham Hamson",
+    at = "2026-11-11 20:00:00" } } }
+  d.played = { badPlayed = 0, board = { [K2 .. "Echo Nightclaw"] = { lvl = 31, hours = 95, t = NOW } } }
+  local c = mk(w2, { name = "Stromham", full = "Stromham Hamson", db = d })
+  c:login()
+  check("Port 2: a setting already set stays (played.share off)", c.DT.get("played", "share") == false)
+  check("Port 2: new logs kept, after the older legacy ones", #d.gank.logs == 4 and d.gank.logs[4].who == "Nethergarde-Newbie Gank")
+  check("Port 2: on a key both boards hold, the newer t wins", d.played.board[K2 .. "Echo Nightclaw"].lvl == 31)
+end
+do
+  -- straight from rc3: Port 1 and Port 2 in one load
+  local w2 = H.world()
+  local rc3 = port2Legacy(timRc3())
+  local snap3 = dump(rc3)
+  local c = mk(w2, { name = "Stromham", full = "Stromham Hamson", db = rc3 })
+  c:login()
+  local d = c:db()
+  check("from rc3 directly: both migrations run once", d.migrated.port1 == true and d.migrated.port2 == true and dump(d.legacy) == snap3)
+  check("from rc3 directly: the gank log and the board arrive keyed to the full name", d.gank.logs[1].by == K2 .. "Stromham Hamson"
+    and d.played.board[K2 .. "Stromham Hamson"] ~= nil)
+end
+do
+  local w2 = H.world()
+  local c = mk(w2, { name = "New", full = "New Bones" })
+  c:login()
+  check("Port 2, a fresh account: marked done, nothing moved", c:db().migrated.port2 == true and #c:db().gank.logs == 0)
 end
 
 H.finish("migrate")

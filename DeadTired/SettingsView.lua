@@ -64,6 +64,13 @@ local function cursorY()
   return y
 end
 
+-- Port 2 (the Port 1 walk's request 3): a grab hand while a row is dragged by its grip. The
+-- client's own SetCursor / ResetCursor (globals, guarded); with neither, the cursor is unchanged.
+local GRAB = [[Interface\CURSOR\openhand]]
+function DT.grabCursor(on)
+  if on then DT.try(SetCursor, GRAB) else DT.try(ResetCursor) end
+end
+
 local function listSub(r, i)
   local sub = r.subs[i]
   if sub then return sub end
@@ -78,10 +85,14 @@ local function listSub(r, i)
     sub.grip.text:SetPoint("CENTER", sub.grip, "CENTER", 0, 0)
     sub.grip.text:SetText("=")
     sub.grip:RegisterForDrag("LeftButton")
-    sub.grip:SetScript("OnDragStart", function() r.dragging = sub.item and sub.item.name end)
+    sub.grip:SetScript("OnDragStart", function()
+      r.dragging = sub.item and sub.item.name
+      if r.dragging then DT.grabCursor(true) end
+    end)
     sub.grip:SetScript("OnDragStop", function()
       local name = r.dragging
       r.dragging = nil
+      DT.grabCursor(false)
       if not name then return end
       local n = DT.dropIndex(cursorY(), r.subs)
       if n > 0 then s.move(name, n) end

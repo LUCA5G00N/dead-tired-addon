@@ -51,6 +51,39 @@ do
   end
 end
 
+-- ---------------------------------------------------------------- R-P2-2: UISpecialFrames, insert only
+do
+  local sample = table.concat({
+    'local name = "DeadTiredViewport_x"',                    -- 1
+    'if type(UISpecialFrames) ~= "table" then return end',   -- 2  the type check: allowed
+    'table.insert(UISpecialFrames, name)',                   -- 3  the one allowed call
+    'table.insert(UISpecialFrames, "DeadTired" .. name:upper())', -- 4 allowed (two arguments)
+    'table.remove(UISpecialFrames, 1)',                      -- 5  a removal: flagged
+    'UISpecialFrames[1] = nil',                              -- 6  an assignment into it: flagged
+    'table.insert(UISpecialFrames, 1, name)',                -- 7  an insert at a position (reorders): flagged
+    'local t = UISpecialFrames',                             -- 8  a copy: flagged
+    'wipe(UISpecialFrames)',                                 -- 9  any other call: flagged
+    'local n = #UISpecialFrames',                            -- 10 any other read: flagged
+    'local g = _G["UISpecialFrames"]',                       -- 11 by _G: flagged
+    'UISpecialFrames = {}',                                  -- 12 replaced: flagged
+    'local ok = table.insert(UISpecialFrames, name)',        -- 13 a result taken: flagged
+    'for i = #UISpecialFrames, 1, -1 do end',                -- 14 flagged
+    '-- table.remove(UISpecialFrames) in a comment',         -- 15 allowed
+  }, "\n")
+  local path = tmpfile(sample)
+  local hits = S.scanFile(path)
+  os.remove(path)
+  local seen, lines = {}, {}
+  for _, h in ipairs(hits) do if not seen[h.line] then seen[h.line] = true; lines[#lines + 1] = h.line end end
+  table.sort(lines)
+  local got = table.concat(lines, ",")
+  check("R-P2-2 scanner: only table.insert(UISpecialFrames, <name>) and type() pass (flags 5,6,7,8,9,10,11,12,13,14)",
+    got == "5,6,7,8,9,10,11,12,13,14")
+  if got ~= "5,6,7,8,9,10,11,12,13,14" then
+    for _, h in ipairs(hits) do print("  hit " .. h.line .. ": " .. h.what) end
+  end
+end
+
 -- ---------------------------------------------------------------- every DT file
 local files = {}
 local p = io.popen('ls "' .. H.addonDir .. '"/*.lua')
@@ -76,6 +109,32 @@ do
   os.remove(path)
   check("rc3's SlashCmdList = SlashCmdList or {} in a copy of Core.lua: the scan goes red",
     #hits == 1 and hits[1].what == "assigns the global SlashCmdList")
+end
+
+-- ---------------------------------------------------------------- R-P2-2 in the addon itself
+do
+  -- exactly one place touches UISpecialFrames: UI.lua's DT.closeOnEscape (its type check and its insert)
+  local where = {}
+  for _, f in ipairs(files) do
+    local p2 = io.popen('luac5.1 -p -l "' .. f .. '" 2>&1')
+    local listing = p2:read("*a")
+    p2:close()
+    local n = select(2, listing:gsub("GETGLOBAL[^\n]*; UISpecialFrames", ""))
+    if n > 0 then where[#where + 1] = f:match("[^/]+$") .. ":" .. n end
+  end
+  check("R-P2-2: only UI.lua reads UISpecialFrames (once to check it, once to insert)", table.concat(where, ",") == "UI.lua:2")
+  local src = io.open(H.addonDir .. "/UI.lua"):read("*a")
+  for _, bad in ipairs({
+      { "a removal", "  escaped[name] = true", "  escaped[name] = true\n  table.remove(UISpecialFrames, 1)" },
+      { "an insert at the front", "table.insert(UISpecialFrames, name)", "table.insert(UISpecialFrames, 1, name)" },
+      { "a replaced table", "  escaped[name] = true", "  escaped[name] = true\n  UISpecialFrames = { name }" } }) do
+    local a = src:find(bad[2], 1, true)
+    local copy = src:sub(1, a - 1) .. bad[3] .. src:sub(a + #bad[2])
+    local path = tmpfile(copy)
+    local hs = S.scanFile(path)
+    os.remove(path)
+    check("R-P2-2: " .. bad[1] .. " in a copy of UI.lua: the scan goes red", #hs >= 1)
+  end
 end
 
 H.finish("taint")

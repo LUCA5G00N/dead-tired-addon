@@ -17,6 +17,19 @@
 -- under the local realm; that entry is marked fromLegacy and moved to its real realm only when a
 -- current HELLO from that full name supplies one (never guessed; counted in migrated.refiled).
 -- legacy itself is never written: everything is copied.
+--
+-- PORT 2 (cards 4 and 6, and card 7's settings), once per account (DeadTiredDB.migrated.port2 =
+-- true), keys by the same rule (the exactly-one short -> full merge, realm normalised):
+--   gank:    legacy.gank[<guild>].logs -> gank.logs (who and by re-keyed; older than any new log;
+--            capped at 500, oldest dropped)
+--   played:  legacy.played[<guild>][key] -> played.board (on a key both hold, the newer t wins);
+--            legacy.played.share -> settings.played.share
+--   stash:   legacy.stash.chars[key] -> stash.chars (on a key both hold, the new store's lists stay,
+--            the legacy bank list only fills an empty one); legacy.stash.share -> settings.stash.share
+--   events:  legacy.events.remind -> settings.events.remind
+--   logs:    legacy.logs.ask / .login -> settings.logs.ask / .login (the visit in progress is not
+--            carried: it belongs to a session)
+-- A setting already set in the new store is not overwritten.
 local ADDON, ns = ...
 local DT = ns.DT
 
@@ -180,6 +193,122 @@ local function run()
 end
 DT.migratePort1 = run
 
+-- ---------------------------------------------------------------- Port 2
+
+-- Every character key the cards 4 and 6 legacy stores name.
+local function legacyKeys2(L)
+  local keys = {}
+  local function add(k) k = norm(k) if k then keys[k] = true end end
+  for _, g in pairs(type(L.gank) == "table" and L.gank or {}) do
+    if type(g) == "table" and type(g.logs) == "table" then
+      for _, e in ipairs(g.logs) do if type(e) == "table" then add(e.who); add(e.by) end end
+    end
+  end
+  for k, b in pairs(type(L.played) == "table" and L.played or {}) do
+    if type(k) == "string" and type(b) == "table" then for key in pairs(b) do add(key) end end
+  end
+  local st = type(L.stash) == "table" and L.stash or {}
+  for key in pairs(type(st.chars) == "table" and st.chars or {}) do add(key) end
+  return keys
+end
+
+local function run2()
+  local db = DT.db()
+  if type(db.migrated) ~= "table" then db.migrated = {} end
+  local M = db.migrated
+  if M.port2 then return false end                                       -- guard: Port 2 migration runs once
+  local L = db.legacy
+  M.port2 = true
+  M.port2At = DT.stamp()
+  if type(L) ~= "table" then M.port2Unmatched = 0; return true end
+
+  local keys = legacyKeys2(L)
+  local map, unmatched = DT.migrationMap(keys, DT.knownKeys())
+  local function key(k)
+    local n = norm(k)
+    if not n then return nil end
+    return map[n] or n
+  end
+  local S = db.settings
+  local function put(id, k, v)
+    if v == nil then return end
+    if type(S[id]) ~= "table" then S[id] = {} end
+    if S[id][k] == nil then S[id][k] = v end
+  end
+
+  -- gank: the legacy logs first (they are older), then any made since; the newest 500 kept
+  local g, LG = DT.gankStore(), type(L.gank) == "table" and L.gank or {}
+  local old = {}
+  for _, t in pairs(LG) do
+    if type(t) == "table" and type(t.logs) == "table" then
+      for _, e in ipairs(t.logs) do
+        if type(e) == "table" and type(e.who) == "string" then
+          local ne = copy(e)
+          ne.who = key(e.who) or e.who
+          if type(e.by) == "string" then ne.by = key(e.by) or e.by end
+          old[#old + 1] = ne
+        end
+      end
+    end
+  end
+  for _, e in ipairs(g.logs) do old[#old + 1] = e end
+  while #old > 500 do table.remove(old, 1) end
+  g.logs = old
+
+  -- played: the board, and the share setting
+  local LP = type(L.played) == "table" and L.played or {}
+  local b = DT.playedBoard()
+  local merged = 0
+  for gk, t in pairs(LP) do
+    if type(gk) == "string" and type(t) == "table" then
+      for k, e in pairs(t) do
+        local nk = key(k)
+        if nk and type(e) == "table" then
+          local cur = b[nk]
+          if cur == nil then b[nk] = copy(e)
+          else
+            merged = merged + 1
+            if type(e.t) == "number" and (type(cur.t) ~= "number" or e.t > cur.t) then b[nk] = copy(e) end
+          end
+        end
+      end
+    end
+  end
+  if type(LP.share) == "boolean" then put("played", "share", LP.share) end
+
+  -- stash: each character's lists, and the share setting
+  local LS = type(L.stash) == "table" and L.stash or {}
+  local chars = DT.stash().chars
+  for k, e in pairs(type(LS.chars) == "table" and LS.chars or {}) do
+    local nk = key(k)
+    if nk and type(e) == "table" then
+      local cur = chars[nk]
+      if cur == nil then chars[nk] = copy(e)
+      else
+        merged = merged + 1
+        if (type(cur.bank) ~= "table" or next(cur.bank) == nil) and type(e.bank) == "table" then
+          cur.bank, cur.bankAt = copy(e.bank), e.bankAt
+        end
+      end
+    end
+  end
+  if type(LS.share) == "boolean" then put("stash", "share", LS.share) end
+
+  -- events and logs settings
+  local LE = type(L.events) == "table" and L.events or {}
+  if type(LE.remind) == "boolean" then put("events", "remind", LE.remind) end
+  local LL = type(L.logs) == "table" and L.logs or {}
+  if type(LL.ask) == "boolean" then put("logs", "ask", LL.ask) end
+  if type(LL.login) == "boolean" then put("logs", "login", LL.login) end
+
+  M.port2Unmatched = unmatched
+  M.port2Merged = merged
+  M.port2Mapped = 0
+  for _ in pairs(map) do M.port2Mapped = M.port2Mapped + 1 end
+  return true
+end
+DT.migratePort2 = run2
+
 -- The connected-realm refile: a HELLO from Realm'-Full Name, while the roster holds the same full
 -- name under our own realm marked fromLegacy, moves that entry (and its deaths, its hcTold record
 -- and every main pointing at it) to the key the HELLO supplied.
@@ -203,5 +332,5 @@ end)
 DT.module({
   id = "migrate",
   title = "Legacy move",
-  init = function() run() end,
+  init = function() run(); run2() end,
 })

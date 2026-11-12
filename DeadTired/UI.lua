@@ -4,8 +4,12 @@
 --
 -- Viewport rules (FEATURES.md, the Wizardry marks bar's visibility rules; its code isn't in
 -- reference/, so only the rules are copied): placed and kept (dragged by the title, the place saved
--- in DeadTiredDB.frames and restored after /reload), not closed by Escape (DT never touches
--- UISpecialFrames or any other Blizzard table), no secure templates, so usable in combat.
+-- in DeadTiredDB.frames and restored after /reload), no secure templates, so usable in combat.
+-- R-P2-2 (Port 2, ruled 11 Nov): Escape closes every viewport. At creation DT does
+-- table.insert(UISpecialFrames, <the viewport's own frame name>), once per viewport; that is the one
+-- touch on a Blizzard table (CLAUDE.md), and DT never removes, reorders or replaces anything in it.
+-- A viewport may opt out with sticky = true (none does yet). tests/test_taint.lua allows exactly
+-- this call and type(UISpecialFrames), nothing else.
 local ADDON, ns = ...
 local DT = ns.DT
 
@@ -60,6 +64,28 @@ end
 
 DT.viewports = {}
 
+-- R-P2-2: Escape closes DT's own frame `name` (a name DT created, "DeadTired..."). Inserts only;
+-- once per name; nothing else in the table is read, moved or removed.
+local escaped = {}
+function DT.closeOnEscape(name)
+  if type(name) ~= "string" or not name:match("^DeadTired") or escaped[name] then return false end  -- guard: DT's own names only
+  if type(UISpecialFrames) ~= "table" then return false end
+  table.insert(UISpecialFrames, name)                                      -- guard: insert only (R-P2-2)
+  escaped[name] = true
+  return true
+end
+
+-- A date for a narrow column: "2026-11-10 21:00:00" -> "10 Nov" (Port 2, the graveyard's date
+-- column). Anything else is returned as given (made safe), at most 10 characters.
+local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+function DT.shortDate(at)
+  if type(at) ~= "string" then return "?" end
+  local m, d = at:match("^%d%d%d%d%-(%d%d)%-(%d%d)")
+  m, d = tonumber(m), tonumber(d)
+  if m and d and MONTHS[m] then return d .. " " .. MONTHS[m] end
+  return DT.safe(at, 10)
+end
+
 -- The body's top, in pixels below the frame's top: under the title, and under the search box with a
 -- clear gap (the box's backdrop edge drawn outside it included).
 local TITLE_H, SEARCH_H, SEARCH_GAP = 22, 20, 10
@@ -72,12 +98,16 @@ end
 DT.SEARCH_H = SEARCH_H
 
 -- DT.viewport{ id, title, search = true|false, width, height, onSearch = fn(text), onShow = fn,
---              footer = pixels kept free at the bottom (for a note line) }
+--              footer = pixels kept free at the bottom (for a note line),
+--              sticky = true: Escape leaves it open (R-P2-2's opt-out) }
 function DT.viewport(o)
   if DT.viewports[o.id] then return DT.viewports[o.id] end
   local vp = { id = o.id }
-  local f = CreateFrame("Frame", "DeadTiredViewport_" .. o.id, UIParent, "BackdropTemplate")
+  local name = "DeadTiredViewport_" .. o.id
+  local f = CreateFrame("Frame", name, UIParent, "BackdropTemplate")
   vp.frame = f
+  vp.name = name
+  if not o.sticky then DT.closeOnEscape(name) end
   f:SetSize(o.width or 360, o.height or 420)
   f:SetFrameStrata("DIALOG")
   f:SetToplevel(true)

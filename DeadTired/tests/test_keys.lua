@@ -65,4 +65,13 @@ check("sameKey ignores case and spacing", DT.sameKey("CAMWOWEU4Realm2PvP-Stromha
 check("the same full name on two realms is two keys", DT.keyOf("Lilbit High", "CAMWOW EU4 Realm 4 PvP")
   ~= DT.keyOf("Lilbit High", "CAMWOW EU4 Realm 2 PvP"))
 
+-- Port 2: DT.normKey, the one spelling for a key from another client or an old store
+do
+  local w = H.world()
+  local c = w:client({ guild = "DEAD TIRED" })
+  local N = c.DT.normKey
+  check("normKey: realm normalised, name tidied", N("CAMWOW EU4 Realm 2 PvP-Stromham  Hamson") == "CAMWOWEU4Realm2PvP-Stromham Hamson")
+  check("normKey: not a key is nil", N("NoRealm") == nil and N("Realm-") == nil and N(nil) == nil)
+end
+
 H.finish("keys")
