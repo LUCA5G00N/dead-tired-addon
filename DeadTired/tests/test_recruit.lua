@@ -382,4 +382,68 @@ do
     and r:said("Nudge on.") ~= nil)
 end
 
+
+-- ---------------------------------------------------------------- fix round 4: the nudge and /reload (R-F4-6, G9)
+do
+  local NUDGE = "The crypt door creaks open: you can recruit again (/dt recruit)."
+  local clock = { now = 1793833200 }
+  local w = H.world()
+  local clients = {}
+  local function mk2(o)
+    o.name = "Stromham"
+    o.setup = function(c) c.now = clock.now; clients[#clients + 1] = c end
+    return mk(w, o)
+  end
+  local function tick(d) w:advance(d); clock.now = clock.now + d; for _, c in ipairs(clients) do c.now = clock.now end end
+  -- a /reload while the cooldown runs: re-armed for the time left, once
+  local s = mk2({})
+  s:login()
+  s:slash("recruit")
+  check("R-F4-6 baseline: the post goes", #s.posts == 1)
+  tick(300)
+  local r = s:reload()                        -- PLAYER_ENTERING_WORLD(false, true)
+  r.printed = {}
+  tick(599)
+  check("G9 a /reload with the cooldown running: nothing early", r:count(NUDGE) == 0)
+  tick(2)
+  check("G9 a /reload with the cooldown running: re-armed, the nudge comes at 15 min after the post", r:count(NUDGE) == 1)
+  tick(2000)
+  check("G9 ...and only once", r:count(NUDGE) == 1)
+  -- two reloads: still once
+  r:slash("recruit"); tick(100)
+  local r2 = r:reload(); tick(100)
+  local r3 = r2:reload(); r3.printed = {}
+  tick(800)
+  check("G9 two reloads inside one cooldown: still one nudge for the post", r3:count(NUDGE) == 1)
+  tick(1000)
+  check("G9 ...still one", r3:count(NUDGE) == 1)
+  -- a fresh login never re-arms
+  r3:slash("recruit"); tick(300)
+  local db = r3:db()
+  r3:logout()
+  local fresh = mk2({ db = db })
+  fresh:login()                               -- PLAYER_ENTERING_WORLD(true, false)
+  tick(2000)
+  check("G9 a fresh login inside the cooldown: no nudge (never re-armed at login)", fresh:count(NUDGE) == 0)
+  -- the cooldown ended during the reload: no late line
+  fresh:slash("recruit"); tick(905)
+  local late = fresh:reload()
+  late.printed = {}
+  tick(2000)
+  check("G9 a /reload after the cooldown ended: no late line", late:count(NUDGE) == 0)
+  -- nudge off: a reload re-arms nothing that speaks
+  late:slash("recruit"); late:slash("recruit nudge off"); tick(100)
+  local quiet = late:reload(); quiet.printed = {}
+  tick(2000)
+  check("G9 nudge off: a reload brings nothing", quiet:count(NUDGE) == 0)
+  -- the event's flag must be exactly true
+  quiet:slash("recruit nudge on"); quiet:slash("recruit"); tick(100)
+  local db2 = quiet:db()
+  quiet:logout()
+  local odd = mk2({ db = db2 })
+  odd:fire("PLAYER_LOGIN"); odd:fire("PLAYER_ENTERING_WORLD", false, 1)
+  tick(2000)
+  check("G9 a reload flag that isn't exactly true re-arms nothing", odd:count(NUDGE) == 0)
+end
+
 H.finish("recruit")

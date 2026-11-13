@@ -13,6 +13,15 @@
 -- in chat, as /played does; DT prints nothing over them.
 -- Fix round 1 (F9): /dt slowest share off sends PLAYED {off=1}, and receivers delete the sender's
 -- entry; entries carry t = time() and are dropped after 30 days.
+-- Fix round 4 (R-F4-5): a master switch (optional = true, the framework's On card, default on).
+-- Off: no events (the framework), inbound messages ignored, nothing sent, nothing printed unasked,
+-- and each verb answers "played.enabled = off" and does nothing else. Off is not a withdrawal.
+-- Ruling (Tim, 12 Nov, on R-F4-5): the sharing toggle always withdraws. Switching played.share off
+-- (on the card or with /dt set) sends PLAYED {off=1} and removes your own entry even while the
+-- module is off: the only send Played makes while off. (The typed /dt slowest share off is a verb
+-- of Played's own, so while off it answers "played.enabled = off" like the others.)
+-- Fix round 4 (R-F4-7): /dt played with sharing off asks the client as before, then says how to
+-- share; nothing is recorded or sent.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -23,6 +32,8 @@ local SHOW = 5
 local MAX_AGE = 30 * 86400
 local CLOSING = "Only guildies running the addon who share their /played. Type /dt played to update yours."
 local NO_CLIENT = "The client won't say how long you've played. Nothing recorded."
+local HINT = "Sharing's off. /dt slowest share on"
+local OFF = "played.enabled = off"
 local EMPTY = "No contenders. Everyone's either fast or shy."
 
 local function store()
@@ -94,6 +105,7 @@ local function valid(f)
 end
 
 DT.on("PLAYED", function(from, f)
+  if not DT.enabled("played") then return end                          -- guard: off ignores inbound (played)
   -- F9: a withdrawal is PLAYED {off=1} and nothing else; it deletes the sender's entry.
   if f.off ~= nil then
     if f.off == "1" and f.lvl == nil and f.h == nil then
@@ -152,23 +164,24 @@ local function redraw()
 end
 DT.slowestRedraw = redraw
 
+-- Fix round 4: the closing line is the viewport's footer (it wraps inside the window: the Port 2
+-- walk's defect 2); every column but the name is as wide as its widest value, so "93.7 h played"
+-- stays on one line; the tooltip is the name only (defect 4, Tim's ruling).
+local function build()
+  if vp then return end
+  model = DT.listModel()
+  vp = DT.viewport({ id = "slowest", title = "Glacial Progress", search = true, width = 420, height = 360, footer = CLOSING,
+    onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+  list = DT.list(vp.body, model, { count = 14,
+    empty = function(m) if #m.rows == 0 then return EMPTY end end,
+    tip = function(row, tt) tt:AddLine(DT.safe(DT.nameOf(row.key), 48)) end,
+    columns = { { key = "n", fixed = true, colour = "muted" }, { key = "name", flex = true },
+      { key = "rateText", fixed = true }, { key = "lvlText", fixed = true, colour = "muted" },
+      { key = "hoursText", fixed = true, colour = "muted" } } })
+end
+
 local function view(rows)
-  if not vp then
-    model = DT.listModel()
-    vp = DT.viewport({ id = "slowest", title = "Glacial Progress", search = true, width = 420, height = 360, footer = 16,
-      onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-    local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
-    note:SetText(CLOSING)
-    vp.note = note
-    DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 14,
-      empty = function(m) if #m.rows == 0 then return EMPTY end end,
-      tip = function(row, tt) tt:AddLine(DT.safe(DT.nameOf(row.key), 48)); tt:AddLine(DT.realmLabel(row.key), 1, 1, 1) end,
-      columns = { { key = "n", width = 22, colour = "muted" }, { key = "name", width = 140 },
-        { key = "rateText", width = 80 }, { key = "lvlText", width = 60, colour = "muted" },
-        { key = "hoursText", width = 80, colour = "muted" } } })
-  end
+  build()
   model:set(rows)
   list:refresh()
   vp:Show()
@@ -190,6 +203,7 @@ end
 -- ---------------------------------------------------------------- verbs
 
 local function verb(args)
+  if not DT.enabled("played") then return DT.out(OFF) end              -- guard: off verbs do nothing else (slowest)
   local w = (args or ""):lower():gsub("%s+", " ")
   if w == "" then return DT.slowest()
   elseif w == "share on" then
@@ -207,7 +221,7 @@ end
 -- F9: switching sharing off (typed, /dt set or the card) withdraws this character's entry from
 -- guildies' boards: one message, queued as usual.
 local function shareChanged(on)
-  if on then return end
+  if on then return end                                               -- (Tim, 12 Nov: withdraws even while Played is off)
   local me = DT.myKey()
   if me then board()[me] = nil end
   DT.send("PLAYED", { off = "1" })                                     -- guard: withdrawn when sharing off (F9)
@@ -219,6 +233,7 @@ DT.keySource(function() return board() end)
 DT.module({
   id = "played",
   title = "Glacial Progress",
+  optional = true,
   settings = {
     { key = "share", type = "bool", default = false, label = "Share my play time", verb = "slowest share on|off",
       onChange = shareChanged,
@@ -226,12 +241,17 @@ DT.module({
   },
   verbs = {
     { verb = "slowest", usage = "slowest [share on/off]", fn = verb },
-    { verb = "played", usage = "played", fn = function() ask() end },
+    { verb = "played", usage = "played", fn = function()
+        if not DT.enabled("played") then return DT.out(OFF) end        -- guard: off verbs do nothing else (played)
+        ask()
+        if not sharing() then DT.out(HINT) end                         -- guard: the hint only when sharing is off
+      end },
   },
   init = function() store(); prune() end,
+  fit = function() build(); model:set(DT.slowestRows()); list:refresh() end,
   events = { TIME_PLAYED_MSG = onPlayed },
 })
 
 -- For the offline tests only.
-DT._played = { asked = function() return askedAt end, CLOSING = CLOSING, EMPTY = EMPTY, NO_CLIENT = NO_CLIENT,
+DT._played = { asked = function() return askedAt end, CLOSING = CLOSING, EMPTY = EMPTY, NO_CLIENT = NO_CLIENT, HINT = HINT,
   vp = function() return vp end, list = function() return list end }

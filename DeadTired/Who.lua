@@ -145,22 +145,23 @@ local function ask()
   DT.openWho()
 end
 
+-- Fix round 4: the note is the viewport's footer; the version and "when" columns are as wide as
+-- their widest value, the name takes the rest. The tooltip keeps its realm line (R-P5, R-F4-10).
+local function build()
+  if vp then return end
+  model = DT.listModel()
+  vp = DT.viewport({ id = "who", title = "Who runs Dead Tired", search = true, width = 380, height = 400,
+    footer = NOTE, onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+  list = DT.list(vp.body, model, { count = 16, tip = tip, empty = function(m)
+      if (DT.trim(m.query) or "") ~= "" or #m.rows > 1 then return nil end
+      return EMPTY
+    end, columns = {
+    { key = "name", flex = true }, { key = "v", fixed = true, colour = "muted" }, { key = "when", fixed = true, colour = "muted" } } })
+end
+
 function DT.openWho()
   if not DT.isMember() then return end
-  if not vp then
-    model = DT.listModel()
-    vp = DT.viewport({ id = "who", title = "Who runs Dead Tired", search = true, width = 380, height = 400,
-      footer = 16, onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-    local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
-    note:SetText(NOTE)
-    DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 16, tip = tip, empty = function(m)
-        if (DT.trim(m.query) or "") ~= "" or #m.rows > 1 then return nil end
-        return EMPTY
-      end, columns = {
-      { key = "name", width = 180 }, { key = "v", width = 70, colour = "muted" }, { key = "when", width = 80, colour = "muted" } } })
-  end
+  build()
   model:set(DT.whoRows())
   list:refresh()
   vp:Show()
@@ -187,6 +188,7 @@ DT.module({
     OnClick = function(_, which) if which == "RightButton" then DT.openSettings("who") else DT.openWho() end end,
     OnTooltipShow = function(tt) tt:AddLine("Who runs Dead Tired"); tt:AddLine(NOTE, 1, 1, 1) end },
   onEnable = function() loginHello() end,
+  fit = function() build(); model:set(DT.whoRows()); list:refresh() end,
 })
 
 -- After the welcome (Guild.lua: once per login, inside the guild), the login hello.

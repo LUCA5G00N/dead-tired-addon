@@ -14,6 +14,9 @@
 -- No combat data: nothing here reads a combat event, a kill or a death recap.
 -- Fix round 1: F7, the double-press window lives in memory and a log's stored t is the epoch; F6b,
 -- a received GANK is kept at most once per sender and enemy per 300 s.
+-- Fix round 4 (R-F4-5): a master switch (optional = true, the framework's On card, default on).
+-- Off: no events (the framework), inbound messages ignored, nothing sent, nothing printed unasked,
+-- and each verb answers "gank.enabled = off" and does nothing else. Off is not a withdrawal.
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -132,6 +135,7 @@ end
 local lastFrom = {}
 
 DT.on("GANK", function(from, f)
+  if not DT.enabled("gank") then return end                                           -- guard: off ignores inbound (gank)
   if not valid(f) then                                                                -- guard: field validation
     local g = gank()
     g.badGank = g.badGank + 1
@@ -194,27 +198,28 @@ redraw = function()
   if model and vp and vp:IsShown() then model:set(DT.gankRows()); list:refresh() end
 end
 
+-- Fix round 4: the closing line is the viewport's footer; n, what and day are as wide as their
+-- widest value, the last zone takes the rest (cut with "…", in full in the tooltip). The
+-- tooltip keeps its realm line (R-F4-10, until the gank rework).
+local function build()
+  if vp then return end
+  model = DT.listModel()
+  vp = DT.viewport({ id = "gank", title = "Grudges", search = true, width = 520, height = 400, footer = CLOSING,
+    onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
+  list = DT.list(vp.body, model, { count = 16,
+    empty = function(m) if #m.rows == 0 then return EMPTY end end,
+    tip = function(row, tt)
+      tt:AddLine(DT.safe(DT.nameOf(row.key), 48)); tt:AddLine(DT.realmLabel(row.key), 1, 1, 1)
+      tt:AddLine(row.full, 0.8, 0.8, 0.8)
+    end,
+    columns = { { key = "n", fixed = true, colour = "muted" }, { key = "name", width = 130 },
+      { key = "what", fixed = true, colour = "muted" }, { key = "by", width = 100 },
+      { key = "last", flex = true, colour = "muted" }, { key = "day", fixed = true, colour = "muted" } } })
+end
+
 function DT.gankBoard()
   if not DT.isMember() then return end
-  if not vp then
-    model = DT.listModel()
-    vp = DT.viewport({ id = "gank", title = "Grudges", search = true, width = 520, height = 400, footer = 16,
-      onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-    local note = vp.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    note:SetPoint("BOTTOMLEFT", vp.frame, "BOTTOMLEFT", DT.style("spacing.pad"), 6)
-    note:SetText(CLOSING)
-    vp.note = note
-    DT.skin(function() DT.fontTo(note, "small", "muted") end)
-    list = DT.list(vp.body, model, { count = 16,
-      empty = function(m) if #m.rows == 0 then return EMPTY end end,
-      tip = function(row, tt)
-        tt:AddLine(DT.safe(DT.nameOf(row.key), 48)); tt:AddLine(DT.realmLabel(row.key), 1, 1, 1)
-        tt:AddLine(row.full, 0.8, 0.8, 0.8)
-      end,
-      columns = { { key = "n", width = 22, colour = "muted" }, { key = "name", width = 130 },
-        { key = "what", width = 80, colour = "muted" }, { key = "by", width = 100 },
-        { key = "last", width = 96, colour = "muted" }, { key = "day", width = 40, colour = "muted" } } })
-  end
+  build()
   model:set(DT.gankRows())
   list:refresh()
   vp:Show()
@@ -275,17 +280,24 @@ DT.keySource(function()
   return out
 end)
 
+local OFF = "gank.enabled = off"
 DT.module({
   id = "gank",
   title = "Gank diary",
+  optional = true,
   verbs = {
-    { verb = "gank", usage = "gank", fn = function() DT.gank() end },
+    { verb = "gank", usage = "gank", fn = function()
+        if not DT.enabled("gank") then return DT.out(OFF) end                         -- guard: off verbs do nothing else (gank)
+        DT.gank()
+      end },
     { verb = "ganks", usage = "ganks [name]", fn = function(args)
+        if not DT.enabled("gank") then return DT.out(OFF) end                         -- guard: off verbs do nothing else (ganks)
         if args ~= "" then return one(args) end
         return DT.gankBoard()
       end },
   },
   init = function() gank() end,
+  fit = function() build(); model:set(DT.gankRows()); list:refresh() end,
 })
 
 -- For the offline tests only.

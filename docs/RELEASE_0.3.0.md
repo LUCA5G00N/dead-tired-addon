@@ -27,7 +27,7 @@ Every list below shows only guildies who run it.
 - **The bar list shows names**, not whatever the button says this minute (BugSack, not `0`).
   A grab hand while you drag a row.
 - **The recruit nudge** survives `/dt recruit nudge off` and `on`.
-- **The graveyard's dates** fit on one line (`10 Nov`); the full date is in the tooltip.
+- The graveyard's dates are short (`10 Nov`), the full date in the tooltip. Some still wrapped: fixed in 0.3.1.
 
 ## Install
 1. Quit WoW. Back up `WTF\Account\<you>\SavedVariables\DeadTired.lua`.

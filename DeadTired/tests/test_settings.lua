@@ -112,7 +112,7 @@ do
   c:slash("skin forever")
   check("/dt skin forever sets core.skin", c.DT.get("core", "skin") == "forever" and c:said("core.skin = forever"))
   c:slash("skin pink")
-  check("/dt skin with a bad name refused", c.DT.get("core", "skin") == "forever" and c:said("/dt set: expects one of: deadtired, forever"))
+  check("/dt skin with a bad name refused", c.DT.get("core", "skin") == "forever" and c:said("/dt set: expects one of: clean, deadtired, forever"))
   c:slash("set who hello off")
   check("/dt set who hello off", c.DT.get("who", "hello") == false)
 end

@@ -30,6 +30,10 @@
 --   logs:    legacy.logs.ask / .login -> settings.logs.ask / .login (the visit in progress is not
 --            carried: it belongs to a session)
 -- A setting already set in the new store is not overwritten.
+--
+-- FIX ROUND 4 (R-F4-4), once per account (DeadTiredDB.migrated.skin031 = true): a saved skin of
+-- "deadtired", or none, becomes "clean" (the new default); "forever" is left alone. Silent. It
+-- writes settings.core.skin and its own flag, nothing else.
 local ADDON, ns = ...
 local DT = ns.DT
 
@@ -329,8 +333,25 @@ DT.on("HELLO", function(from)
   if type(M) == "table" then M.refiled = (M.refiled or 0) + 1 end
 end)
 
+local function run3()
+  local db = DT.db()
+  if type(db.migrated) ~= "table" then db.migrated = {} end
+  local M = db.migrated
+  if M.skin031 then return false end                                     -- guard: the skin move runs once
+  M.skin031 = true
+  local core = db.settings.core
+  local cur = type(core) == "table" and core.skin or nil
+  if cur == nil or cur == "deadtired" then                               -- guard: forever left alone
+    if type(core) ~= "table" then core = {}; db.settings.core = core end
+    core.skin = "clean"
+    DT.restyle()
+  end
+  return true
+end
+DT.migrateSkin = run3
+
 DT.module({
   id = "migrate",
   title = "Legacy move",
-  init = function() run(); run2() end,
+  init = function() run(); run2(); run3() end,
 })

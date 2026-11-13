@@ -236,7 +236,7 @@ do
   local vp = tim.DT._stash.vp()
   check("the answers open in a viewport: one row per holder, in arrival order",
     vp and vp:IsShown() and rows(tim)[1] == "Ghoul Alt: Linen Cloth x60" and rows(tim)[2] == "Ghoul Grim: Linen Cloth x20, Bolt of Linen Cloth x4")
-  check("the closing line under them", vp.note.text == CLOSING)
+  check("the closing line under them", vp.footer.text == CLOSING)
   check("the answers are a DT viewport: Escape closes it (R-P2-2)", vp.name == "DeadTiredViewport_stash")
   check("nothing printed over them", #tim.printed == 0)
   check("receivers print nothing", not a:said("Linen") and not b:said("Linen"))
@@ -388,6 +388,59 @@ do
   check("own short key: folded into the full key at login (bank kept, bags rescanned)", chars[K2 .. "Stromham"] == nil
     and chars[K2 .. "Stromham Hamson"].bank[2592] == 9 and chars[K2 .. "Stromham Hamson"].bags[2589] == 20)
   check("another character's short key is left for its own login", chars[K2 .. "Gizzardthe"] ~= nil)
+end
+
+
+-- ---------------------------------------------------------------- fix round 4: the master switch (R-F4-5, G10)
+do
+  local OFF = "stash.enabled = off"
+  local w = H.world()
+  local a = mk(w, { name = "Stromham", full = "Stromham Hamson", bags = { [0] = { item(2589, 60) } } })
+  local b = mk(w, { name = "Echo", full = "Echo Nightclaw" })
+  a:login(); b:login(); w:advance(10)
+  local m = a.DT.byId.stash
+  check("G10 stash: an On card, default on", m.optional and a.DT.setting("stash", "enabled").label == "On"
+    and a.DT.enabled("stash") and m.frame.events.BAG_UPDATE_DELAYED)
+  a:slash("stash share on")
+  check("on: the bags read", mine(a) and mine(a).bags[2589] == 60)
+  a:slash("set stash enabled off")
+  check("G10 stash off: registers no events", not m.frame.events.BAG_UPDATE_DELAYED and not m.frame.events.BANKFRAME_OPENED
+    and not m.frame.events.PLAYER_ENTERING_WORLD)
+  local scans, sent = a.scans, #sentKind(a, "STASH")
+  for _, v in ipairs({ "stash", "stash linen", "stash share off", "stash share" }) do
+    a:slash(v)
+    check("G10 stash off: /dt " .. v .. " prints " .. OFF .. " and nothing else", #a.printed == 1 and a.printed[1] == P .. OFF)
+  end
+  check("G10 stash off: the verbs changed nothing (sharing still on, nothing asked)", a.DT.get("stash", "share") == true
+    and #sentKind(a, "STASHQ") == 0)
+  inject(a, "STASHQ", b:key(), { q = "123", term = "linen" })
+  w:advance(10)
+  check("G10 stash off: a search is ignored, nothing sent", #sentKind(a, "STASH") == sent)
+  inject(a, "STASHQ", b:key(), { q = "x", term = "" })
+  check("G10 stash off: inbound not even counted as bad", a:db().stash.badStash == 0)
+  a:fire("BAG_UPDATE_DELAYED")
+  check("G10 stash off: the bags aren't read", a.scans == scans)
+  -- a search heard while on, switched off before the answer's delay: nothing sent
+  a:slash("set stash enabled on")
+  local c3 = mk(w, { name = "Crow", full = "Crow Feather" })
+  inject(a, "STASHQ", c3:key(), { q = "777", term = "linen" })
+  a:slash("set stash enabled off")
+  w:advance(10)
+  check("G10 stash off: an answer already waiting is not sent", #sentKind(a, "STASH") == sent)
+  -- a search asked while on, its answers arriving after off: dropped, no window
+  a:slash("set stash enabled on")
+  a:slash("stash linen")
+  a:slash("set stash enabled off")
+  inject(a, "STASH", b:key(), { q = tostring(a.DT._stash.open() and a.DT._stash.open().q or 0), to = a:key(), hits = "2589:5:Echo Nightclaw" })
+  local o = a.DT._stash.open()
+  check("G10 stash off: a late answer is not even recorded", o ~= nil and next(o.answers) == nil)
+  w:advance(11)
+  check("G10 stash off: late answers ignored, no window", not (a.DT._stash.vp() and a.DT._stash.vp():IsShown()))
+  a:slash("set stash enabled on")
+  w:advance(31)
+  b:slash("stash linen")
+  w:advance(11)
+  check("G10 stash on again: answers searches", #sentKind(a, "STASH") == sent + 1)
 end
 
 H.finish("stash")

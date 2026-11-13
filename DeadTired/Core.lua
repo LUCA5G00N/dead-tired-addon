@@ -18,7 +18,7 @@ ns = ns or {}
 local DT = {}
 ns.DT = DT
 DT.ADDON = ADDON
-DT.VERSION = "0.3.0"
+DT.VERSION = "0.3.1"
 DT.SCHEMA = 3
 DT.Config = ns.Config or {}
 
@@ -202,10 +202,13 @@ local function store(id)
   return all[id]
 end
 
+-- A read creates nothing (fix round 4: master switches are read outside the guild too).
 function DT.get(id, key)
   local s = DT.setting(id, key)
   if not s then return nil end
-  local v = store(id)[key]
+  local mine = DT.db().settings[id]
+  local v = nil
+  if type(mine) == "table" then v = mine[key] end
   if v == nil then return s.default end
   return v
 end

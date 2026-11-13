@@ -63,7 +63,7 @@ for _, f in ipairs(c.frames) do
     -- the welcome row's checkbox: the first CheckButton (guild is the first card)
     check_ = f
   end
-  if f._type == "Button" and f._template == "UIPanelButtonTemplate" and f.text == "deadtired" then choice = f end
+  if f._type == "Button" and f._template == "UIPanelButtonTemplate" and f.text == "clean" then choice = f end
 end
 check("the welcome checkbox reads the setting", check_ and check_:GetChecked() == true)
 check_:SetChecked(false); check_.scripts.OnClick(check_)
@@ -72,7 +72,7 @@ check("changed in the viewport: /dt get shows it", c:said("guild.welcome = off")
 c:slash("set guild welcome on")
 check("changed with /dt set: the viewport shows it", check_:GetChecked() == true)
 choice.scripts.OnClick(choice)
-check("a choice cycles through DT.set", DT.get("core", "skin") == "forever" and choice.text == "forever")
+check("a choice cycles through DT.set", DT.get("core", "skin") == "deadtired" and choice.text == "deadtired")
 
 -- search
 local search = c:frame("DeadTiredViewport_settings")
@@ -150,6 +150,36 @@ do
   -- skins: both
   c2:slash("skin forever")
   check("the gap holds in the Forever skin", D.bodyTop(true) >= D.style("spacing.pad") + 22 + D.SEARCH_H + 6)
+end
+
+
+-- ---------------------------------------------------------------- fix round 4: the cards' text (R-F4-1)
+do
+  local w2 = H.world()
+  local c2 = w2:client({ guild = "DEAD TIRED" })
+  c2:login()
+  c2:slash("settings")
+  local D2 = c2.DT
+  local labels, blocks, headers, boxed = 0, 0, 0, true
+  for _, r in ipairs(D2._settingsView.rows()) do
+    if r.header then
+      if D2.textRecord(r.text).kind == "line" and D2.textRecord(r.text).role == "title" then headers = headers + 1 end
+    else
+      if D2.textRecord(r.label).kind == "line" then labels = labels + 1 end
+      if D2.textRecord(r.desc).kind == "block" and D2.textRecord(r.hint).kind == "block" then blocks = blocks + 1 end
+      if r.frame.shown and (D2.textRecord(r.desc).boxH or 0) < r.desc:GetStringHeight() then boxed = false end
+    end
+  end
+  local n = #D2._settingsView.rows() - headers
+  check("settings: every label a line, every description and hint a block, every module title a line",
+    labels == n and blocks == n and headers > 10)
+  check("settings: every shown description sized from its measured height (P1-H5 kept)", boxed)
+  local five = 0
+  for _, id in ipairs({ "gank", "played", "stash", "events", "logs" }) do
+    local s = D2.setting(id, "enabled")
+    if s and s.label == "On" and D2.get(id, "enabled") == true then five = five + 1 end
+  end
+  check("R-F4-5: Gank, Played, Stash, Events and Logs each have an On card, all on", five == 5)
 end
 
 H.finish("settingsview")

@@ -28,7 +28,7 @@ its own viewport (but built on a standard frame so the skin maintenance stays ea
 | Piece | What it is | Notes |
 |---|---|---|
 | **Launcher bar** | A small bar of module buttons (Naowh's Top Bar idea). Placed where you want, kept | Only enabled modules show. `/dt` keeps working for everything |
-| **Viewport frame** | One standard frame every module draws into: title, close, body, optional search | Visibility rules from the Wizardry marks bar: placed and kept, survives `/reload`, Escape doesn't close it, works in combat (insecure frames only) |
+| **Viewport frame** | One standard frame every module draws into: title, close, body, optional search | Visibility rules from the Wizardry marks bar: placed and kept, survives `/reload`, Escape closes it (R-P2-2, walked 12 Nov), works in combat (insecure frames only) |
 | **Skins** | Every frame draws through one style table, so a skin is a palette and a few textures | Start with two: **Forever** (the game's stone and metal) and **Dead Tired** (the guild's, curated). More later. Must be in the first shell round: retrofitting a style is the expensive part |
 | **Settings as cards** | Each module declares its settings; the settings view builds itself. Per-module on/off | Includes the existing toggles (welcome, sharing opt-ins, logs prompt off) |
 | **Search on every list** | The list widget comes with a search box | *Tim:* standard for any list view |
@@ -258,6 +258,38 @@ bridge (the bot's job), guild builds.
    Grimm`); the realm goes in the row's tooltip. Proposal: only if two people share a full name is
    the realm added to tell them apart. **Keys keep the realm** (it's what keeps two same-named
    players apart and what made the cross-realm walk work).
+
+## Ruled 12 Nov (for `dt_fixes4`)
+Ratified by Tim, 12 Nov 14:26 (`docs/COWORK_BRIEF_dt_fixes4.md`).
+- **R-F4-1 Text fit.** Rows are one line, cut with "…", the full text in the row's tooltip.
+  Footers, descriptions, empty-state lines, dialogs and toasts are bounded both sides and wrapped,
+  their box sized from the measured height. Date, level, count and version columns are measured
+  from their widest value at the current font; each list has exactly one flexible column. No
+  shrink-to-fit. Modules never create raw text.
+- **R-F4-2 DT cuts the text itself.** None of the client's truncation calls (`IsTruncated`,
+  `SetMaxLines`); DT measures with `GetStringWidth` on a hidden string and trims to fit.
+- **R-F4-3 The clean skin.** A third skin, id `clean`, shown as **Dead Tired**: the Dead Tired
+  colours and edges with the game's own lettering (Friz Quadrata) throughout. The gothic skin keeps
+  id `deadtired`, shown as **Dead Tired Gothic**. `clean` is the default. `/dt skin clean|deadtired|forever`.
+- **R-F4-4 Who is switched.** Once per account, anyone on `deadtired` (or with no saved choice) is
+  moved to `clean`; `forever` is left alone. Silent (the release notes say it). `/dt skin deadtired`
+  afterwards sticks.
+- **R-F4-5 Master switches** on Gank, Played, Stash, Events, Logs: the framework's `On` card,
+  default on. Off: no events, inbound ignored, nothing sent, nothing printed unasked; a typed verb
+  answers `<id>.enabled = off` and does nothing else. Off is not a withdrawal.
+  **Ruled (Tim, 12 Nov): the sharing toggle always withdraws.** Switching Played's sharing off
+  (the card or `/dt set`) sends the PLAYED withdrawal and removes your own entry even while Played
+  is switched off: the only send allowed while the module is off.
+- **R-F4-6 The nudge and `/reload`.** A `/reload` while a post's cooldown runs re-arms the nudge
+  for the time left. A fresh login never does. No late line if the cooldown ended during the reload.
+- **R-F4-7 The hint.** `/dt played` with sharing off prints, after asking the client:
+  `Sharing's off. /dt slowest share on`
+- **R-F4-8 The skin card's description:** `How every Dead Tired window and the bar look: Dead
+  Tired (the guild's colours, plain lettering), Dead Tired Gothic (the same, with gothic titles) or
+  Forever (the game's stone and metal).`
+- **R-F4-9 Version.** 0.3.1, though PATCH is fixes only and this round adds a skin and five
+  switches: a one-off, noted in the release notes.
+- **R-F4-10 Other tooltips.** The Who list's and the Grudges board's tooltips keep their realm line.
 
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
