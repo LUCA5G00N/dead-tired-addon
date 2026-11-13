@@ -306,14 +306,31 @@ do
   check("G5 ...and the board ends above all of it", bottom == pad + 20)
   local cols = {}
   for _, c in ipairs(L.columns) do cols[c.key] = c end
-  check("defect 2: \"93.7 h played\" on one line, not cut", L.rows[1].cells[5].text == "93.7 h played"
-    and L.rows[1].cells[5]:GetStringWidth() <= cols.hoursText.w)
-  check("R-F4-1: n, rate, level and hours fixed; the name the one flex column", cols.n.fixed and cols.rateText.fixed
-    and cols.lvlText.fixed and cols.hoursText.fixed and cols.name.flex and cols.name.w >= 60)
+  check("R-F5-3: the detail line reads \"<rate> h/level, level <n>, <hours> h played\", on one line, not cut",
+    L.rows[1].detail.text == "2.8 h/level, level 34, 93.7 h played" and not a.DT.textRecord(L.rows[1].detail).cut)
+  check("R-F5-2: n and name are the columns, the name the one flex column; the detail key is detailText",
+    cols.n.fixed and cols.name.flex and cols.name.w >= 60 and #L.columns == 2 and L.detail.key == "detailText")
   local tt = a.DT.tooltip()
   tt.lines = {}
   L.rows[1].scripts.OnEnter(L.rows[1])
   check("G8 the tooltip is the name only: no realm line (defect 4)", #tt.lines == 1 and tt.lines[1] == "Turtle Shell")
+  check("G5 Glacial Progress declares a detail line and covers the name in its tooltip", L.detail and L.detail.key == "detailText"
+    and L.rows[1].cells[2].text == "Turtle Shell")
+  for _, skin in ipairs({ "clean", "deadtired", "forever" }) do
+    a.DT.fitSkin = skin; a.DT.restyle()
+    check("R-F5-2 Glacial Progress shows three rows or more under " .. skin, L.count >= 3)
+  end
+  a.DT.fitSkin = nil; a.DT.restyle()
+  -- a cut name: the tooltip shows it once (tipCovers)
+  local longRows = a.DT.slowestRows()
+  longRows[#longRows + 1] = { key = K2 .. "Long One", n = "2.", name = "Stromham " .. string.rep("Hamsonbergenstein", 4),
+    rateText = "1.0 h/level", lvlText = "level 10", hoursText = "10.0 h played", detailText = "1.0 h/level, level 10, 10.0 h played", search = "long" }
+  L.model:set(longRows); L:refresh()
+  local cutRow
+  for _, b in ipairs(L.rows) do if b.row and a.DT.textRecord(b.cells[2]).cut then cutRow = b end end
+  tt.lines = {}
+  if cutRow then cutRow.scripts.OnEnter(cutRow) end
+  check("H3 a cut name: the tooltip shows the name once, not twice", cutRow and #tt.lines == 1)
 end
 
 -- ---------------------------------------------------------------- fix round 4: the hint (R-F4-7)

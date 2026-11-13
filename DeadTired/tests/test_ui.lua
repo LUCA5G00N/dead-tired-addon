@@ -333,6 +333,118 @@ do
     L2.total == 300 - 28 and not pcall(D.list, c.env.CreateFrame("Frame"), D.listModel(), { columns = { { key = "a", flex = true } } }))
 end
 
+-- ---------------------------------------------------------------- fix round 5: two-line rows (R-F5-1), tipCovers
+do
+  local w = H.world()
+  local c = w:client({ guild = G })
+  c:login()
+  local D = c.DT
+  local LONG = "Sunday 14:00 server time, in 6d 3h 30m. And then a great many more words to be sure it is cut"
+  local vp = D.viewport({ id = "two", title = "Two", search = true, width = 300, height = 260, footer = "Short." })
+  local m = D.listModel()
+  local rows = {}
+  for i = 1, 12 do rows[i] = { name = "Row " .. i, when = (i == 1) and LONG or ("short " .. i), search = "r" .. i } end
+  m:set(rows)
+  check("R-F5-1 a detail list takes the body's declared height as a list takes its declared width: no height, it raises",
+    not pcall(D.list, c.env.CreateFrame("Frame", nil), D.listModel(), { width = 200, detail = { key = "when" },
+      columns = { { key = "name", flex = true } } })
+    and pcall(D.list, D.viewport({ id = "two0", title = "T", width = 300, height = 200 }).body, D.listModel(),
+      { detail = { key = "when" }, columns = { { key = "name", flex = true } } }))
+  local L = D.list(vp.body, m, { count = 12, detail = { key = "when" }, columns = { { key = "name", flex = true } } })
+  L:refresh()
+  local b1, b2 = L.rows[1], L.rows[2]
+  local rowH = D.style("spacing.row") + 10 + 2
+  check("G2 each row is two lines: a name line and a detail line, the detail muted and small",
+    b1.cells[1].text == "Row 1" and b2.detail.text == "short 2" and D.textRecord(b2.detail).kind == "line"
+    and D.textRecord(b2.detail).role == "small" and D.textRecord(b2.detail).colour == "muted")
+  check("G2 the row height is one fixed number: row spacing + small font size + 2, the same for every row",
+    L.rowH == rowH and b1.h == rowH and b2.h == rowH and L.rows[5].h == rowH)
+  check("G2 the detail line starts at the flex column's left edge and runs to the right padding",
+    b2.detail.points[1][4] == 4 and b2.detail.w == 300 - 28 - 4 - 4 and L.detailX == 4)
+  check("G2 the second line sits under the first, inside the row", -b2.detail.points[1][5] > 0 and -b2.detail.points[1][5] + 10 <= rowH)
+  check("G2 count = the rows that fit the body's declared height, never more than the frames",
+    L.count == math.floor(vp.body.dtHeight / rowH) and L.count < 12 and L.count >= 3)
+  check("G2 the last drawn row ends inside the body", L.height <= vp.body.dtHeight and L.height == L.count * rowH)
+  check("G2 rows past `count` are hidden", L.rows[L.count].shown and not L.rows[L.count + 1].shown)
+  L.frame.scripts.OnMouseWheel(L.frame, -100)
+  check("G2 scrolling reaches the last row, no further", L.rows[L.count].cells[1].text == "Row 12")
+  L.frame.scripts.OnMouseWheel(L.frame, 100)
+  -- G3: a cut detail line
+  local dr = D.textRecord(b1.detail)
+  check("G3 a detail line too long is cut with the ellipsis, inside its width",
+    dr.cut and b1.detail.text:sub(-3) == "\226\128\166" and b1.detail:GetStringWidth() <= L.detailW and not D.textRecord(b2.detail).cut)
+  local tt = D.tooltip()
+  tt.lines = {}
+  b1.scripts.OnEnter(b1)
+  check("G3 its full text is in the row's tooltip", #tt.lines == 1 and tt.lines[1] == LONG)
+  tt.lines = {}
+  b2.scripts.OnEnter(b2)
+  check("G3 an uncut detail adds nothing", #tt.lines == 0)
+  check("G3 the cut detail is counted among the cut rows", L:cutRows() == 1)
+  -- skin change: height recomputed, count re-derived
+  c:slash("skin forever")
+  check("G2 a skin change recomputes the row height and the count", L.rowH == D.style("spacing.row", "forever") + 10 + 2
+    and L.count == math.floor(vp.body.dtHeight / L.rowH) and b2.h == L.rowH)
+  c:slash("skin clean")
+  -- no detail: exactly as in 0.3.1
+  local vp3 = D.viewport({ id = "one", title = "One", width = 300 })
+  local m3 = D.listModel()
+  m3:set({ { name = "a", when = "b", search = "x" }, { name = "c", when = "d", search = "y" } })
+  local L3 = D.list(vp3.body, m3, { count = 5, columns = { { key = "name", width = 80 }, { key = "when", flex = true } } })
+  L3:refresh()
+  check("G2 a list without detail: no second line, height the row spacing, count as given",
+    L3.detail == nil and L3.rows[1].detail == nil and L3.count == 5 and L3.rows[1].h == D.style("spacing.row") and L3.height == 2 * D.style("spacing.row"))
+  -- G4: tipCovers
+  local vp4 = D.viewport({ id = "cov", title = "Cov", width = 300 })
+  local m4 = D.listModel()
+  m4:set({ { name = "A name far too long to fit the sixty pixels given", note = "A note far too long to fit in its column either", search = "z" } })
+  local D4 = D.list(vp4.body, m4, { count = 2, tip = function(row, t) t:AddLine(row.name) end, tipCovers = { "name" },
+    columns = { { key = "name", width = 60 }, { key = "note", width = 60 }, { key = "rest", flex = true } } })
+  m4:set({ { name = "A name far too long to fit the sixty pixels given", note = "A note far too long to fit in its column either", search = "z" } })
+  D4:widths(); D4:refresh()
+  check("G4 both cells are cut", D.textRecord(D4.rows[1].cells[1]).cut and #D4.rows[1].cut == 1 and D4.rows[1].cut[1]:find("A note", 1, true) == 1)
+  tt.lines = {}
+  D4.rows[1].scripts.OnEnter(D4.rows[1])
+  check("G4 a cut name the tip already shows is not added again; a cut cell not covered still is",
+    #tt.lines == 2 and tt.lines[1] == "A name far too long to fit the sixty pixels given" and tt.lines[2]:find("A note", 1, true) == 1)
+  local m5 = D.listModel()
+  m5:set({ { name = "A name far too long to fit the sixty pixels given", search = "z" } })
+  local L5 = D.list(vp4.body, m5, { count = 2, tip = function(row, t) t:AddLine(row.name) end,
+    columns = { { key = "name", width = 60 }, { key = "rest", flex = true } } })
+  L5:refresh()
+  check("G4 without tipCovers a cut cell is added (0.3.1)", #L5.rows[1].cut == 1)
+end
+
+-- ---------------------------------------------------------------- fix round 5: which lists are two-line (R-F5-2)
+do
+  local w = H.world()
+  local c = w:client({ guild = G, setup = function(c0)
+    rawset(c0.env, "C_DateAndTime", { GetServerTimeLocal = function() return 1793491200 end })
+    rawset(c0.env, "date", function(f, t) if f == "!*t" then return os.date("!*t", t) end return "2026-11-11 21:00:00" end)
+  end })
+  c:login()
+  c:slash("who"); c:slash("graveyard"); c:slash("ganks"); c:slash("slowest"); c:slash("events")
+  local D = c.DT
+  local by = {}
+  for _, L in ipairs(D.lists) do by[L.window] = L end
+  check("G5 the graveyard, Grudges and Who are one-line lists (no detail)", by.crypt and by.gank and by.who
+    and not by.crypt.detail and not by.gank.detail and not by.who.detail)
+  check("G5 Events and Glacial Progress are two-line lists", by.events and by.slowest and by.events.detail and by.slowest.detail)
+  check("G5 the graveyard's and Grudges' tooltips already show the name: tipCovers (checked by a cut name adding nothing)", (function()
+    for _, win in ipairs({ "crypt", "gank" }) do
+      local L = by[win]
+      L.model:set({ { key = "R-" .. string.rep("Long Name ", 10), name = string.rep("Long Name ", 10), day = "1 Nov", lvl = "1", zone = "z",
+        what = "w", by = "b", last = "l", n = "1.", full = "full", search = "x" } })
+      L:refresh()
+      local b = L.rows[1]
+      local tt = D.tooltip(); tt.lines = {}
+      b.scripts.OnEnter(b)
+      if not D.textRecord(b.cells[win == "crypt" and 2 or 2]).cut then return false end
+      for _, l in ipairs(tt.lines) do if l == string.rep("Long Name ", 10) then return false end end
+    end
+    return true end)())
+end
+
 -- ---------------------------------------------------------------- fix round 4: footers, titles, toast (G5)
 do
   local w = H.world()

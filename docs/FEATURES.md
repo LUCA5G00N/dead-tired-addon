@@ -261,7 +261,7 @@ bridge (the bot's job), guild builds.
 
 ## Ruled 12 Nov (for `dt_fixes4`)
 Ratified by Tim, 12 Nov 14:26 (`docs/COWORK_BRIEF_dt_fixes4.md`).
-- **R-F4-1 Text fit.** Rows are one line, cut with "…", the full text in the row's tooltip.
+- **R-F4-1 Text fit.** Rows are one line (two where a list declares a detail line, R-F5-1), cut with three dots (the game's font draws `…` that way), the full text in the row's tooltip.
   Footers, descriptions, empty-state lines, dialogs and toasts are bounded both sides and wrapped,
   their box sized from the measured height. Date, level, count and version columns are measured
   from their widest value at the current font; each list has exactly one flexible column. No
@@ -290,6 +290,29 @@ Ratified by Tim, 12 Nov 14:26 (`docs/COWORK_BRIEF_dt_fixes4.md`).
 - **R-F4-9 Version.** 0.3.1, though PATCH is fixes only and this round adds a skin and five
   switches: a one-off, noted in the release notes.
 - **R-F4-10 Other tooltips.** The Who list's and the Grudges board's tooltips keep their realm line.
+
+## Ruled 13 Nov (for `dt_fixes5`)
+Ratified by Tim, 13 Nov 15:10 (`docs/COWORK_BRIEF_dt_fixes5.md`).
+- **R-F5-1 Two-line rows amend R-F4-1.** A list row is one line, or two where the list declares a
+  detail line: the first line as now, the second one muted line of detail under it. Each line is
+  still cut to its width with the full text in the row's tooltip, and every row in a list is one
+  height. A cut cell the module's own tooltip already shows is not added again (`tipCovers`).
+- **R-F5-2 Which lists.** Two-line: Events, Who has it, Glacial Progress. One-line, as they are:
+  the graveyard, Grudges, Who.
+- **R-F5-3 The detail lines.** Events: the `when` text. Who has it: the items. Glacial Progress:
+  the three existing texts joined with commas, `3.0 h/level, level 36, 108.6 h played`. No other
+  new wording.
+- **R-F5-4 The cut mark.** DT writes `…` (one character); the game's font draws it as three
+  dots. Accepted: no code change; the docs say "three dots".
+- **R-F5-5 The skin switch, cause unproven.** Guess: a font not yet used this session isn't ready
+  when the open window is re-fonted. So every skin's fonts are set once on a hidden string at load,
+  and a skin change repaints at once and again on the next frame. An experiment; its falsifier is
+  the walk-sheet's H1. If H1 fails the guess is wrong, the two changes stay, and the next round
+  starts with an in-game probe.
+- **Tim, 13 Nov, on the `dt_fixes4` report's questions:** the On cards keep the stock wording; the
+  AddOns-page title stays; the template button labels stay; the combat-log prompt left up in
+  combat stays.
+- **Version.** 0.3.2.
 
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when

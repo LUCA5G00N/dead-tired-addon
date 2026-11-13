@@ -83,14 +83,15 @@ local vp, list, model
 
 -- Fix round 4: "Times are server time." is the viewport's footer; "when" takes the rest of the
 -- width (cut with "…", in full in the row's tooltip, which this list has only for a cut row).
+-- Fix round 5 (R-F5-1, R-F5-3): two lines a row: the name, then the `when` text under it.
 local function build()
   if vp then return end
   model = DT.listModel()
   vp = DT.viewport({ id = "events", title = "Events", search = true, width = 440, height = 260, footer = NOTE,
     onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-  list = DT.list(vp.body, model, { count = 10,
+  list = DT.list(vp.body, model, { count = 10, detail = { key = "when" },
     empty = function(m) if #m.rows == 0 then return NONE end end,
-    columns = { { key = "name", width = 190 }, { key = "when", flex = true, colour = "muted" } } })
+    columns = { { key = "name", flex = true } } })
 end
 
 local function view(rows)

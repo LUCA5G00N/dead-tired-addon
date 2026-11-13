@@ -79,4 +79,75 @@ DT.skin(function() error("bad brush") end)
 c:slash("skin forever")
 check("a failing painter is counted, the others still run", runs == 4 and (c:db().errors.skin or 0) >= 1)
 
+-- ---------------------------------------------------------------- fix round 5 (R-F5-5)
+do
+  -- every skin's fonts are set once on a hidden string at load (the `loaded` signal)
+  local Frame = H.Frame
+  local real = Frame.SetFont
+  local seen, loading = {}, true
+  Frame.SetFont = function(self, p, size, fl)
+    if loading then seen[#seen + 1] = { fs = self, p = p, size = size } end
+    return real(self, p, size, fl)
+  end
+  local w5 = H.world()
+  local c5 = w5:client({ guild = G })
+  c5:login()
+  loading = false
+  local D5 = c5.DT
+  local want = {}
+  for name in pairs(D5.skins) do
+    for _, role in ipairs({ "title", "body", "small" }) do
+      local p, size = D5.font(role, name)
+      want[name .. ":" .. role] = { p = p, size = size }
+    end
+  end
+  check("R-F5-5 fonts at load: every skin's title, body and small font was set once on the preload string",
+    #D5.preloaded == 9 and (function()
+      for k in pairs(want) do
+        local found = false
+        for _, x in ipairs(D5.preloaded) do if x == k then found = true end end
+        if not found then return false end
+      end
+      return true end)())
+  local n_morph = 0
+  for _, x in ipairs(seen) do if x.p == [[Fonts\MORPHEUS_CYR.TTF]] and x.size == 16 then n_morph = n_morph + 1 end end
+  check("R-F5-5 fonts at load: the gothic font is set at login though the default skin is clean", n_morph >= 1)
+  -- a skin change repaints at once and again on the next frame
+  local runs5 = 0
+  D5.skin(function() runs5 = runs5 + 1 end)
+  check("R-F5-5 a painter ran once when registered", runs5 == 1)
+  c5:slash("skin deadtired")
+  check("R-F5-5 a skin change repaints at once...", runs5 == 2)
+  w5:advance(0.1)
+  check("R-F5-5 ...and again on the next frame", runs5 == 3)
+  w5:advance(5)
+  check("R-F5-5 ...and no more than twice", runs5 == 3)
+  -- a SetFont that answers false is counted under ui:font, the paint carries on
+  local before = c5:db().errors["ui:font"] or 0
+  local vp5 = D5.viewport({ id = "fonttest", title = "Font test" })
+  Frame.SetFont = function(self, p, size, fl) real(self, p, size, fl); return false end
+  c5:slash("skin clean")
+  w5:advance(1)
+  Frame.SetFont = real
+  check("R-F5-5 a false from SetFont is counted under ui:font", (c5:db().errors["ui:font"] or 0) > before)
+  check("R-F5-5 ...and the paint carried on (the title is plain)", vp5.title.font[1] == [[Fonts\FRIZQT__.TTF]])
+  local before2 = c5:db().errors["ui:font"] or 0
+  c5:slash("skin deadtired")
+  w5:advance(1)
+  -- and at load: a false from the preload's SetFont is counted too
+  -- false only for the gothic font, which at load (default skin clean) only the preload asks for,
+  -- so fontTo's own count can't cover for it
+  Frame.SetFont = function(self, p, size, fl)
+    real(self, p, size, fl)
+    if p == [[Fonts\MORPHEUS_CYR.TTF]] then return false end
+  end
+  local w6 = H.world()
+  local c6 = w6:client({ guild = G })
+  c6:login()
+  Frame.SetFont = real
+  check("R-F5-5 a false from SetFont at load (the preload's one gothic font) is counted under ui:font",
+    (c6:db().errors["ui:font"] or 0) == 1)
+  check("R-F5-5 a SetFont that answers nothing (the usual case) is not counted", (c5:db().errors["ui:font"] or 0) == before2)
+end
+
 H.finish("skins")

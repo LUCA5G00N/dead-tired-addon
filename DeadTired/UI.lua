@@ -93,6 +93,29 @@ local function measurer(role)
   return fs
 end
 
+-- Fix round 5 (R-F5-5): on the `loaded` signal every skin's fonts are set once on one hidden string,
+-- so a font not yet used this session is ready when a window is re-fonted. Only SetFont, only on
+-- DT's own hidden string. DT.preloaded lists what was set ("skin:role").
+DT.preloaded = {}
+function DT.preloadFonts()
+  local fs = measurer("preload")
+  DT.preloaded = {}
+  local names = {}
+  for name in pairs(DT.skins) do names[#names + 1] = name end
+  table.sort(names)
+  for _, name in ipairs(names) do
+    for _, role in ipairs({ "title", "body", "small" }) do
+      local p, size, flags = DT.font(role, name)
+      if fs.SetFont then
+        local ok = fs:SetFont(p, size, flags)
+        if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a false SetFont
+        DT.preloaded[#DT.preloaded + 1] = name .. ":" .. role
+      end
+    end
+  end
+end
+DT.listen("loaded", function() DT.preloadFonts() end)               -- guard: fonts set at load for every skin
+
 local function widthOf(fs, text)
   fs:SetText(text)
   local ok, w = pcall(fs.GetStringWidth, fs)
@@ -278,7 +301,7 @@ function DT.viewport(o)
   if not o.sticky then DT.closeOnEscape(name) end
   local width = o.width or 360
   vp.width = width
-  f:SetSize(width, o.height or 420)
+  f:SetSize(width, o.height or 420)  -- (frameH below is the same number)
   f:SetFrameStrata("DIALOG")
   f:SetToplevel(true)
   f:Hide()
@@ -315,6 +338,7 @@ function DT.viewport(o)
 
   vp.body = CreateFrame("Frame", nil, f)
   vp.body.dtWidth = width - 2 * pad       -- the declared width lists take their flex column from
+  local frameH = o.height or 420
   vp.body:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -top)
 
   -- the footer: a block between the paddings; the body ends above its measured height
@@ -330,6 +354,7 @@ function DT.viewport(o)
     vp.body:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -top)
     vp.body:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -pad, pad + math.ceil(h))   -- guard: footer insets the body
     vp.bodyBottom = pad + math.ceil(h)
+    vp.body.dtHeight = frameH - top - vp.bodyBottom   -- the declared height a two-line list counts its rows from
   end
   inset()
 
@@ -409,10 +434,25 @@ end
 -- fn(model, visible) -> text or nil }. Exactly one flex column, or DT.list raises. A cell cut
 -- with "…" has its full text in the row's tooltip, after the module's own lines; a list with no
 -- tip shows a tooltip only for a cut row. list:refresh() redraws from the model.
+-- Fix round 5 (R-F5-1): detail = { key = "<row field>" } makes each row two lines: the columns as
+-- above, and under them one muted `small` line (the field's text) from the flex column's left edge
+-- to the right padding. Every row is then one fixed height (the skin's row spacing + its small font
+-- size + 2, recomputed on a skin change, never from the text) and `count` is the number of such
+-- rows that fit the body's declared height (body.dtHeight), at most the frames made (opts.count).
+-- A cut detail line adds its full text to the tooltip like a cut cell. tipCovers = { key, ... }:
+-- keys whose full text the module's own tip already shows; a cut one is not added again.
 local LEFT, GAP, RIGHT = 4, 6, 4
 local FLEX_MIN = 60
 DT.FLEX_MIN = FLEX_MIN
 local function cellText(r, key) return DT.safe(r[key], 255) end
+DT.DETAIL_PAD = 2
+
+-- The height of a two-line row under the current skin: row spacing + small font size + 2.
+local function detailRowHeight()
+  local _, size = DT.font("small")
+  return DT.style("spacing.row") + (tonumber(size) or 10) + DT.DETAIL_PAD
+end
+DT.detailRowHeight = detailRowHeight
 
 function DT.list(parent, model, opts)
   local flexes = 0
@@ -420,10 +460,32 @@ function DT.list(parent, model, opts)
   if flexes ~= 1 then error("DT.list: exactly one flex column (" .. flexes .. " given)", 2) end   -- guard: exactly one flex column
   local total = opts.width or (parent and parent.dtWidth)
   if type(total) ~= "number" or total <= 0 then error("DT.list: no declared width", 2) end
-  local L = { model = model, offset = 0, rows = {}, columns = opts.columns, total = total }
+  local L = { model = model, offset = 0, rows = {}, columns = opts.columns, total = total, detail = opts.detail }
+  if opts.detail then
+    if type(opts.detail) ~= "table" or type(opts.detail.key) ~= "string" then error("DT.list: detail = { key = \"<field>\" }", 2) end
+    local h = parent and parent.dtHeight
+    if type(h) ~= "number" or h <= 0 then error("DT.list: no declared height", 2) end
+    L.bodyH = h
+    L.parent = parent
+  end
+  local covers = {}
+  for _, k in ipairs(opts.tipCovers or {}) do covers[k] = true end
   local rh = opts.rowHeight or DT.style("spacing.row")
+  if opts.detail then rh = detailRowHeight() end                           -- guard: a list without detail is unchanged
   L.rowH = rh
-  local count = opts.count or 16
+  local frames = opts.count or 16                 -- the row frames made: the most rows ever drawn
+  local count = frames
+  L.count = count
+  -- Two-line lists: the rows that fit the declared body height under the current skin (at least 1).
+  function L:layout()
+    if not self.detail then return end
+    self.rowH = detailRowHeight()
+    self.detailY = DT.style("spacing.row") - 2
+    local bh = self.parent.dtHeight                                         -- the body's declared height, re-read: a skin changes the title/search/footer room
+    if type(bh) == "number" and bh > 0 then self.bodyH = bh end
+    count = math.max(1, math.min(frames, math.floor(self.bodyH / self.rowH)))   -- guard: count keeps the last row inside the body
+    self.count = count
+  end
   L.frame = CreateFrame("Frame", nil, parent)
   L.frame:SetAllPoints(parent)
   L.frame:EnableMouseWheel(true)
@@ -462,6 +524,16 @@ function DT.list(parent, model, opts)
       end
       x = x + col.w + GAP
     end
+    if self.detail then
+      local fx = LEFT
+      for _, col in ipairs(self.columns) do if col.flex then fx = col.x end end
+      self.detailX, self.detailW = fx, math.max(1, self.total - fx - RIGHT)
+      for _, b in ipairs(self.rows) do
+        b.detail:ClearAllPoints()
+        b.detail:SetPoint("TOPLEFT", b, "TOPLEFT", fx, -self.detailY)
+        DT.setWidth(b.detail, self.detailW)                                -- guard: the detail line is cut to its width
+      end
+    end
     self.measured = self.model.rows
   end
 
@@ -474,6 +546,7 @@ function DT.list(parent, model, opts)
     for c, col in ipairs(opts.columns) do
       b.cells[c] = DT.text(b, "line", { colour = col.colour, width = col.width or 0 })
     end
+    if opts.detail then b.detail = DT.text(b, "line", { role = "small", colour = "muted", width = 1 }) end
     b.cut = {}
     b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     b:SetScript("OnClick", function(_, button) if b.row and opts.onClick then opts.onClick(b.row, button) end end)
@@ -501,20 +574,24 @@ function DT.list(parent, model, opts)
     if self.offset > maxOff then self.offset = maxOff end
     local y = 0
     for i, b in ipairs(self.rows) do
-      local r = vis[self.offset + i]
+      local r = i <= count and vis[self.offset + i] or nil
       b.row = r
       b.cut = {}
       for c, col in ipairs(self.columns) do
         local full = r and cellText(r, col.key) or ""
-        if DT.setText(b.cells[c], full) then b.cut[#b.cut + 1] = full end
+        if DT.setText(b.cells[c], full) and not covers[col.key] then b.cut[#b.cut + 1] = full end   -- guard: tipCovers suppresses the repeat
+      end
+      if b.detail then
+        local full = r and cellText(r, self.detail.key) or ""
+        if DT.setText(b.detail, full) and not covers[self.detail.key] then b.cut[#b.cut + 1] = full end   -- guard: a cut detail's text reaches the tooltip
       end
       if r then
-        b:SetHeight(rh)                                                    -- guard: every row one height
+        b:SetHeight(self.rowH)                                             -- guard: every row one height
         b:ClearAllPoints()
         b:SetPoint("TOPLEFT", self.frame, "TOPLEFT", 0, -y)
         b:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", 0, -y)
         b.top = y
-        y = y + rh
+        y = y + self.rowH
         b:Show()
       else
         b:Hide()
@@ -542,6 +619,10 @@ function DT.list(parent, model, opts)
         local w = DT.measure(cellText(r, col.key), "body")
         if w and col.w and w > col.w then n = n + 1 break end
       end
+      if self.detail and self.detailW then
+        local w = DT.measure(cellText(r, self.detail.key), "small")
+        if w and w > self.detailW then n = n + 1 end
+      end
     end
     return n
   end
@@ -549,9 +630,11 @@ function DT.list(parent, model, opts)
     L.offset = math.max(0, L.offset - delta)
     L:refresh()
   end)
+  L:layout()
   L:widths()
   DT.skin(function()
     for i, b in ipairs(L.rows) do b.bg:SetColorTexture(DT.colour(i % 2 == 0 and "row" or "bg")) end
+    L:layout()
     L:widths()
     L:refresh()
   end)

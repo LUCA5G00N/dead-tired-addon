@@ -175,7 +175,7 @@ local function build()
   model = DT.listModel()
   vp = DT.viewport({ id = "crypt", title = "Rest in Pieces", search = true, width = 440, height = 400, footer = CLOSING,
     onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-  list = DT.list(vp.body, model, { count = 16,
+  list = DT.list(vp.body, model, { count = 16, tipCovers = { "name" },
     empty = function(m) if #m.rows == 0 then return EMPTY end end,
     tip = function(row, tt)
       tt:AddLine(DT.safe(DT.nameOf(row.key), 48))
