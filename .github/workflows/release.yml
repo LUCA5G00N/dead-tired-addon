@@ -1,0 +1,68 @@
+# Publishes a GitHub release when main carries a version that has none yet (ruled 20 Nov, R1:
+# Tim's merge is the go-ahead). Docs-only merges and brief merges leave the version alone, so
+# they release nothing. Checks first: .toc and DT.VERSION agree, every suite is green, the zip
+# in dist/ is the source, and the release notes exist. Any failure stops it with nothing published.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the version
+        id: v
+        run: |
+          v=$(sed -n 's/^## Version: *//p' DeadTired/DeadTired.toc | tr -d '\r ')
+          core=$(sed -n 's/^DT.VERSION = "\(.*\)".*/\1/p' DeadTired/Core.lua)
+          echo "toc $v, Core.lua $core"
+          [ -n "$v" ] && [ "$v" = "$core" ] || { echo "::error::.toc and DT.VERSION disagree"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Already released?
+        id: seen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ steps.v.outputs.version }}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "v${{ steps.v.outputs.version }} is already out: nothing to do"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Tests
+        if: steps.seen.outputs.skip == 'false'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+          sh DeadTired/tests/run_all.sh
+
+      - name: Zip and notes
+        if: steps.seen.outputs.skip == 'false'
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          zip="dist/DeadTired-$v.zip"; notes="docs/RELEASE_$v.md"
+          [ -f "$zip" ] || { echo "::error::$zip missing"; exit 1; }
+          [ -f "$notes" ] || { echo "::error::$notes missing"; exit 1; }
+          mkdir -p /tmp/z && unzip -q "$zip" -d /tmp/z
+          diff -r -x tests /tmp/z/DeadTired DeadTired || { echo "::error::$zip is not the source"; exit 1; }
+          head -1 "$notes" | sed 's/^# *//' > /tmp/title.txt
+          sed -e '1d' -e '/^Zip: /d' "$notes" | sed '/./,$!d' > /tmp/notes.md
+          cat /tmp/title.txt
+
+      - name: Publish
+        if: steps.seen.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          gh release create "v$v" "dist/DeadTired-$v.zip" --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "$(cat /tmp/title.txt)" --notes-file /tmp/notes.md
