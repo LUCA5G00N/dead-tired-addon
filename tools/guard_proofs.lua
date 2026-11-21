@@ -132,6 +132,17 @@ local GUARDS = {
   { "the second repaint is scheduled on a skin change (R-F5-5)", "DeadTired/Skins.lua", "    DT.after(0, DT.restyle)                                                -- guard: the second repaint is scheduled", "", "test_skins" },
   { "a false from SetFont is counted (fontTo) (R-F5-5)", "DeadTired/Skins.lua", '    if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: a false from SetFont is counted', "", "test_skins" },
   { "a false from SetFont is counted (the preload) (R-F5-5)", "DeadTired/UI.lua", '        if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a false SetFont', "", "test_skins" },
+  -- dt_classcolours (0.3.3), Task 7
+  { "colorStr is 8 hex digits (R-F6-5)", "DeadTired/Guild.lua", 'if type(hex) ~= "string" or not hex:match("^%x%x%x%x%x%x%x%x$") then return nil end', 'if type(hex) ~= "string" then return nil end', "test_guild" },
+  { "r/g/b in range (R-F6-5)", "DeadTired/Guild.lua", "  if not (unit(r) and unit(g) and unit(b)) then return nil end             -- guard: r/g/b in range", "", "test_guild" },
+  { "realm match (R-F6-3)", "DeadTired/Guild.lua", "  if e.realm and e.realm:lower() ~= realm:lower() then return nil end      -- guard: realm match", "", "test_guild" },
+  { "plain fallback: not on the roster (R-F6-5)", "DeadTired/Guild.lua", "  if not e then return nil end                                             -- guard: not on the roster, plain", '  if not e then e = { token = "SHAMAN" } end', "test_crypt" },
+  { "a reused row's colour is reset (rgb)", "DeadTired/UI.lua", 'else b.cells[c]:SetTextColor(DT.colour(col.colour or "text")) end   -- guard: a reused row\'s colour is reset', "end", "test_ui" },
+  { "the colour after a skin change (rgb)", "DeadTired/UI.lua", "    L:layout()\n    L:widths()\n    L:refresh()\n  end)", "    L:layout()\n    L:widths()\n  end)", "test_ui" },
+  { "one roster walk per graveyard build", "DeadTired/Crypt.lua", "  local roster = DT.rosterClasses()                                        -- guard: one roster walk per build", "  local roster = nil", "test_crypt" },
+  { "debug rip records nothing (R-F6-6; a record inserted)", "DeadTired/Debug.lua", '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))', '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))\n  local dd = DT.crypt().deaths; dd[#dd + 1] = { who = key, lvl = 30, zone = "Duskwood", hc = false, at = "x" }', "test_debug" },
+  { "debug rip uses the key a real DEATH would carry (walk fix, 21 Nov)", "DeadTired/Debug.lua", '  key = key or (realm and (realm .. "-" .. e.name))                     -- guard: a real key, never "?"', '  key = (e.realm or mine or "?") .. "-" .. e.name', "test_debug" },
+  { "debug rip sends nothing (R-F6-6; a send inserted)", "DeadTired/Debug.lua", '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))', '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))\n  DT.send("DEATH", { lvl = "30", zone = "Duskwood", hc = "0" })', "test_debug" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end

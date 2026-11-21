@@ -6,6 +6,7 @@
 --                      one line per fault, then "fit: <n> checked, <m> over, <k> rows cut,
 --                      measure failures <f>". Each window is built (hidden) with its current data;
 --                      each skin is applied in memory only; nothing is saved.
+--   /dt debug rip <n>  0.3.3: a guildie's two death-notice lines, previewed (R-F6-6)
 -- Values are printed through DT.safe: as strings, never interpreted.
 local ADDON, ns = ...
 local DT = ns.DT
@@ -55,6 +56,33 @@ local function errors()
     .. ", restricted flag " .. q(c.flagRestricted))
 end
 
+-- R-F6-6 (0.3.3): /dt debug rip <name> prints the two death-notice lines (ordinary, then hardcore)
+-- as they would look if that roster member died, at level 30 in Duskwood. Records nothing, sends
+-- nothing; built by DT.noticeLine, the line the DEATH handler prints.
+local function rip(args)
+  local want = DT.fullName(DT.trim(args or "") or "")
+  if not want then return DT.out("/dt debug rip <name>") end
+  local roster = DT.rosterClasses()
+  local e = roster[(want:lower():gsub("%s+", " "))]
+  if not e then return DT.out("not on the roster.") end
+  -- The key a real DEATH from them would carry: a key DT already knows for that name (on the roster's
+  -- realm when it gives one; my realm first), else the name on the roster's realm or mine. Never a
+  -- made-up "?" realm (walk, 21 Nov: the 0.3.3 preview printed "Echo Wagyu (?)").
+  local mine = DT.splitKey(DT.myKey() or "")
+  local key, lname = nil, e.name:lower()
+  for _, k in ipairs(DT.knownKeys()) do
+    local r, n = DT.splitKey(k)
+    if n and n:lower() == lname and (not e.realm or r:lower() == e.realm:lower()) then
+      if not key or (mine and r:lower() == mine:lower()) then key = k end
+    end
+  end
+  local realm = e.realm or mine
+  key = key or (realm and (realm .. "-" .. e.name))                     -- guard: a real key, never "?"
+  if not key then return DT.out("not on the roster.") end
+  DT.out(DT.noticeLine(key, 30, "Duskwood", false, roster))
+  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))
+end
+
 DT.module({
   id = "debug",
   title = "Diagnostics",
@@ -63,5 +91,6 @@ DT.module({
     { verb = "debug senders", usage = "debug senders", fn = senders },
     { verb = "debug errors", usage = "debug errors", fn = errors },
     { verb = "debug fit", usage = "debug fit", fn = function() for _, l in ipairs(DT.fitCheck()) do DT.out(l) end end },
+    { verb = "debug rip", usage = "debug rip <name>", fn = rip },
   },
 })

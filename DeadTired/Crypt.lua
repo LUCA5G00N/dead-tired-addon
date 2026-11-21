@@ -103,6 +103,20 @@ end
 
 local function lvlText(l) return (l and l > 0) and tostring(l) or "??" end
 
+-- A guildie's death notice, one line (card 3 R1's wording, unchanged). 0.3.3 (R-F6-1, R-F6-2): the
+-- name in its class colour when the roster can place it (DT.classColour, Guild.lua); else plain.
+-- DT.display has already escaped any "|" in the name. Shared by the DEATH handler and
+-- /dt debug rip (R-F6-6), so the preview can't drift from the real line.
+function DT.noticeLine(from, lvl, zone, hc, roster)
+  local who, z = DT.display(from), DT.safe(zone, ZONE_MAX)
+  local _, _, _, hex = DT.classColour(from, roster)
+  if hex then who = "|c" .. hex .. who .. "|r" end
+  if hc then
+    return "Rest in Pieces: " .. who .. ", level " .. lvlText(lvl) .. ", " .. z .. ". Hardcore. Gone for good."
+  end
+  return who .. " died at level " .. lvlText(lvl) .. " in " .. z .. ". Again."
+end
+
 -- lvl "0" is accepted as "level unknown": it is what a sender whose UnitLevel failed sends.
 local function valid(f)
   local lvl = type(f.lvl) == "string" and f.lvl:match("^%d%d?%d?$") and tonumber(f.lvl)
@@ -128,12 +142,7 @@ DT.on("DEATH", function(from, f)
   DT.cryptSession.heard = DT.cryptSession.heard + 1
   record({ who = from, lvl = lvl, zone = f.zone, hc = hc, at = DT.stamp(), mine = false })
   if not DT.get("crypt", "rip") then return end                        -- guard: rip toggle
-  local who, z = DT.display(from), DT.safe(f.zone, ZONE_MAX)
-  if hc then
-    DT.out("Rest in Pieces: " .. who .. ", level " .. lvlText(lvl) .. ", " .. z .. ". Hardcore. Gone for good.")
-  else
-    DT.out(who .. " died at level " .. lvlText(lvl) .. " in " .. z .. ". Again.")
-  end
+  DT.out(DT.noticeLine(from, lvl, f.zone, hc))
 end)
 
 -- ---------------------------------------------------------------- the graveyard (a viewport)
@@ -145,6 +154,7 @@ function DT.graveRows()
   local list, keys = crypt().deaths, {}
   for _, e in ipairs(list) do if type(e) == "table" then keys[#keys + 1] = e.who end end
   local name = DT.namer(keys)
+  local roster = DT.rosterClasses()                                        -- guard: one roster walk per build
   local rows = {}
   for i = #list, 1, -1 do
     local e = list[i]
@@ -153,8 +163,9 @@ function DT.graveRows()
       local n = name(e.who)
       local z = DT.safe(e.zone, ZONE_MAX) .. (e.hc and " (HC)" or "")
       local short = DT.shortDate(e.at)
+      local cr, cg, cb = DT.classColour(e.who, roster)
       rows[#rows + 1] = { key = e.who, day = short, full = DT.safe(type(e.at) == "string" and e.at or day, 20), name = n,
-        lvl = lvlText(e.lvl), zone = z, search = table.concat({ day, short, n, tostring(e.who), lvlText(e.lvl), z }, " ") }
+        lvl = lvlText(e.lvl), zone = z, nameRGB = cr and { cr, cg, cb } or nil, search = table.concat({ day, short, n, tostring(e.who), lvlText(e.lvl), z }, " ") }
     end
   end
   return rows
@@ -181,7 +192,7 @@ local function build()
       tt:AddLine(DT.safe(DT.nameOf(row.key), 48))
       tt:AddLine(row.full, 0.8, 0.8, 0.8)
     end,
-    columns = { { key = "day", fixed = true, colour = "muted" }, { key = "name", width = 160 },
+    columns = { { key = "day", fixed = true, colour = "muted" }, { key = "name", width = 160, rgb = "nameRGB" },
       { key = "lvl", fixed = true, colour = "muted" }, { key = "zone", flex = true, colour = "muted" } } })
 end
 

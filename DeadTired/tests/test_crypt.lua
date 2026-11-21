@@ -421,4 +421,112 @@ do
   check("crypt switched off: nothing recorded or sent", #q.printed == 0 and p.DT.cryptSession.mine == 1)
 end
 
+-- ---------------------------------------------------------------- class colours (0.3.3, dt_classcolours)
+-- 0.3.3 class colours: the probe's five classes (21 Nov 13:24) and their colours, plus broken entries.
+local CC = {
+  SHAMAN = { r = 0, g = 0.44, b = 0.87, colorStr = "ff0070dd" },
+  ROGUE = { r = 1, g = 0.96, b = 0.41, colorStr = "fffff468" },
+  MAGE = { r = 0.25, g = 0.78, b = 0.92, colorStr = "ff3fc7eb" },
+  WARLOCK = { r = 0.53, g = 0.53, b = 0.93, colorStr = "ff8788ee" },
+  PALADIN = { r = 0.96, g = 0.55, b = 0.73, colorStr = "fff48cba" },
+  HUNTER = { r = 0.67, g = 0.83, b = 0.45, colorStr = "ffabd47" },          -- 7 digits: refused
+  DRUID = { r = 1.5, g = 0.49, b = 0.04, colorStr = "ffff7c0a" },           -- r out of range: refused
+  PRIEST = { r = 1, g = 1, b = 1 },                                        -- no colorStr: refused
+}
+-- name, token (11th value), as the Forever roster gives them: no "-Realm" (the probe), except where shown
+local ROSTER = {
+  { "Echo Wagyu", "SHAMAN" }, { "Zupsy Stab", "ROGUE" }, { "Trevlyn Kratos", "MAGE" },
+  { "Vespera Grimm", "WARLOCK" }, { "Stromham Hamson", "PALADIN" }, { "Echo Nightclaw", "SHAMAN" },
+  { "Odd Token", "WIZARD" }, { "No Token", nil }, { "Hunter Bad", "HUNTER" }, { "Druid Bad", "DRUID" },
+  { "Priest Bad", "PRIEST" }, { "Marvella Hex-SomeOtherRealm", "WARLOCK" },
+}
+local function classStub(c, roster)
+  local env = c.env
+  rawset(env, "RAID_CLASS_COLORS", CC)
+  rawset(env, "GetNumGuildMembers", function() return #(c.roster or roster or ROSTER) end)
+  rawset(env, "GetGuildRosterInfo", function(i)
+    local e = (c.roster or roster or ROSTER)[i]
+    if e then return e[1], "rank", 4, 40, "Class", "Zone", "", "", true, 0, e[2] end
+  end)
+end
+
+do
+  local w2 = H.world()
+  local function mkc(o) local s0 = o.setup; o.setup = function(c) classStub(c); if s0 then s0(c) end end; return mk(w2, o) end
+  local tim = mkc({ name = "Stromham", full = "Stromham Hamson" })
+  local echo = mkc({ name = "Echo", full = "Echo Wagyu" })
+  local out = mkc({ name = "Out", full = "Out Sider" })
+  tim:login(); echo:login(); out:login(); w2:advance(30)
+  echo:slash("rip share on"); out:slash("rip share on"); echo.printed = {}
+  tim.printed = {}
+  w2:advance(61); echo:fire("PLAYER_DEAD"); w2:advance(2)
+  check("R-F6-1/2: the ordinary notice wraps the name in the class code, the rest as 0.3.2",
+    tim:said("|cff0070ddEcho Wagyu|r died at level 23 in The Barrens. Again.") ~= nil and #tim.printed == 1)
+  echo.hc = true; tim.printed = {}
+  w2:advance(61); echo:fire("PLAYER_DEAD"); w2:advance(2)
+  check("R-F6-2: the hardcore notice wraps the name too",
+    tim:said("Rest in Pieces: |cff0070ddEcho Wagyu|r, level 23, The Barrens. Hardcore. Gone for good.") ~= nil)
+  tim.printed = {}
+  w2:advance(61); out:fire("PLAYER_DEAD"); w2:advance(2)
+  check("R-F6-5: not on the roster: the 0.3.2 line exactly, nothing else printed",
+    #tim.printed == 1 and tim.printed[1] == "|cff7fa650Dead Tired|r Out Sider died at level 23 in The Barrens. Again.")
+  check("R-F6-5: nothing counted as an error", (function()
+    for k in pairs(tim:db().errors) do if k:find("crypt") or k:find("guild") or k:find("class") then return false end end
+    return true
+  end)())
+  check("own deaths still print nothing (Echo heard only Out Sider's)", not echo:said("Echo Wagyu") and echo:count("died at level") == 1)
+  check("R-F6-3: nothing new sent: DEATH carries lvl, zone, hc only", (function()
+    local d = lastDeath(echo); local n = 0
+    for k in pairs(d) do n = n + 1 end
+    return d.class == nil and d.lvl ~= nil and d.zone ~= nil and d.hc ~= nil
+  end)())
+  check("R-F6-3: nothing new saved in the graveyard", (function()
+    for _, e in ipairs(tim:db().crypt.deaths) do if e.class or e.token or e.colour or e.nameRGB then return false end end
+    return true
+  end)())
+  -- the graveyard
+  local d = tim:db().crypt.deaths
+  d[#d + 1] = { who = "CAMWOWEU4Realm2PvP-Stromham Hamson", lvl = 44, zone = "Mulgore", hc = false, at = "2026-11-19 20:00:00" }
+  d[#d + 1] = { who = "CAMWOWEU4Realm2PvP-Zupsy Stab", lvl = 20, zone = "Durotar", hc = false, at = "2026-11-19 21:00:00" }
+  local walks = tim.DT.rosterWalks or 0
+  local rows = tim.DT.graveRows()
+  check("graveyard: one roster walk per build", (tim.DT.rosterWalks or 0) == walks + 1)
+  local byName = {}
+  for _, r in ipairs(rows) do byName[r.name] = r end
+  check("graveyard: placed rows carry nameRGB, others none", byName["Zupsy Stab"].nameRGB[1] == 1 and byName["Zupsy Stab"].nameRGB[2] == 0.96
+    and byName["Echo Wagyu"].nameRGB[3] == 0.87 and byName["Stromham Hamson"].nameRGB[1] == 0.96 and byName["Out Sider"].nameRGB == nil)
+  check("graveyard: the search text unchanged (no colour in it)", not byName["Zupsy Stab"].search:find("|", 1, true))
+  local function cellOf(name)
+    for _, f in ipairs(tim.frames) do
+      if f._type == "Button" and f.row and f.shown and f.row.name == name then return f.cells[2], f end
+    end
+  end
+  tim:slash("graveyard")
+  local plain = { tim.DT.colour("text") }
+  local zc = cellOf("Zupsy Stab")
+  check("graveyard: a placed name cell takes the class colour", zc and zc.textColour[1] == 1 and zc.textColour[2] == 0.96 and zc.textColour[3] == 0.41)
+  local oc = cellOf("Out Sider")
+  check("graveyard: an unplaced name cell has the column's own colour", oc and oc.textColour[1] == plain[1] and oc.textColour[2] == plain[2])
+  local zip, zframe = cellOf("Zupsy Stab")
+  local vp = tim.DT._crypt.vp()
+  vp.search:SetText("Durotar Out Sider Barrens"); vp.search.scripts.OnTextChanged(vp.search)
+  vp.search:SetText("Out Sider"); vp.search.scripts.OnTextChanged(vp.search)
+  local first
+  for _, f in ipairs(tim.frames) do if f._type == "Button" and f.row and f.shown and f.row.day then first = first or f end end
+  check("graveyard: a reused row frame is reset to the column's colour", first and first.row.name == "Out Sider"
+    and first.cells[2].textColour[1] == plain[1] and first.cells[2].textColour[3] == plain[3])
+  vp.search:SetText(""); vp.search.scripts.OnTextChanged(vp.search)
+  tim:slash("skin deadtired"); w2:advance(1)
+  local zc2 = cellOf("Zupsy Stab")
+  check("graveyard: the colour holds after a skin change", zc2 and zc2.textColour[1] == 1 and zc2.textColour[2] == 0.96)
+  tim:slash("skin clean"); w2:advance(1)
+  local zc3 = cellOf("Zupsy Stab")
+  check("graveyard: and after changing back", zc3 and zc3.textColour[3] == 0.41)
+  -- a graveyard of 100 deaths walks the roster once
+  for i = 1, 100 do d[#d + 1] = { who = "CAMWOWEU4Realm2PvP-Echo Wagyu", lvl = 30, zone = "Feralas", hc = false, at = "2026-11-20 20:00:00" } end
+  walks = tim.DT.rosterWalks
+  tim.DT.graveRows()
+  check("graveyard of 100: still one roster walk", tim.DT.rosterWalks == walks + 1)
+end
+
 H.finish("crypt")

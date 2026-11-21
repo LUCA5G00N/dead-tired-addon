@@ -476,4 +476,43 @@ do
   check("toast: a longer text: the toast grows to fit it", t.h == 36 + 24 and D.textRecord(t.text).boxH == 36)
 end
 
+-- ---------------------------------------------------------------- 0.3.3: a colour per row (column option rgb)
+do
+  local w = H.world()
+  local c = w:client({ guild = G })
+  c:login()
+  local D = c.DT
+  local m = D.listModel()
+  local vp = D.viewport({ id = "rgbtest", title = "RGB", search = true, onSearch = function(t) m:filter(t) end })
+  local L = D.list(vp.body, m, { count = 3, columns = { { key = "name", flex = true, rgb = "col" },
+    { key = "lvl", fixed = true, colour = "muted" } } })
+  m:set({ { name = "Echo Wagyu", lvl = "16", search = "Echo Wagyu", col = { 0, 0.44, 0.87 } },
+    { name = "Out Sider", lvl = "20", search = "Out Sider" },
+    { name = "Bad Shape", lvl = "9", search = "Bad Shape", col = "nope" } })
+  m:filter(""); L:refresh()
+  local text = { D.colour("text") }
+  local tc = L.rows[1].cells[1].textColour
+  check("rgb: a row with the field: its cell takes that colour", tc[1] == 0 and tc[2] == 0.44 and tc[3] == 0.87)
+  tc = L.rows[2].cells[1].textColour
+  check("rgb: a row without it: the column's own colour (text)", tc[1] == text[1] and tc[2] == text[2] and tc[3] == text[3])
+  tc = L.rows[3].cells[1].textColour
+  check("rgb: a field that isn't a table: the column's own colour", tc[1] == text[1] and tc[3] == text[3])
+  local muted = { D.colour("muted") }
+  check("rgb: other columns untouched", L.rows[1].cells[2].textColour[1] == muted[1] and L.rows[1].cells[2].textColour[3] == muted[3])
+  m:filter("out"); L:refresh()
+  tc = L.rows[1].cells[1].textColour
+  check("rgb: a reused row frame is reset", L.rows[1].cells[1].text == "Out Sider" and tc[1] == text[1] and tc[3] == text[3])
+  m:filter("zzz"); L:refresh()
+  tc = L.rows[1].cells[1].textColour
+  check("rgb: an empty row is reset too", tc[1] == text[1] and tc[3] == text[3])
+  m:filter(""); L:refresh()
+  check("rgb: no colour code in the list text", not L.rows[1].cells[1].text:find("|", 1, true))
+  c:slash("skin deadtired"); w:advance(1)
+  tc = L.rows[1].cells[1].textColour
+  check("rgb: the colour holds after a skin change", tc[1] == 0 and tc[2] == 0.44 and tc[3] == 0.87)
+  local dtext = { D.colour("text") }
+  tc = L.rows[2].cells[1].textColour
+  check("rgb: an unplaced row follows the new skin's text colour", tc[1] == dtext[1] and tc[2] == dtext[2] and tc[3] == dtext[3])
+end
+
 H.finish("ui")

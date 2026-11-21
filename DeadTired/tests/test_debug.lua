@@ -123,4 +123,81 @@ do
   check("debug fit outside the guild: nothing", (function() d.guild = nil; d:slash("debug fit"); return #d.printed == 0 end)())
 end
 
+-- ---------------------------------------------------------------- 0.3.3: /dt debug rip <name> (R-F6-6)
+-- 0.3.3 class colours: the probe's five classes (21 Nov 13:24) and their colours, plus broken entries.
+local CC = {
+  SHAMAN = { r = 0, g = 0.44, b = 0.87, colorStr = "ff0070dd" },
+  ROGUE = { r = 1, g = 0.96, b = 0.41, colorStr = "fffff468" },
+  MAGE = { r = 0.25, g = 0.78, b = 0.92, colorStr = "ff3fc7eb" },
+  WARLOCK = { r = 0.53, g = 0.53, b = 0.93, colorStr = "ff8788ee" },
+  PALADIN = { r = 0.96, g = 0.55, b = 0.73, colorStr = "fff48cba" },
+  HUNTER = { r = 0.67, g = 0.83, b = 0.45, colorStr = "ffabd47" },          -- 7 digits: refused
+  DRUID = { r = 1.5, g = 0.49, b = 0.04, colorStr = "ffff7c0a" },           -- r out of range: refused
+  PRIEST = { r = 1, g = 1, b = 1 },                                        -- no colorStr: refused
+}
+-- name, token (11th value), as the Forever roster gives them: no "-Realm" (the probe), except where shown
+local ROSTER = {
+  { "Echo Wagyu", "SHAMAN" }, { "Zupsy Stab", "ROGUE" }, { "Trevlyn Kratos", "MAGE" },
+  { "Vespera Grimm", "WARLOCK" }, { "Stromham Hamson", "PALADIN" }, { "Echo Nightclaw", "SHAMAN" },
+  { "Odd Token", "WIZARD" }, { "No Token", nil }, { "Hunter Bad", "HUNTER" }, { "Druid Bad", "DRUID" },
+  { "Priest Bad", "PRIEST" }, { "Marvella Hex-SomeOtherRealm", "WARLOCK" },
+}
+local function classStub(c, roster)
+  local env = c.env
+  rawset(env, "RAID_CLASS_COLORS", CC)
+  rawset(env, "GetNumGuildMembers", function() return #(c.roster or roster or ROSTER) end)
+  rawset(env, "GetGuildRosterInfo", function(i)
+    local e = (c.roster or roster or ROSTER)[i]
+    if e then return e[1], "rank", 4, 40, "Class", "Zone", "", "", true, 0, e[2] end
+  end)
+end
+
+do
+  local w2 = H.world()
+  local d = w2:client({ guild = G, setup = function(c0) classStub(c0) end })
+  d:login(); w2:advance(5)
+  local graves, sent = #d:db().crypt.deaths, #d.sent
+  d:slash("debug rip Echo Wagyu")
+  check("debug rip: two lines, ordinary then hardcore, the name in its class colour", #d.printed == 2
+    and d.printed[1] == "|cff7fa650Dead Tired|r |cff0070ddEcho Wagyu|r died at level 30 in Duskwood. Again."
+    and d.printed[2] == "|cff7fa650Dead Tired|r Rest in Pieces: |cff0070ddEcho Wagyu|r, level 30, Duskwood. Hardcore. Gone for good.")
+  d:slash("debug rip  stromham   HAMSON ")
+  check("debug rip: case and spaces ignored; a paladin is pink", #d.printed == 2 and d.printed[1]:find("|cfff48cbaStromham Hamson|r died at level 30", 1, true) ~= nil)
+  w2:advance(30)
+  check("debug rip: records nothing", #d:db().crypt.deaths == graves and d.DT.cryptSession.heard == 0)
+  check("debug rip: sends nothing", #d.sent == sent)
+  d:slash("debug rip Out Sider")
+  check("debug rip: a stranger: not on the roster.", #d.printed == 1 and d:said("not on the roster.") ~= nil)
+  d:slash("debug rip")
+  check("debug rip alone: the usage", d:said("/dt debug rip <name>") ~= nil)
+  d:slash("debug rip Hunter Bad")
+  check("debug rip: on the roster but no usable colour: both lines plain", #d.printed == 2
+    and d.printed[1] == "|cff7fa650Dead Tired|r Hunter Bad died at level 30 in Duskwood. Again.")
+  d:slash("help")
+  check("debug rip is listed in /dt help", d:said("debug rip <name>") ~= nil)
+  -- the walk's "(?)" (21 Nov): the preview uses the key a real DEATH would carry
+  local keys = { "CAMWOWEU4Realm4PvP-Echo Wagyu" }
+  d.DT.keySource(function() return keys end)
+  d:slash("debug rip Echo Wagyu")
+  check("debug rip: a known key for the name is used (Echo on another realm): no realm label",
+    #d.printed == 2 and d.printed[1] == "|cff7fa650Dead Tired|r |cff0070ddEcho Wagyu|r died at level 30 in Duskwood. Again.")
+  keys[2] = "CAMWOWEU4Realm2PvP-Echo Wagyu"
+  d:slash("debug rip Echo Wagyu")
+  local real = d.DT.noticeLine("CAMWOWEU4Realm2PvP-Echo Wagyu", 30, "Duskwood", false)
+  check("debug rip: a real collision shows exactly what a real notice would (my realm's key first)",
+    #d.printed == 2 and d.printed[1] == "|cff7fa650Dead Tired|r " .. real and real:find("Echo Wagyu (", 1, true) ~= nil)
+  check("debug rip: never a made-up \"?\" realm", not d.printed[1]:find("(?)", 1, true) and not d.printed[2]:find("(?)", 1, true))
+  keys[1], keys[2] = nil, nil
+  local realmFn = d.env.GetNormalizedRealmName
+  rawset(d.env, "GetNormalizedRealmName", function() return nil end)
+  rawset(d.env, "GetRealmName", function() return nil end)
+  d:slash("debug rip Echo Wagyu")
+  check("debug rip: no realm anywhere: no line with a \"?\" realm", not d:said("(?)") and not d:said("died at level"))
+  rawset(d.env, "GetNormalizedRealmName", realmFn)
+  rawset(d.env, "GetRealmName", function() return "CAMWOW EU4 Realm 2 PvP" end)
+  d.guild = nil
+  d:slash("debug rip Echo Wagyu")
+  check("debug rip outside the guild: nothing", #d.printed == 0)
+end
+
 H.finish("debug")
