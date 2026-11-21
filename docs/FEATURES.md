@@ -309,6 +309,9 @@ Ratified by Tim, 13 Nov 15:10 (`docs/COWORK_BRIEF_dt_fixes5.md`).
   and a skin change repaints at once and again on the next frame. An experiment; its falsifier is
   the walk-sheet's H1. If H1 fails the guess is wrong, the two changes stay, and the next round
   starts with an in-game probe.
+  **Walked 21 Nov: H1 failed.** Open windows kept their titles after `/dt skin`; a later `/dt debug fit`
+  (which cycles the skins in memory) did repaint them. The probe starts from that difference.
+  0.3.2 shipped with the switch listed as a known issue (Tim, 21 Nov 18:47).
 - **Tim, 13 Nov, on the `dt_fixes4` report's questions:** the On cards keep the stock wording; the
   AddOns-page title stays; the template button labels stay; the combat-log prompt left up in
   combat stays.
