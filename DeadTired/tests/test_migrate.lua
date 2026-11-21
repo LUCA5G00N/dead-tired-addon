@@ -334,4 +334,43 @@ do
   check("G11 the move refuses a second run", c3.DT.migrateSkin() == false)
 end
 
+-- ---------------------------------------------------------------- 0.3.4: the realm seed (R-F7-3)
+do
+  local function db0()
+    return { schema = 3, migrated = { port1 = true, port2 = true, skin031 = true }, settings = { guild = { welcome = true } },
+      alts = { roster = {
+        ["CAMWOWEU4Realm2PvP-Stromham Hamson"] = { mine = true, seen = "2026-11-20 10:00:00" },
+        ["CAMWOWEU4Realm2PvP-Marvella Swineson"] = { mine = true, main = "CAMWOWEU4Realm2PvP-Stromham Hamson" },
+        ["CAMWOWEU4Realm2PvP-Twin Name"] = { mine = true }, ["CAMWOWEU4Realm4PvP-Twin Name"] = { mine = true },
+        ["CAMWOWEU4Realm2PvP-Echo Nightclaw"] = { main = "CAMWOWEU4Realm2PvP-Echo Nightclaw" },  -- not mine
+      } } }
+  end
+  -- a fixture like Tim's, on the client that gives ""
+  local d = db0()
+  local w = H.world()
+  local c = w:client({ guild = G, db = d, realm = "", setup = function(c0)
+    rawset(c0.env, "UnitGUID", function(u) if u == "player" then return "Player-6842-001FEF8D" end end) end })
+  c:login()
+  local by = d.realms.byChar
+  check("R-F7-3: Tim's own key seeds his realm", by["stromham hamson"] == "CAMWOWEU4Realm2PvP")
+  check("R-F7-3: and his alt's", by["marvella swineson"] == "CAMWOWEU4Realm2PvP")
+  check("R-F7-3: a name on two realms is left out", by["twin name"] == nil)
+  check("R-F7-3: a guildie's key (not mine) is ignored", by["echo nightclaw"] == nil)
+  check("R-F7-3: flagged once: migrated.realm034", d.migrated.realm034 == true)
+  check("and with it the key is back: the character's realm, not a stand-in",
+    c.DT.myKey() == "CAMWOWEU4Realm2PvP-Stromham Hamson" and c.DT.realmSource() == "character")
+  -- runs once: a later roster change isn't seeded
+  d.alts.roster["CAMWOWEU4Realm6PvP-Late Alt"] = { mine = true }
+  local c2 = c:reload()
+  check("R-F7-3: runs once (a later own key isn't seeded)", d.realms.byChar["late alt"] == nil and c2.DT.migrateRealms(d.realms) == false)
+  -- the seed replaces a stand-in saved before it ran, never a real realm
+  local e = db0()
+  e.realms = { byChar = { ["stromham hamson"] = "S6842", ["marvella swineson"] = "OtherRealm" }, byServer = {} }
+  local w2 = H.world()
+  local c3 = w2:client({ guild = G, db = e, realm = "" })
+  c3:login()
+  check("R-F7-3: a saved S<id> is replaced by the seed; a saved realm is not", e.realms.byChar["stromham hamson"] == "CAMWOWEU4Realm2PvP"
+    and e.realms.byChar["marvella swineson"] == "OtherRealm")
+end
+
 H.finish("migrate")

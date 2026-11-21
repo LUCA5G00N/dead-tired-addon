@@ -17,15 +17,91 @@ local function str(v)
   return v
 end
 
--- The realm key. With no realm: the player's own (GetNormalizedRealmName, else GetRealmName).
-function DT.realmKey(realm)
-  if realm == nil then
-    realm = str((try(GetNormalizedRealmName))) or str((try(GetRealmName)))
-  end
+-- ---------------------------------------------------------------- my realm (0.3.4, dt_realmless)
+-- Client build 71037 (21 Nov) returns "" for both realm calls, so DT had no key and sent nothing.
+-- R-F7-1: my realm is (1) the game's, else (2) the realm DT last saw for this character, else (3) the
+-- realm DT remembers for this server ID (UnitGUID's middle number), else (4) "S<server ID>", saved as
+-- this character's so it never changes. R-F7-2: whatever (1) gives is remembered for the character and
+-- the server; (2)-(4) never overwrite a better one. DeadTiredDB.realms = { byChar, byServer }.
+local REALM_CAP = 200
+local source                                                               -- of the last own lookup
+
+local function norm(realm)
   if type(realm) ~= "string" then return nil end
   realm = realm:gsub("[%s%-]", "")                                       -- guard: realm normalise (AUD-06)
   if realm == "" then return nil end
   return realm
+end
+
+-- The store, or nil before the saved variables load (nothing is remembered then).
+local function realmStore()
+  if not DT.loaded then return nil end
+  local db = DT.db()
+  if type(db.realms) ~= "table" then db.realms = {} end
+  local s = db.realms
+  if type(s.byChar) ~= "table" then s.byChar = {} end
+  if type(s.byServer) ~= "table" then s.byServer = {} end
+  if DT.migrateRealms then DT.migrateRealms(s) end                        -- R-F7-3's seed, before any use
+  return s
+end
+DT.realmStore = realmStore
+
+-- The player's server ID from UnitGUID ("Player-6842-001FEF8D" -> "6842"), or nil.
+function DT.serverId()
+  local g = clean((try(UnitGUID, "player")))
+  if type(g) ~= "string" then return nil end
+  return g:match("^Player%-(%d+)%-")                                       -- guard: GUID pattern
+end
+
+local function remember(t, k, v)
+  if type(k) ~= "string" or t[k] == v then return end
+  if t[k] == nil then
+    local n = 0
+    for _ in pairs(t) do n = n + 1 end
+    if n >= REALM_CAP then return end                                      -- guard: realms store cap
+  end
+  t[k] = v
+end
+
+local function charKey()
+  local n = DT.myName and DT.myName()
+  return n and (n:lower():gsub("%s+", " ")) or nil
+end
+
+local function myRealm()
+  local game = norm(str((try(GetNormalizedRealmName)))) or norm(str((try(GetRealmName))))
+  local s, me, sid = realmStore(), charKey(), DT.serverId()
+  if game then                                                              -- (1) the game
+    if s then
+      if me then remember(s.byChar, me, game) end                          -- R-F7-2: remembered
+      if sid then remember(s.byServer, sid, game) end
+    end
+    source = "game"
+    return game
+  end
+  if not s then source = nil return nil end
+  local c = me and norm(s.byChar[me])
+  if c and not c:match("^S%d+$") then source = "character" return c end   -- (2) guard: the character's realm
+  local v = sid and norm(s.byServer[sid])
+  if v then                                                                 -- (3) guard: the server's realm
+    if me and (not s.byChar[me] or c) then remember(s.byChar, me, v) end   -- never overwrites a better one (replaces S<id>)
+    source = "server"
+    return v
+  end
+  if c then source = "server-id" return c end                              -- (4), already chosen
+  if not (me and sid) then source = nil return nil end
+  remember(s.byChar, me, "S" .. sid)                                       -- (4) guard: saved, so it stays
+  source = s.byChar[me] and "server-id" or nil
+  return norm(s.byChar[me])
+end
+
+-- Where the last own lookup found the realm: "game", "character", "server", "server-id" or nil.
+function DT.realmSource() return source end
+
+-- The realm key. With no realm: the player's own (R-F7-1). With one: that realm, normalised (unchanged).
+function DT.realmKey(realm)
+  if realm == nil then return myRealm() end
+  return norm(realm)
 end
 
 -- A full name in the one spelling: trimmed, one space between parts, no "-Realm" suffix.

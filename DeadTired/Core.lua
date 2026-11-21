@@ -18,7 +18,7 @@ ns = ns or {}
 local DT = {}
 ns.DT = DT
 DT.ADDON = ADDON
-DT.VERSION = "0.3.3"
+DT.VERSION = "0.3.4"
 DT.SCHEMA = 3
 DT.Config = ns.Config or {}
 

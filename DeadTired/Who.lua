@@ -92,7 +92,7 @@ end
 local function record(key, d)
   if type(key) ~= "string" or isMe(key) then return end
   local v = type(d.v) == "string" and DT.safe(d.v, 16) or "?"
-  local rn = type(d.rn) == "string" and DT.safe(d.rn, 40) or nil
+  local rn = type(d.rn) == "string" and d.rn:match("%S") and DT.safe(d.rn, 40) or nil   -- guard: empty rn not stored
   local r = DT.splitKey(key)
   if r and rn then DT.realmNames[r] = rn end
   session[key] = { v = v, rn = rn, t = DT.now() }
@@ -104,12 +104,19 @@ end
 local extra = {}
 function DT.helloField(name, fn) extra[name] = fn end
 
+-- R-F7-5 (0.3.4): the realm's name only when the game gives one ("" since build 71037).
+local function realmName()
+  local rn = clean((try(GetRealmName)))
+  if type(rn) ~= "string" or not rn:match("%S") then return nil end      -- guard: empty rn not sent
+  return rn
+end
+
 local function hello(login)
   if not DT.get("who", "hello") then return false end
   local t = DT.now()
   if lastHello and t - lastHello < HELLO_GAP then return false end         -- guard: hello rate limit
   lastHello = t
-  local d = { v = DT.VERSION, rn = clean((try(GetRealmName))), login = login or nil }
+  local d = { v = DT.VERSION, rn = realmName(), login = login or nil }
   for k, fn in pairs(extra) do
     local ok, v = pcall(fn)
     if ok and v ~= nil and d[k] == nil then d[k] = v end
@@ -140,7 +147,7 @@ local function ask()
   local t = DT.now()
   if not lastAsk or t - lastAsk >= ASK_GAP then                            -- guard: ask rate limit
     lastAsk = t
-    DT.send("WHO", { v = DT.VERSION, rn = clean((try(GetRealmName))) })
+    DT.send("WHO", { v = DT.VERSION, rn = realmName() })
   end
   DT.openWho()
 end

@@ -529,4 +529,46 @@ do
   check("graveyard of 100: still one roster walk", tim.DT.rosterWalks == walks + 1)
 end
 
+-- ---------------------------------------------------------------- 0.3.4: realmless (R-F7-4, G4)
+do
+  local w3 = H.world()
+  local function g(c0) rawset(c0.env, "UnitGUID", function(u) if u == "player" then return c0.guid end end) end
+  -- a death saved as "?" while the game gave no realm, plus a guildie's "?" (not mine) that must stay
+  local d = { schema = 3, migrated = { port1 = true, port2 = true, skin031 = true },
+    settings = { guild = { welcome = true } }, alts = { roster = { ["CAMWOWEU4Realm2PvP-Stromham Hamson"] = { mine = true } } },
+    crypt = { deaths = {
+      { who = "?", lvl = 45, zone = "Uldaman", hc = false, at = "2026-11-21 19:00:00", mine = true },
+      { who = "?", lvl = 30, zone = "Feralas", hc = false, at = "2026-11-21 19:05:00" },
+      { who = "CAMWOWEU4Realm2PvP-Echo Nightclaw", lvl = 45, zone = "Feralas", hc = false, at = "2026-11-19 20:00:00" } } } }
+  local tim = mk(w3, { name = "Stromham", full = "Stromham Hamson", realm = "", db = d, setup = g })
+  tim.guid = "Player-6842-001FEF8D"
+  tim:login(); w3:advance(5)
+  local deaths = tim:db().crypt.deaths
+  check("R-F7-4: an own death saved as ? gets this character's key", deaths[1].who == "CAMWOWEU4Realm2PvP-Stromham Hamson")
+  check("R-F7-4: a ? that isn't mine is left", deaths[2].who == "?")
+  check("R-F7-4: nothing else rewritten", deaths[3].who == "CAMWOWEU4Realm2PvP-Echo Nightclaw" and deaths[1].zone == "Uldaman"
+    and deaths[1].lvl == 45 and deaths[1].at == "2026-11-21 19:00:00")
+  -- G4: two clients on "" hear each other's deaths
+  -- Echo's own saved data seeds Echo's realm (an existing install, like every guildie's today)
+  local edb = { schema = 3, migrated = { port1 = true, port2 = true, skin031 = true }, settings = { guild = { welcome = true } },
+    alts = { roster = { ["CAMWOWEU4Realm2PvP-Echo Nightclaw"] = { mine = true } } } }
+  local echo = mk(w3, { name = "Echo", full = "Echo Nightclaw", realm = "", db = edb, setup = g })
+  echo.guid = "Player-6842-001FDB3B"
+  echo:login(); w3:advance(30)
+  echo:slash("rip share on"); tim.printed = {}
+  w3:advance(61); echo:fire("PLAYER_DEAD"); w3:advance(2)
+  check("G4: on a client giving no realm, a guildie's death is heard again, as before",
+    #tim.printed == 1 and tim.printed[1] == "|cff7fa650Dead Tired|r Echo Nightclaw died at level 23 in The Barrens. Again.")
+  check("G4: and filed under Echo's real key", tim:db().crypt.deaths[#tim:db().crypt.deaths].who == "CAMWOWEU4Realm2PvP-Echo Nightclaw")
+  -- a guildie with no saved key (installed after the patch) gets S<id>: R-P5 then labels it beside the
+  -- old key. Expected by R-F7-1 (4); reported, not fixed here (other players' keys are out of scope).
+  local fresh = mk(w3, { name = "Lilbit", full = "Lilbit High", realm = "", setup = g })
+  fresh.guid = "Player-6950-00000042"
+  fresh:login(); w3:advance(30)
+  check("a fresh install with no saved key: S<server ID>, still heard", fresh.DT.myKey() == "S6950-Lilbit High")
+  tim:fire("PLAYER_DEAD"); w3:advance(2)
+  local last = tim:db().crypt.deaths[#tim:db().crypt.deaths]
+  check("an own death now saves the key, not ?", last.mine == true and last.who == "CAMWOWEU4Realm2PvP-Stromham Hamson")
+end
+
 H.finish("crypt")

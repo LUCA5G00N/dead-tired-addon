@@ -332,6 +332,16 @@ different colour to paladins for this."
   records nothing, sends nothing.
 - **R-F6-7 Version.** 0.3.3: a small feature in a patch number, said in the release notes.
 
+## Ruled 22 Nov (for `dt_realmless`, hotfix 0.3.4)
+Brief `docs/COWORK_BRIEF_dt_realmless.md`, ratified by Tim's merge of PR #23 (21 Nov 23:03). Cause: client
+build 71037 (21 Nov) returns "" for the realm, so DT had no key and sent nothing.
+- **R-F7-1** My realm: the game's, else the character's remembered realm, else the server ID's remembered
+  realm (`UnitGUID`), else `S<server ID>`, saved. Others' realms unchanged.
+- **R-F7-2** The game's realm is remembered for the character and the server (`DeadTiredDB.realms`, capped).
+- **R-F7-3** Seeded once from the account's own saved keys; a name on two realms is left out.
+- **R-F7-4** Own deaths saved as `?` get the key back. **R-F7-5** Empty realm names neither sent nor stored.
+- **R-F7-6** `/dt debug names` says where the realm came from. **R-F7-7** 0.3.4.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
