@@ -65,7 +65,20 @@ local function rip(args)
   local roster = DT.rosterClasses()
   local e = roster[(want:lower():gsub("%s+", " "))]
   if not e then return DT.out("not on the roster.") end
-  local key = (e.realm or DT.splitKey(DT.myKey() or "") or "?") .. "-" .. e.name
+  -- The key a real DEATH from them would carry: a key DT already knows for that name (on the roster's
+  -- realm when it gives one; my realm first), else the name on the roster's realm or mine. Never a
+  -- made-up "?" realm (walk, 21 Nov: the 0.3.3 preview printed "Echo Wagyu (?)").
+  local mine = DT.splitKey(DT.myKey() or "")
+  local key, lname = nil, e.name:lower()
+  for _, k in ipairs(DT.knownKeys()) do
+    local r, n = DT.splitKey(k)
+    if n and n:lower() == lname and (not e.realm or r:lower() == e.realm:lower()) then
+      if not key or (mine and r:lower() == mine:lower()) then key = k end
+    end
+  end
+  local realm = e.realm or mine
+  key = key or (realm and (realm .. "-" .. e.name))                     -- guard: a real key, never "?"
+  if not key then return DT.out("not on the roster.") end
   DT.out(DT.noticeLine(key, 30, "Duskwood", false, roster))
   DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))
 end

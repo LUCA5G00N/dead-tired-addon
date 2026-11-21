@@ -10,8 +10,8 @@ report. Not merged; Tim merges after his walk, and the merge publishes the relea
 
 ## Counts
 Baseline `run_all.sh` at `f46be81`: ALL GREEN, 26 suites, 1364 checks.
-Final: ALL GREEN, 26 suites, **1417 checks**. Changed suites: guild 20 -> 39, crypt 103 -> 119,
-debug 26 -> 35, ui 113 -> 122; core and who: version strings only (same counts).
+Final: ALL GREEN, 26 suites, **1421 checks** (1417 at the first walk; +4 with the walk fix below).
+Changed suites: guild 20 -> 39, crypt 103 -> 119, debug 26 -> 39, ui 113 -> 122; core and who: version strings only (same counts).
 
 ## What landed, task by task
 1. Baseline: as above.
@@ -60,8 +60,25 @@ approximations; the build reads both from the client, never from a table of its 
 | debug rip records nothing (R-F6-6; a record inserted) | `Debug.lua` | `DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster)) ⏎   local dd = DT.crypt().deaths; dd[#dd + 1] = { who = key, lvl = 30, zone = "Duskwood", hc = false, at = "x" }` | test_debug | **red**: debug rip: records nothing |
 | debug rip sends nothing (R-F6-6; a send inserted) | `Debug.lua` | `DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster)) ⏎   DT.send("DEATH", { lvl = "30", zone = "Duskwood", hc = "0" })` | test_debug | **red**: debug rip: sends nothing |
 
-All 128 guards in `tools/guard_proofs.lua` (0.3.2's 119 and these nine) went red when removed and
+All 129 guards in `tools/guard_proofs.lua` (0.3.2's 119, these nine, and the walk fix's one) went red when removed and
 were restored byte for byte: "every guard proved; every file restored".
+
+## Walk fix (21 Nov, after the first walk; Tim: "you can go with the fix first and then we'll merge")
+The first walk (19:29, PR #22 comment) passed H1's colour but both preview lines read **`Echo Wagyu (?)`**:
+an R-P5 realm label of `?`, which only appears when the key's realm is `?`. The 0.3.3 preview built
+its key as `(roster realm or my realm or "?") .. "-" .. name`. So in game, at that moment, neither
+the roster nor `DT.myKey()` gave a realm, and the made-up `?-Echo Wagyu` collided with Echo's real key.
+**Not proven** (the harness can't reproduce the in-game state); this is the only path that prints
+`(?)`. Fix (`Debug.lua`): the preview now uses the key a real `DEATH` would carry: a key DT already
+knows for that name (my realm's first), else the name on the roster's realm or mine; **never a `?`
+realm**, and no line at all if no realm is known. Four new checks in `test_debug`, one new guard
+(below), proved. **Question for Tim:** if `DT.myKey()` really was nil at 19:29, other things that
+use it would be affected too. Next time you're in game, `/dt debug names` shows the `key` the addon
+has for you: if it reads `nil`, tell me.
+
+| Guard | File | Change | Suite | Went red |
+|---|---|---|---|---|
+| debug rip uses the key a real DEATH would carry (walk fix, 21 Nov) | `Debug.lua` | `key = (e.realm or mine or "?") .. "-" .. e.name` | test_debug | **red**: debug rip: a known key for the name is used (Echo on another realm): no realm label; debug rip: no realm anywhere: no line with a "?" realm |
 
 ## Player-facing lines added
 - `not on the roster.` and `/dt debug rip <name>` (the preview's usage; also listed in `/dt help`).
@@ -69,8 +86,8 @@ were restored byte for byte: "every guard proved; every file restored".
 No notice line's wording changed: the tests check both lines byte for byte against 0.3.2's.
 
 ## Zip
-`dist/DeadTired-0.3.3.zip`, 177174 bytes, sha256
-`0623cb5027c8381c87ca0138122dafa4135f7e62211299bc124637d537c5dced`, 41 files (the same set as
+`dist/DeadTired-0.3.3.zip`, 177439 bytes, sha256
+`8c6f81a79b6202a8bc63c86dc76f31edbb4513b57dcd225ee9d5ee7d88e6277e` (rebuilt with the walk fix; the first walk's zip was `0623cb50…c5dced`), 41 files (the same set as
 0.3.2), `diff -r` clean against `DeadTired/` (tests excluded).
 
 ## What the brief got wrong, or left open

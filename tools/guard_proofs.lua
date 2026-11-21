@@ -141,6 +141,7 @@ local GUARDS = {
   { "the colour after a skin change (rgb)", "DeadTired/UI.lua", "    L:layout()\n    L:widths()\n    L:refresh()\n  end)", "    L:layout()\n    L:widths()\n  end)", "test_ui" },
   { "one roster walk per graveyard build", "DeadTired/Crypt.lua", "  local roster = DT.rosterClasses()                                        -- guard: one roster walk per build", "  local roster = nil", "test_crypt" },
   { "debug rip records nothing (R-F6-6; a record inserted)", "DeadTired/Debug.lua", '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))', '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))\n  local dd = DT.crypt().deaths; dd[#dd + 1] = { who = key, lvl = 30, zone = "Duskwood", hc = false, at = "x" }', "test_debug" },
+  { "debug rip uses the key a real DEATH would carry (walk fix, 21 Nov)", "DeadTired/Debug.lua", '  key = key or (realm and (realm .. "-" .. e.name))                     -- guard: a real key, never "?"', '  key = (e.realm or mine or "?") .. "-" .. e.name', "test_debug" },
   { "debug rip sends nothing (R-F6-6; a send inserted)", "DeadTired/Debug.lua", '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))', '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))\n  DT.send("DEATH", { lvl = "30", zone = "Duskwood", hc = "0" })', "test_debug" },
 }
 

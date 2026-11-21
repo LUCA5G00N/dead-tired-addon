@@ -175,6 +175,26 @@ do
     and d.printed[1] == "|cff7fa650Dead Tired|r Hunter Bad died at level 30 in Duskwood. Again.")
   d:slash("help")
   check("debug rip is listed in /dt help", d:said("debug rip <name>") ~= nil)
+  -- the walk's "(?)" (21 Nov): the preview uses the key a real DEATH would carry
+  local keys = { "CAMWOWEU4Realm4PvP-Echo Wagyu" }
+  d.DT.keySource(function() return keys end)
+  d:slash("debug rip Echo Wagyu")
+  check("debug rip: a known key for the name is used (Echo on another realm): no realm label",
+    #d.printed == 2 and d.printed[1] == "|cff7fa650Dead Tired|r |cff0070ddEcho Wagyu|r died at level 30 in Duskwood. Again.")
+  keys[2] = "CAMWOWEU4Realm2PvP-Echo Wagyu"
+  d:slash("debug rip Echo Wagyu")
+  local real = d.DT.noticeLine("CAMWOWEU4Realm2PvP-Echo Wagyu", 30, "Duskwood", false)
+  check("debug rip: a real collision shows exactly what a real notice would (my realm's key first)",
+    #d.printed == 2 and d.printed[1] == "|cff7fa650Dead Tired|r " .. real and real:find("Echo Wagyu (", 1, true) ~= nil)
+  check("debug rip: never a made-up \"?\" realm", not d.printed[1]:find("(?)", 1, true) and not d.printed[2]:find("(?)", 1, true))
+  keys[1], keys[2] = nil, nil
+  local realmFn = d.env.GetNormalizedRealmName
+  rawset(d.env, "GetNormalizedRealmName", function() return nil end)
+  rawset(d.env, "GetRealmName", function() return nil end)
+  d:slash("debug rip Echo Wagyu")
+  check("debug rip: no realm anywhere: no line with a \"?\" realm", not d:said("(?)") and not d:said("died at level"))
+  rawset(d.env, "GetNormalizedRealmName", realmFn)
+  rawset(d.env, "GetRealmName", function() return "CAMWOW EU4 Realm 2 PvP" end)
   d.guild = nil
   d:slash("debug rip Echo Wagyu")
   check("debug rip outside the guild: nothing", #d.printed == 0)
