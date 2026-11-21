@@ -152,6 +152,7 @@ function DT.slowestRows()
     r.rateText = h1(r.rate) .. " h/level"
     r.lvlText = "level " .. r.lvl
     r.hoursText = h1(r.hours) .. " h played"
+    r.detailText = r.rateText .. ", " .. r.lvlText .. ", " .. r.hoursText
     r.search = table.concat({ r.name, r.key, r.lvlText }, " ")
   end
   return rows
@@ -172,12 +173,10 @@ local function build()
   model = DT.listModel()
   vp = DT.viewport({ id = "slowest", title = "Glacial Progress", search = true, width = 420, height = 360, footer = CLOSING,
     onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-  list = DT.list(vp.body, model, { count = 14,
+  list = DT.list(vp.body, model, { count = 14, detail = { key = "detailText" }, tipCovers = { "name" },
     empty = function(m) if #m.rows == 0 then return EMPTY end end,
     tip = function(row, tt) tt:AddLine(DT.safe(DT.nameOf(row.key), 48)) end,
-    columns = { { key = "n", fixed = true, colour = "muted" }, { key = "name", flex = true },
-      { key = "rateText", fixed = true }, { key = "lvlText", fixed = true, colour = "muted" },
-      { key = "hoursText", fixed = true, colour = "muted" } } })
+    columns = { { key = "n", fixed = true, colour = "muted" }, { key = "name", flex = true } } })
 end
 
 local function view(rows)

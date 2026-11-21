@@ -43,6 +43,26 @@ local function lines(c)
   return out
 end
 
+-- ---------------------------------------------------------------- fix round 5: two lines a row (R-F5-1, R-F5-3)
+do
+  local w = H.world()
+  local a = mk(w, { name = "Stromham" })
+  a:login()
+  at(w, a, 1, "10:30")
+  a:slash("events")
+  local L = a.DT._events.list()
+  check("G5 events declares a detail line, the `when` text; one flex column, the name", L.detail and L.detail.key == "when"
+    and #L.columns == 1 and L.columns[1].key == "name" and L.columns[1].flex)
+  check("R-F5-3 the name on the first line, the day, time and countdown on the second",
+    L.rows[1].cells[1].text == EV and L.rows[1].detail.text == "Sunday 14:00 server time, in 6d 3h 30m.")
+  for _, skin in ipairs({ "clean", "deadtired", "forever" }) do
+    a.DT.fitSkin = skin; a.DT.restyle()
+    check("G6 the Fishing Extravaganza row is not cut under " .. skin .. ", both lines in full, three rows or more visible",
+      not a.DT.textRecord(L.rows[1].cells[1]).cut and not a.DT.textRecord(L.rows[1].detail).cut and L:cutRows() == 0 and L.count >= 3)
+  end
+  a.DT.fitSkin = nil; a.DT.restyle()
+end
+
 -- ---------------------------------------------------------------- the list (a viewport)
 do
   local w = H.world()

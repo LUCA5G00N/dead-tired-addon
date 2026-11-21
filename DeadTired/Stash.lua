@@ -298,13 +298,13 @@ local function build()
   model = DT.listModel()
   vp = DT.viewport({ id = "stash", title = "Who has it", search = true, width = 420, height = 300, footer = CLOSING,
     onSearch = function(text) model:filter(text); list.offset = 0; list:refresh() end })
-  list = DT.list(vp.body, model, { count = 12,
+  list = DT.list(vp.body, model, { count = 12, detail = { key = "items" }, tipCovers = { "holder" },
     empty = function(m) if #m.rows == 0 then return NOBODY end end,
     tip = function(row, tt)
       tt:AddLine(row.holder)
       tt:AddLine(DT.display(row.from), 1, 1, 1)
     end,
-    columns = { { key = "holder", width = 130 }, { key = "items", flex = true, colour = "muted" } } })
+    columns = { { key = "holder", flex = true } } })
 end
 
 local function view(rows)

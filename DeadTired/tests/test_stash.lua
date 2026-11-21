@@ -237,6 +237,16 @@ do
   check("the answers open in a viewport: one row per holder, in arrival order",
     vp and vp:IsShown() and rows(tim)[1] == "Ghoul Alt: Linen Cloth x60" and rows(tim)[2] == "Ghoul Grim: Linen Cloth x20, Bolt of Linen Cloth x4")
   check("the closing line under them", vp.footer.text == CLOSING)
+  local SL = tim.DT._stash.list()
+  check("G5 Who has it declares a detail line, the items; the holder is the one flex column, covered by the tip",
+    SL.detail and SL.detail.key == "items" and #SL.columns == 1 and SL.columns[1].key == "holder" and SL.columns[1].flex
+    and SL.rows[1].cells[1].text == "Ghoul Alt" and SL.rows[1].detail.text == "Linen Cloth x60"
+    and SL.rows[2].detail.text == "Linen Cloth x20, Bolt of Linen Cloth x4")
+  for _, skin in ipairs({ "clean", "deadtired", "forever" }) do
+    tim.DT.fitSkin = skin; tim.DT.restyle()
+    check("R-F5-2 Who has it shows three rows or more under " .. skin, SL.count >= 3)
+  end
+  tim.DT.fitSkin = nil; tim.DT.restyle()
   check("the answers are a DT viewport: Escape closes it (R-P2-2)", vp.name == "DeadTiredViewport_stash")
   check("nothing printed over them", #tim.printed == 0)
   check("receivers print nothing", not a:said("Linen") and not b:said("Linen"))

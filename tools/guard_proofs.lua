@@ -52,7 +52,7 @@ local GUARDS = {
   { "bar: colour codes pass", "DeadTired/Bar.lua", "if colour then out[#out + 1] = colour; i = i + #colour; open = true", "if false then", "test_bar" },
   -- (fix round 4: R-F4-1 retires 0.3.0's "list rows fit their text" (rows grew with wrapped text);
   -- its place is taken by the opposite rule, every row one height, proved below.)
-  { "every row one height (R-F4-1; replaces 'list rows fit their text')", "DeadTired/UI.lua", "        b:SetHeight(rh)                                                    -- guard: every row one height", "        b:SetHeight(#b.cut > 0 and rh * 2 or rh)", "test_ui" },
+  { "every row one height (R-F4-1; replaces 'list rows fit their text')", "DeadTired/UI.lua", "        b:SetHeight(self.rowH)                                             -- guard: every row one height", "        b:SetHeight(#b.cut > 0 and self.rowH * 2 or self.rowH)", "test_ui" },
   { "settings content follows the scroll", "DeadTired/SettingsView.lua", "  if scroll > maxS then scroll = maxS end\n  place()", "  if scroll > maxS then scroll = maxS end", "test_settingsview" },
   -- Port 2 (COWORK_BRIEF_dt_port2.md, Task 5)
   { "gank reads the target only on the verb (R1)", "DeadTired/Gank.lua", "  if not DT.inCommand then return false end                            -- guard: target read only on /dt gank (R1)", "", "test_gank" },
@@ -121,6 +121,17 @@ local GUARDS = {
   { "a log dialog sized from its text", "DeadTired/Logs.lua", "  dlg:SetSize(w, L.dialogHeight(DT.textHeight(dlg.title, tw), DT.textHeight(dlg.status, tw)))   -- guard: dialog sized from its text", "  dlg:SetSize(w, 104)", "test_logs" },
   { "the skin move runs once (R-F4-4)", "DeadTired/Migrate.lua", "  if M.skin031 then return false end                                     -- guard: the skin move runs once", "", "test_migrate" },
   { "the skin move leaves forever alone", "DeadTired/Migrate.lua", '  if cur == nil or cur == "deadtired" then                               -- guard: forever left alone', '  if cur ~= "clean" then', "test_migrate" },
+  -- Fix round 5 (COWORK_BRIEF_dt_fixes5.md, Task 6)
+  { "the detail line is cut to its width (R-F5-1)", "DeadTired/UI.lua", "        DT.setWidth(b.detail, self.detailW)                                -- guard: the detail line is cut to its width", "        DT.setWidth(b.detail, 100000)", "test_ui" },
+  { "a cut detail's text reaches the tooltip (R-F5-1)", "DeadTired/UI.lua", "        if DT.setText(b.detail, full) and not covers[self.detail.key] then b.cut[#b.cut + 1] = full end   -- guard: a cut detail's text reaches the tooltip", "        DT.setText(b.detail, full)", "test_ui" },
+  { "a detail list's rows are one height (R-F5-1)", "DeadTired/UI.lua", "        b:SetHeight(self.rowH)                                             -- guard: every row one height", "        b:SetHeight(self.rowH + (b.detail and #b.cut or 0))", "test_ui" },
+  { "count keeps the last row inside the body (R-F5-1)", "DeadTired/UI.lua", "    count = math.max(1, math.min(frames, math.floor(self.bodyH / self.rowH)))   -- guard: count keeps the last row inside the body", "    count = frames", "test_ui" },
+  { "tipCovers suppresses the repeat (R-F5-1)", "DeadTired/UI.lua", "        if DT.setText(b.cells[c], full) and not covers[col.key] then b.cut[#b.cut + 1] = full end   -- guard: tipCovers suppresses the repeat", "        if DT.setText(b.cells[c], full) then b.cut[#b.cut + 1] = full end", "test_ui" },
+  { "a list without detail is unchanged (R-F5-1)", "DeadTired/UI.lua", "  if opts.detail then rh = detailRowHeight() end                           -- guard: a list without detail is unchanged", "  rh = detailRowHeight()", "test_ui" },
+  { "fonts set at load for every skin (R-F5-5)", "DeadTired/UI.lua", 'DT.listen("loaded", function() DT.preloadFonts() end)               -- guard: fonts set at load for every skin', "", "test_skins" },
+  { "the second repaint is scheduled on a skin change (R-F5-5)", "DeadTired/Skins.lua", "    DT.after(0, DT.restyle)                                                -- guard: the second repaint is scheduled", "", "test_skins" },
+  { "a false from SetFont is counted (fontTo) (R-F5-5)", "DeadTired/Skins.lua", '    if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: a false from SetFont is counted', "", "test_skins" },
+  { "a false from SetFont is counted (the preload) (R-F5-5)", "DeadTired/UI.lua", '        if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a false SetFont', "", "test_skins" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end

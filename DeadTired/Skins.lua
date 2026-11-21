@@ -142,7 +142,10 @@ end
 function DT.fontTo(fs, role, colour)
   if not fs then return end
   local p, size, flags = DT.font(role)
-  if fs.SetFont then fs:SetFont(p, size, flags) end
+  if fs.SetFont then
+    local ok = fs:SetFont(p, size, flags)
+    if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: a false from SetFont is counted
+  end
   if fs.SetTextColor then fs:SetTextColor(DT.colour(colour or (role == "title" and "title" or "text"))) end
 end
 
@@ -161,4 +164,10 @@ function DT.restyle()
   end
 end
 
-DT.listen("setting", function(id, key) if id == "core" and key == "skin" then DT.restyle() end end)
+-- R-F5-5: a skin change repaints at once and again on the next frame.
+DT.listen("setting", function(id, key)
+  if id == "core" and key == "skin" then
+    DT.restyle()
+    DT.after(0, DT.restyle)                                                -- guard: the second repaint is scheduled
+  end
+end)
