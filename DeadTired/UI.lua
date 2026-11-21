@@ -580,6 +580,11 @@ function DT.list(parent, model, opts)
       for c, col in ipairs(self.columns) do
         local full = r and cellText(r, col.key) or ""
         if DT.setText(b.cells[c], full) and not covers[col.key] then b.cut[#b.cut + 1] = full end   -- guard: tipCovers suppresses the repeat
+        if col.rgb then                                                    -- 0.3.3: a colour per row (R-F6-2)
+          local v = r and r[col.rgb]
+          if type(v) == "table" then b.cells[c]:SetTextColor(v[1], v[2], v[3])
+          else b.cells[c]:SetTextColor(DT.colour(col.colour or "text")) end   -- guard: a reused row's colour is reset
+        end
       end
       if b.detail then
         local full = r and cellText(r, self.detail.key) or ""

@@ -6,6 +6,7 @@
 --                      one line per fault, then "fit: <n> checked, <m> over, <k> rows cut,
 --                      measure failures <f>". Each window is built (hidden) with its current data;
 --                      each skin is applied in memory only; nothing is saved.
+--   /dt debug rip <n>  0.3.3: a guildie's two death-notice lines, previewed (R-F6-6)
 -- Values are printed through DT.safe: as strings, never interpreted.
 local ADDON, ns = ...
 local DT = ns.DT
@@ -55,6 +56,20 @@ local function errors()
     .. ", restricted flag " .. q(c.flagRestricted))
 end
 
+-- R-F6-6 (0.3.3): /dt debug rip <name> prints the two death-notice lines (ordinary, then hardcore)
+-- as they would look if that roster member died, at level 30 in Duskwood. Records nothing, sends
+-- nothing; built by DT.noticeLine, the line the DEATH handler prints.
+local function rip(args)
+  local want = DT.fullName(DT.trim(args or "") or "")
+  if not want then return DT.out("/dt debug rip <name>") end
+  local roster = DT.rosterClasses()
+  local e = roster[(want:lower():gsub("%s+", " "))]
+  if not e then return DT.out("not on the roster.") end
+  local key = (e.realm or DT.splitKey(DT.myKey() or "") or "?") .. "-" .. e.name
+  DT.out(DT.noticeLine(key, 30, "Duskwood", false, roster))
+  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))
+end
+
 DT.module({
   id = "debug",
   title = "Diagnostics",
@@ -63,5 +78,6 @@ DT.module({
     { verb = "debug senders", usage = "debug senders", fn = senders },
     { verb = "debug errors", usage = "debug errors", fn = errors },
     { verb = "debug fit", usage = "debug fit", fn = function() for _, l in ipairs(DT.fitCheck()) do DT.out(l) end end },
+    { verb = "debug rip", usage = "debug rip <name>", fn = rip },
   },
 })

@@ -317,6 +317,21 @@ Ratified by Tim, 13 Nov 15:10 (`docs/COWORK_BRIEF_dt_fixes5.md`).
   combat stays.
 - **Version.** 0.3.2.
 
+## Ruled 21 Nov (for `dt_classcolours`)
+Brief `docs/COWORK_BRIEF_dt_classcolours.md`, ratified by Tim's merge of PR #21 (21 Nov); R-F6-4
+answered explicitly (19:16): "we'll stick with blue for the shamans - it's better to give them a
+different colour to paladins for this."
+- **R-F6-1 Whose name.** Only the dead guildie's name is coloured, by class.
+- **R-F6-2 Where.** The chat notice (both lines) and the graveyard's name column. Nowhere else.
+- **R-F6-3 Where the class comes from.** The guild roster's class token (`GetGuildRosterInfo`'s 11th
+  value), matched on the full name, and on the realm too when the roster name carries `-Realm`.
+  Nothing new is sent or saved.
+- **R-F6-4 Which colours.** The client's own `RAID_CLASS_COLORS`: shamans blue.
+- **R-F6-5 When it can't.** Not placed, no or unknown token, a bad colour: plain, silently.
+- **R-F6-6 A preview for the walk.** `/dt debug rip <name>`: both notice lines for a roster member;
+  records nothing, sends nothing.
+- **R-F6-7 Version.** 0.3.3: a small feature in a patch number, said in the release notes.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
