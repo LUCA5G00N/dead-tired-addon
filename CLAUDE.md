@@ -10,6 +10,10 @@ Owner: Tim (in game: Stromham). Built from briefs in `docs/` by cloud sessions; 
 2. Read `docs/ROADMAP.md` only for context. Never build a later card inside the current one.
 3. Work on the branch the brief names. If the session can only push to its own branch, use that and
    say so at the top of the report (ruled 2026-11-11). Do not merge to `main`; Tim merges after his walk.
+4. **Releases** (`docs/DECISIONS.md` 0001): build on `claude/<slug>`, open a PR to `main` (never
+   stacked on another PR), draft the #dt-crypt-workshop post in the PR. Tim's merge publishes, via
+   the Release workflow. Never merge your own PR, push to `main`, force-push, or delete a tag or
+   release unless Tim asks; fix a bad release forward with a new patch version.
 
 ## The client, and what that rules out
 - **WoW Forever** is classic content on **retail's addon API** (interface **16001** on the beta,
