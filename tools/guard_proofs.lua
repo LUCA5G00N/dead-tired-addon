@@ -162,7 +162,7 @@ local GUARDS = {
   { "S3 key can fail", "DeadTired/Selftest.lua", "  if not key then return false, \"no key (realm from \" .. tostring(rec.source or \"nowhere\") .. \")\" end  -- guard: S3", "", "test_selftest" },
   { "S4 apis can fail", "DeadTired/Selftest.lua", "    if type(lookup(name)) ~= \"function\" then missing[#missing + 1] = name end  -- guard: S4", "", "test_selftest" },
   { "S5 modules can fail", "DeadTired/Selftest.lua", "    if not m.loaded or session.init[m.id] then bad[#bad + 1] = m.id end      -- guard: S5", "", "test_selftest" },
-  { "S6 errors can fail", "DeadTired/Selftest.lua", "  if session.count > 0 then                                                -- guard: S6", "  if false then", "test_selftest" },
+  { "S6 errors can fail", "DeadTired/Selftest.lua", '  if #ids > 0 then return false, table.concat(ids, ", ") .. note end      -- guard: S6', "", "test_selftest" },
   { "S7 windows can fail", "DeadTired/Selftest.lua", "  if tonumber(over) ~= 0 or tonumber(fails) ~= 0 then                     -- guard: S7", "  if false then", "test_selftest" },
   { "S8 switches: a print is caught", "DeadTired/Selftest.lua", "      if #outs > before then loud[#loud + 1] = s[1] .. \" printed\" end      -- guard: S8 (out)", "", "test_selftest" },
   { "S8 switches: a send is caught", "DeadTired/Selftest.lua", "      if #sends > 0 then loud[#loud + 1] = s[1] .. \" sent \" .. table.concat(sends, \"/\") end  -- guard: S8 (send)", "", "test_selftest" },
@@ -185,6 +185,10 @@ local GUARDS = {
   { "purge site: PLAYER_LOGOUT", "DeadTired/Ghost.lua", "  events = { PLAYER_LOGOUT = function() DT.ghostPurge() end },", "  events = { PLAYER_LOGOUT = function() end },", "test_ghost" },
   { "purge site: every load (Migrate)", "DeadTired/Migrate.lua", "run3(); if DT.ghostPurge then DT.ghostPurge() end end,", "run3() end,", "test_ghost" },
   { "the sent signal (R-F8-4)", "DeadTired/Comms.lua", "  DT.signal(\"sent\", kind, data)", "", "test_ghost" },
+  -- dt_fontinfo (COWORK_BRIEF_dt_fontinfo.md, Task 3)
+  { "R-F10-1: ui:font is information", "DeadTired/Selftest.lua", '    if KNOWN[id] then known[#known + 1] = id .. " " .. n .. " (known, not counted)"  -- guard: known ids are information', '    if false then known[#known + 1] = id .. " " .. n .. " (known, not counted)"', "test_selftest" },
+  { "R-F10-1: other ids still fail", "DeadTired/Selftest.lua", '    else ids[#ids + 1] = id .. " " .. n end', '    else known[#known + 1] = id .. " " .. n end', "test_selftest" },
+  { "R-F10-2: a run's own errors don't count", "DeadTired/Selftest.lua", '  if not session.running then                                              -- guard: a run\'s own errors don\'t count', '  if true then', "test_selftest" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end
