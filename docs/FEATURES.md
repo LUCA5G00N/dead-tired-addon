@@ -361,6 +361,16 @@ Replaces `dt_fontload` (PR #29, closed unmerged: the font is refused mid-session
 - **R-F10-2** Errors recorded during a self-test run don't count in a later run's S6 (still saved).
 - **R-F10-3** Nothing else changes. **R-F10-4** 0.3.6.
 
+## Ruled 22 Nov (for `dt_fontprobe`, 0.3.7)
+Brief `docs/COWORK_BRIEF_dt_fontprobe.md`, ratified by Tim's merge of PR #32 and "all as leaned" (18:04).
+Observes only, to find why the client refuses the gothic font on DT's strings.
+- **R-F11-1** Every `SetFont` DT makes goes through `DT.fontCall` (static check in `test_textfit`).
+- **R-F11-2** `/dt debug fontprobe on|off`: records each call (site, role, skin, font, answer, font before
+  and after, visible, template). Session only; the last 300 kept in `DeadTiredDB.fontprobe.calls`.
+- **R-F11-3** `/dt debug fontprobe matrix`: eight control strings (template or none, shown or hidden, fresh or
+  from Friz), each tried with both gothic files. **R-F11-4** `/dt debug fontprobe`: the summary.
+- **R-F11-5** Observes only. **R-F11-6** 0.3.7; the probe stays as a debug tool.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A

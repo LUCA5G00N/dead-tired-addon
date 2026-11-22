@@ -194,7 +194,7 @@ local function control(r, parent)
       DT.paint(c, true)
       c:SetBackdropColor(DT.colour("input"))
       local p, size, flags = DT.font("body")
-      c:SetFont(p, size, flags)
+      DT.fontCall(c, p, size, flags, "settings", "body", "editbox")
       c:SetTextColor(DT.colour("text"))
     end)
   end

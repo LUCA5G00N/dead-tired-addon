@@ -84,6 +84,27 @@ local function rip(args)
   DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))
 end
 
+-- dt_fontprobe (R-F11-2 to R-F11-4): /dt debug fontprobe on|off|matrix, and with nothing the summary.
+local function fontprobe(args)
+  local w = (DT.trim(args) or ""):lower()
+  if w == "on" then
+    DT.fontProbeOn()
+    return DT.out("fontprobe: on, recording every font Dead Tired sets until you say off.")
+  elseif w == "off" then
+    DT.fontProbeOff()
+    return DT.out("fontprobe: off. /reload to save what it saw.")
+  elseif w == "matrix" then
+    for _, r in ipairs(DT.fontProbeMatrix()) do
+      DT.out("fontprobe " .. r.tpl .. " " .. r.where .. " " .. r.start .. ": CYR " .. tostring(r.cyr)
+        .. ", plain " .. tostring(r.plain))
+    end
+    return
+  elseif w ~= "" then
+    return DT.out("/dt debug fontprobe on|off|matrix")
+  end
+  for _, l in ipairs(DT.fontProbeSummary()) do DT.out(l) end
+end
+
 DT.module({
   id = "debug",
   title = "Diagnostics",
@@ -93,5 +114,6 @@ DT.module({
     { verb = "debug errors", usage = "debug errors", fn = errors },
     { verb = "debug fit", usage = "debug fit", fn = function() for _, l in ipairs(DT.fitCheck()) do DT.out(l) end end },
     { verb = "debug rip", usage = "debug rip <name>", fn = rip },
+    { verb = "debug fontprobe", usage = "debug fontprobe [on|off|matrix]", fn = fontprobe },
   },
 })

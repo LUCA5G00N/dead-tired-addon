@@ -79,6 +79,119 @@ local recs = setmetatable({}, { __mode = "k" })   -- fontstring -> its record
 DT.lists = {}                           -- every DT.list, for /dt debug fit
 
 -- One hidden string per font role, fonted from the current skin at each measure.
+-- ---------------------------------------------------------------- the font door and probe (dt_fontprobe)
+-- R-F11-1 (0.3.7): every SetFont DT makes goes through DT.fontCall (tests/test_textfit.lua enforces it:
+-- no SetFont anywhere else but the matrix below). It returns what SetFont returned and does nothing
+-- else, unless /dt debug fontprobe is on (R-F11-2): then each call is recorded, with the string's font
+-- before and after, whether it is visible and the template DT made it from. Only observes (R-F11-5).
+local PROBE_CAP = 300
+local probe = { on = false }                                               -- this session only, never saved
+local templates = setmetatable({}, { __mode = "k" })                       -- [fs] = the template DT made it from
+
+local function fontOf(fs)
+  if not fs or not fs.GetFont then return nil end
+  local p, size, flags = DT.try(fs.GetFont, fs)
+  return { DT.clean(p), DT.clean(size), DT.clean(flags) }
+end
+
+local function sameFont(a, b)
+  return type(a) == "table" and type(b) == "table" and a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
+end
+
+local function probeStore()
+  local db = DT.db()
+  if type(db.fontprobe) ~= "table" then db.fontprobe = {} end
+  local fp = db.fontprobe
+  if type(fp.calls) ~= "table" then fp.calls = {} end
+  return fp
+end
+
+function DT.fontCall(fs, path, size, flags, site, role, tpl)
+  if not fs or not fs.SetFont then return nil end
+  local before = probe.on and fontOf(fs) or nil
+  local res = fs:SetFont(path, size, flags)
+  if probe.on then                                                         -- guard: the probe records only while on
+    local calls = probeStore().calls
+    while #calls >= PROBE_CAP do table.remove(calls, 1) end                -- guard: the probe keeps the last 300
+    local vis = DT.try(fs.IsVisible, fs)
+    calls[#calls + 1] = { site = site, role = role, skin = DT.skinName(), path = tostring(path), size = size,
+      flags = flags, res = res == nil and "nil" or res, before = before, after = fontOf(fs),
+      vis = DT.clean(vis) and true or false, tpl = tpl or templates[fs] or "?" }
+  end
+  return res
+end
+
+-- R-F11-3: eight control strings per run: DT's template or none, on a shown or a hidden frame, fresh or
+-- first set to Friz Quadrata. Each is set to the gothic file LibSharedMedia gives (CYR), then to the
+-- plain one; what SetFont answered and the font after are kept. Made anew each run, so "fresh" stays true.
+local FRIZ, CYR, PLAIN = [[Fonts\FRIZQT__.TTF]], [[Fonts\MORPHEUS_CYR.TTF]], [[Fonts\MORPHEUS.TTF]]
+local matrixHosts
+function DT.fontProbeMatrix()
+  if not matrixHosts then
+    local shown = CreateFrame("Frame", nil, UIParent)
+    shown:SetSize(1, 1)
+    shown:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -100, 100)              -- off-screen, no text
+    shown:Show()
+    local hidden = CreateFrame("Frame", nil, UIParent)
+    hidden:Hide()
+    matrixHosts = { shown = shown, hidden = hidden }
+  end
+  local rows = {}
+  for _, tpl in ipairs({ "GameFontHighlight", "none" }) do
+    for _, where in ipairs({ "shown", "hidden" }) do
+      for _, start in ipairs({ "fresh", "friz" }) do
+        local fs = matrixHosts[where]:CreateFontString(nil, "OVERLAY", tpl ~= "none" and tpl or nil)
+        if start == "friz" then fs:SetFont(FRIZ, 16, "") end
+        local r = { tpl = tpl, where = where, start = start, before = fontOf(fs) }
+        local a = fs:SetFont(CYR, 16, "")
+        r.cyr, r.cyrAfter = a == nil and "nil" or a, fontOf(fs)
+        local b = fs:SetFont(PLAIN, 16, "")
+        r.plain, r.plainAfter = b == nil and "nil" or b, fontOf(fs)
+        rows[#rows + 1] = r
+      end
+    end
+  end
+  local fp = probeStore()
+  fp.matrix, fp.matrixAt = rows, DT.stamp()                                -- overwritten each run
+  return rows
+end
+
+function DT.fontProbeOn()
+  probe.on = true
+  local fp = probeStore()
+  fp.calls, fp.at = {}, DT.stamp()                                         -- overwritten by the next on
+end
+function DT.fontProbeOff() probe.on = false end
+
+-- R-F11-4: the summary lines.
+function DT.fontProbeSummary()
+  local calls = probeStore().calls
+  local refused, kept, bySite, byVis, byTpl = 0, 0, {}, {}, {}
+  for _, c in ipairs(calls) do
+    if c.res == false then
+      refused = refused + 1
+      bySite[c.site] = (bySite[c.site] or 0) + 1
+      local v = c.vis and "shown" or "hidden"
+      byVis[v] = (byVis[v] or 0) + 1
+      byTpl[c.tpl] = (byTpl[c.tpl] or 0) + 1
+      if sameFont(c.before, c.after) then kept = kept + 1 end
+    end
+  end
+  local function list(t)
+    local out = {}
+    for k, n in pairs(t) do out[#out + 1] = k .. " " .. n end
+    table.sort(out)
+    return #out > 0 and table.concat(out, ", ") or "none"
+  end
+  return {
+    "fontprobe: " .. (probe.on and "on" or "off") .. ", " .. #calls .. " calls, " .. refused .. " refused",
+    "fontprobe refused by site: " .. list(bySite),
+    "fontprobe refused by visibility: " .. list(byVis) .. "; by template: " .. list(byTpl),
+    "fontprobe refused and the old font kept: " .. kept .. " of " .. refused,
+  }
+end
+DT._fontprobe = { probe = probe, templates = templates, CAP = PROBE_CAP }
+
 local measureHost, measurers = nil, {}
 local function measurer(role)
   local fs = measurers[role]
@@ -88,6 +201,7 @@ local function measurer(role)
     measureHost:Hide()
   end
   fs = measureHost:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  templates[fs] = "GameFontHighlight"
   if fs.SetWordWrap then fs:SetWordWrap(false) end
   measurers[role] = fs
   return fs
@@ -107,7 +221,7 @@ function DT.preloadFonts()
     for _, role in ipairs({ "title", "body", "small" }) do
       local p, size, flags = DT.font(role, name)
       if fs.SetFont then
-        local ok = fs:SetFont(p, size, flags)
+        local ok = DT.fontCall(fs, p, size, flags, "preload", role)
         if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a false SetFont
         DT.preloaded[#DT.preloaded + 1] = name .. ":" .. role
       end
@@ -133,7 +247,7 @@ function DT.measure(text, role, fs)
   if not fs then
     fs = measurer(role)
     local p, size, flags = DT.font(role)
-    if fs.SetFont then fs:SetFont(p, size, flags) end
+    DT.fontCall(fs, p, size, flags, "measure", role)
   end
   local w, raw = widthOf(fs, text)
   if not w or w <= 0 then                                                  -- guard: measure failure counted
@@ -209,6 +323,7 @@ function DT.text(parent, kind, opts)
   if not KINDS[kind] then error("DT.text: kind must be line, block or label", 2) end
   opts = opts or {}
   local fs = parent:CreateFontString(nil, opts.layer or "OVERLAY", opts.template or "GameFontHighlight")
+  templates[fs] = opts.template or "GameFontHighlight"
   local rec = { fs = fs, kind = kind, role = opts.role or "body", colour = opts.colour, fixedFont = opts.fixedFont,
     window = opts.window or windowOf(parent), parent = parent, raw = "", inset = opts.inset or 0 }
   recs[fs] = rec
@@ -367,7 +482,7 @@ function DT.viewport(o)
       DT.paint(vp.search, true)
       vp.search:SetBackdropColor(DT.colour("input"))
       local p, size, flags = DT.font("body")
-      vp.search:SetFont(p, size, flags)
+      DT.fontCall(vp.search, p, size, flags, "search", "body", "editbox")
       vp.search:SetTextColor(DT.colour("text"))
     end
   end)

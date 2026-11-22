@@ -143,7 +143,7 @@ function DT.fontTo(fs, role, colour)
   if not fs then return end
   local p, size, flags = DT.font(role)
   if fs.SetFont then
-    local ok = fs:SetFont(p, size, flags)
+    local ok = DT.fontCall(fs, p, size, flags, "fontTo", role)
     if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: a false from SetFont is counted
   end
   if fs.SetTextColor then fs:SetTextColor(DT.colour(colour or (role == "title" and "title" or "text"))) end

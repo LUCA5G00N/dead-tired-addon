@@ -5,6 +5,8 @@
 --   * red on a footer given as a number (a table field footer = <number constant>, anywhere: the
 --     viewport takes the footer's text, never a pixel count). DT.viewport also raises at run time
 --     on a footer that isn't text (test_ui.lua).
+--   * dt_fontprobe (R-F11-1, 0.3.7): red on any method call :SetFont( outside DT.fontCall and
+--     DT.fontProbeMatrix in UI.lua (every font DT sets goes through the one door the probe watches).
 -- The scanner is proved on a fixture first.
 -- lua5.1 DeadTired/tests/test_textfit.lua
 local dir = (arg and arg[0] or ""):match("^(.*)[/\\][^/\\]+$") or "."
@@ -23,13 +25,18 @@ end
 local function scan(path)
   local l, err = listing(path)
   if not l then return nil, err end
-  local hits = {}
+  local hits, fn = {}, 0
   for row in l:gmatch("[^\n]+") do
+    local fstart = row:match("^%w+ <.-:(%d+),%d+>")
+    if fstart then fn = tonumber(fstart) end
     local line, op, args, comment = row:match("^%s+%d+%s+%[(%d+)%]%s+(%u+)%s+([%-%d ]+)%s*;?%s*(.*)$")
     if op == "SELF" or op == "GETTABLE" then
       local c = select(3, args:match("^(%-?%d+)%s*(%-?%d*)%s*(%-?%d*)"))
       if tonumber(c) and tonumber(c) < 0 and comment:match('^"CreateFontString"') then        -- the CreateFontString rule
         hits[#hits + 1] = { line = tonumber(line), what = "CreateFontString" }
+      end
+      if op == "SELF" and tonumber(c) and tonumber(c) < 0 and comment:match('^"SetFont"') then  -- the SetFont rule
+        hits[#hits + 1] = { line = tonumber(line), what = "SetFont", fn = fn }
       end
     elseif op == "SETTABLE" then
       local k, v = comment:match('^"([^"]*)"%s+(%S+)$')
@@ -81,6 +88,18 @@ do
   local h2 = scan(fy)
   os.remove(fy)
   check("scanner: red on a numeric footer", h2 and #h2 == 1 and h2[1].what == "footer = 16")
+  local fz = tmpfile(table.concat({
+    'local fs = CreateFrame("Frame")',                            -- 1
+    'fs:SetFont("x", 12, "")',                                    -- 2  a raw call: caught (fn 0)
+    'local function f(a) a:SetFont("y", 12, "") end',             -- 3  inside a function: caught (fn 3)
+    'if fs.SetFont then DT.fontCall(fs, "z", 12, "") end',        -- 4  a look, and the door: allowed
+  }, "\n") .. "\n")
+  local h3 = scan(fz)
+  os.remove(fz)
+  local got3 = {}
+  for _, h in ipairs(h3 or {}) do if h.what == "SetFont" then got3[#got3 + 1] = h.line .. "@" .. h.fn end end
+  check("scanner: red on a raw :SetFont( (2 at main, 3 in its function); a look and the door pass",
+    table.concat(got3, ",") == "2@0,3@3")
 end
 
 -- ---------------------------------------------------------------- the tree
@@ -91,6 +110,16 @@ do
   p:close()
   check("the scan sees the addon's files", #files >= 20)
   local raw, footers, unreadable, inUI = {}, {}, {}, 0
+  local setfonts, doorCalls = {}, 0
+  -- the two functions allowed to call :SetFont( (R-F11-1): their first lines in UI.lua
+  local allowed = {}
+  do
+    local n = 0
+    for src in io.lines(H.addonDir .. "/UI.lua") do
+      n = n + 1
+      if src:match("^function DT%.fontCall%(") or src:match("^function DT%.fontProbeMatrix%(") then allowed[n] = true end
+    end
+  end
   for _, path in ipairs(files) do
     local hits, err = scan(path)
     local base = path:match("[^/\\]+$")
@@ -99,6 +128,9 @@ do
       for _, h in ipairs(hits) do
         if h.what == "CreateFontString" then
           if base == "UI.lua" then inUI = inUI + 1 else raw[#raw + 1] = base .. ":" .. h.line end
+        elseif h.what == "SetFont" then
+          if base == "UI.lua" and allowed[h.fn] then doorCalls = doorCalls + 1
+          else setfonts[#setfonts + 1] = base .. ":" .. h.line end
         else
           footers[#footers + 1] = base .. ":" .. h.line .. " " .. h.what
         end
@@ -111,7 +143,10 @@ do
   for _, r in ipairs(raw) do print("  raw CreateFontString at " .. r) end
   check("R-F4-1: no viewport footer given as a number", #footers == 0)
   for _, r in ipairs(footers) do print("  numeric footer at " .. r) end
-  check("UI.lua does call it (the scan isn't blind): DT.text and the measuring string", inUI == 2)
+  check("UI.lua does call it (the scan isn't blind): DT.text, the measuring string and the probe's matrix", inUI == 3)
+  check("R-F11-1: no :SetFont( outside DT.fontCall and the matrix", #setfonts == 0)
+  for _, r in ipairs(setfonts) do print("  raw SetFont at " .. r) end
+  check("R-F11-1: the door and the matrix do call it (the scan isn't blind)", doorCalls == 4)
 end
 
 H.finish("textfit")
