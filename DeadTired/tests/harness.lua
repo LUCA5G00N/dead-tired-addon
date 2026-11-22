@@ -128,7 +128,12 @@ function Frame:GetText() return self.text end
 -- font's size wide, a line is the font's size tall; with no font set, 12 (so 6 px a character and
 -- 12 px a line, as before). A string with word wrap off is one line; otherwise it wraps at its
 -- width when one is set.
-local function chars(s) return #(s:gsub("[\128-\191]", "")) end
+-- Width in characters as the client draws it: an escaped "||" is one character, a texture escape
+-- (|T...|t) about two (an icon the font's height), colour codes nothing (0.4.0).
+local function chars(s)
+  s = s:gsub("||", "\1"):gsub("|T.-|t", "WW"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  return #(s:gsub("[\128-\191]", ""))
+end
 local function fontSize(f) return (f.font and tonumber(f.font[2])) or 12 end
 function Frame:GetStringWidth() return chars(tostring(self.text or "")) * fontSize(self) / 2 end
 function Frame:GetStringHeight()

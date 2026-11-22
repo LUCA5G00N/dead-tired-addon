@@ -35,7 +35,7 @@ DT.REQUIRED = {
   "C_AddOns.IsAddOnLoaded", "C_AddOns.GetAddOnMetadata", "C_ChatInfo.SendAddonMessage",
   "C_ChatInfo.RegisterAddonMessagePrefix", "C_ChatInfo.InChatMessagingLockdown",
   "C_ChatInfo.AreOutgoingAddonChatMessagesRestricted", "C_ChatInfo.SendChatMessage",
-  "C_DateAndTime.GetServerTimeLocal", "C_GameRules.IsHardcoreActive", "C_GuildInfo.GuildRoster",
+  "C_DateAndTime.GetServerTimeLocal", "C_DateAndTime.GetSecondsUntilWeeklyReset", "C_GameRules.IsHardcoreActive", "C_GuildInfo.GuildRoster",
   "C_GuildInfo.IsGuildOfficer", "C_Item.GetItemCount", "C_Item.GetItemInfoInstant",
   "C_Item.GetItemNameByID", "C_Item.IsBound", "C_Item.RequestLoadItemDataByID", "C_Timer.After",
 }
@@ -47,6 +47,7 @@ local FLAGS = { "port1", "port2", "skin031", "realm034" }
 local CAPS = {
   { "crypt", "deaths", 100 }, { "gank", "logs", 500 }, { "realms", "byChar", 200 },
   { "realms", "byServer", 200 }, { "comms", "senders", 50 }, { "comms", "mismatches", 10 },
+  { "deathboard", "board", 200 },
 }
 
 -- One sample of every message kind (S8 and S10). Query kinds are safe here: S8 runs with every
@@ -59,6 +60,7 @@ local function samples(me)
     { "DEATH", { lvl = "13", zone = "The Barrens", hc = "0" } },
     { "GANK", { who = DT.GHOST.realm .. "-Hapless Gnome", cls = "MAGE", lvl = "14", zone = "The Barrens" } },
     { "PLAYED", { lvl = "13", h = "666.0" } },
+    { "TALLY", { n = "13", w = "2", we = "1794600000", hc = "0" } },
     { "STASHQ", { q = "1", term = "Linen" } },
     { "STASH", { q = "1", to = me, hits = "2589:20:" .. DT.GHOST.name } },
     { "PREPQ", { q = "1" } },

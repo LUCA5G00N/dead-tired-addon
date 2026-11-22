@@ -472,6 +472,12 @@ function DT.viewport(o)
     vp.body.dtHeight = frameH - top - vp.bodyBottom   -- the declared height a two-line list counts its rows from
   end
   inset()
+  -- 0.4.0: new footer text (the deathboard's deadliest zone); the body is inset again to fit it.
+  function vp:setFooter(text)
+    if not self.footer then return end
+    DT.setText(self.footer, text)
+    inset()
+  end
 
   f:SetScript("OnShow", function() if o.onShow then o.onShow(vp) end end)
 
@@ -559,7 +565,12 @@ end
 local LEFT, GAP, RIGHT = 4, 6, 4
 local FLEX_MIN = 60
 DT.FLEX_MIN = FLEX_MIN
-local function cellText(r, key) return DT.safe(r[key], 255) end
+-- 0.4.0: a column declared raw = true shows its value as given (the deathboard's skull icon). Only
+-- for values the module itself sets from a constant, never anything a message carried.
+local function cellText(r, key, raw)
+  if raw then return tostring(r[key] or "") end                            -- guard: raw only where declared
+  return DT.safe(r[key], 255)
+end
 DT.DETAIL_PAD = 2
 
 -- The height of a two-line row under the current skin: row spacing + small font size + 2.
@@ -617,7 +628,7 @@ function DT.list(parent, model, opts)
       if col.fixed then
         local widest = 0
         for _, r in ipairs(self.model.rows or {}) do
-          local w = DT.measure(cellText(r, col.key), "body") or 0
+          local w = DT.measure(cellText(r, col.key, col.raw), "body") or 0
           if w > widest then widest = w end                                -- guard: fixed column from its widest value
         end
         col.w = math.ceil(widest) + 2
@@ -693,7 +704,7 @@ function DT.list(parent, model, opts)
       b.row = r
       b.cut = {}
       for c, col in ipairs(self.columns) do
-        local full = r and cellText(r, col.key) or ""
+        local full = r and cellText(r, col.key, col.raw) or ""
         if DT.setText(b.cells[c], full) and not covers[col.key] then b.cut[#b.cut + 1] = full end   -- guard: tipCovers suppresses the repeat
         if col.rgb then                                                    -- 0.3.3: a colour per row (R-F6-2)
           local v = r and r[col.rgb]
@@ -856,7 +867,7 @@ function DT.fitFaults()
       if col.fixed then
         local widest, text = 0, ""
         for _, r in ipairs(L.model.rows or {}) do
-          local t = cellText(r, col.key)
+          local t = cellText(r, col.key, col.raw)
           local w = DT.measure(t, "body") or 0
           if w > widest then widest, text = w, t end
         end

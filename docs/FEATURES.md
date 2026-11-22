@@ -371,6 +371,21 @@ Observes only, to find why the client refuses the gothic font on DT's strings.
   from Friz), each tried with both gothic files. **R-F11-4** `/dt debug fontprobe`: the summary.
 - **R-F11-5** Observes only. **R-F11-6** 0.3.7; the probe stays as a debug tool.
 
+## Ruled 22 Nov (for `dt_deathboard`, 0.4.0)
+Brief `docs/COWORK_BRIEF_dt_deathboard.md`, L1-L6 agreed by Tim (18:56), ratified by his merge of PR #34;
+built before the Waypointer (Tim, 19:24). Liliac's leaderboard, design block G.
+- **L1** A tally per character, `TALLY {n, w, we, hc}`, sent under `crypt.share` (no new switch): after each
+  of your deaths, 10 s after login, and when sharing goes on. Share off sends `TALLY {off=1}`; receivers
+  delete you. That withdrawal is sent even with the board switched off.
+- **L2** The tally starts from the character's own deaths already in the graveyard, once. The footer says
+  older deaths may not be counted.
+- **L3** The week ends at the game's weekly reset. Past it, this week reads 0 everywhere; if the reset
+  can't be read, it is never zeroed.
+- **L4** The deadliest zone this week, from your graveyard, is the only "killer" named. No combat data.
+- **L5** `/dt deaths` ("Body Count"): skull for hardcore, name, total, this week; sorted by this week,
+  total, name; 30-day drop; 200 entries.
+- **L6** 0.4.0.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A

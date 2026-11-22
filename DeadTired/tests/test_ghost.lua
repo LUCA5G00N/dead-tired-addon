@@ -141,11 +141,13 @@ do
   w:advance(2)
   a:slash("debug ghost on")
   a:slash("debug ghost all")
-  check("all: the ghost said its four (no question open)", a:said("The Restless Ghost said 4 things.") ~= nil)
+  check("all: the ghost said its five (no question open; 0.4.0 adds its tally)", a:said("The Restless Ghost said 5 things.") ~= nil)
+  check("all: the ghost's tally is on the death board", a.DT.deathBoard()[GKEY] ~= nil)
   check("before off: the ghost is in the saved data", ghostly(a:db()))
   a:slash("debug ghost off")
   check("off: says so", a:said("laid to rest") ~= nil)
   check("off: no DTGHOST anywhere in DeadTiredDB", not ghostly(a:db()))
+  check("off: the ghost's tally is gone from the death board", a.DT.deathBoard()[GKEY] == nil)
   check("off: not in Who's session list; the bar back to 1", not listed(a) and a.DT.whoCount() == 1)
   local bkey = b:key()
   local keptDeath, keptGank = false, false
@@ -231,6 +233,30 @@ do
   n:slash("debug ghost hello")
   check("switch off: the verb says so and does nothing", n:said("ghost.enabled = off") ~= nil and not listed(n))
   check("help lists debug ghost", n.DT.helpLine():find("debug ghost", 1, true) ~= nil)
+end
+
+-- ---------------------------------------------------------------- 0.4.0: the ghost's tally (dt_deathboard Task 4)
+do
+  local w = H.world()
+  local a = w:client({ name = "Stromham", full = "Stromham Hamson", realm = "CAMWOW EU4 Realm 2 PvP", guild = G,
+    setup = function(c)
+      rawset(c.env, "time", function() return 1794000000 + math.floor(c.world.t - 1000) end)
+      rawset(c.env, "C_DateAndTime", { GetSecondsUntilWeeklyReset = function() return 3 * 86400 end })
+    end })
+  a:login(); w:advance(10)
+  a:slash("debug ghost tally")
+  local e = a.DT.deathBoard()[GKEY]
+  check("ghost tally: says so", a:said("The Restless Ghost: tally.") ~= nil)
+  check("ghost tally: 13 total, 2 this week, not hardcore, this week's reset", e and e.n == 13 and e.w == 2 and e.hc == false
+    and e.we == a.DT.weekEnd())
+  local row
+  for _, r in ipairs(a.DT.deathRows()) do if r.key == GKEY then row = r end end
+  check("ghost tally: on the board as Restless Ghost, 13 / 2", row and row.name == "Restless Ghost" and row.n == 13 and row.w == 2)
+  check("ghost tally: nothing on the wire", #a.sent == 0 or (function()
+    for _, m in ipairs(a.sent) do local ok, p = a.DT._comms.decode(m.text); if ok == "ok" and p.k == "TALLY" then return false end end
+    return true end)())
+  a:slash("debug ghost off")
+  check("ghost off: its tally is purged", a.DT.deathBoard()[GKEY] == nil)
 end
 
 H.finish("ghost")
