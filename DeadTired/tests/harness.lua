@@ -147,6 +147,7 @@ function Frame:SetBackdrop(b) self.backdrop = b end
 function Frame:SetBackdropColor(...) self.bgColour = { ... } end
 function Frame:SetBackdropBorderColor(...) self.borderColour = { ... } end
 function Frame:SetFont(p, s, fl) self.font = { p, s, fl } end
+function Frame:GetFont() local f = self.font or {}; return f[1], f[2], f[3] end
 function Frame:SetTextColor(...) self.textColour = { ... } end
 function Frame:SetTexture(t) self.texture = t end
 function Frame:SetColorTexture(...) self.colourTexture = { ... } end

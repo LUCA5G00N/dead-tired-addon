@@ -515,4 +515,95 @@ do
   check("rgb: an unplaced row follows the new skin's text colour", tc[1] == dtext[1] and tc[2] == dtext[2] and tc[3] == dtext[3])
 end
 
+-- ---------------------------------------------------------------- dt_fontprobe (R-F11-1 to R-F11-5, 0.3.7)
+do
+  local G2 = "DEAD TIRED"
+  local Frame = H.Frame
+  local real = Frame.SetFont
+  local CYR = [[Fonts\MORPHEUS_CYR.TTF]]
+  local w = H.world()
+  local c = w:client({ guild = G2 })
+  c:login(); w:advance(5)
+  local DTc = c.DT
+  local P = DTc._fontprobe
+  c:slash("set core skin clean")
+  check("probe off: nothing recorded", c:db().fontprobe == nil or #(c:db().fontprobe.calls or {}) == 0)
+  c:slash("debug fontprobe on")
+  check("probe on: says so", c:said("fontprobe: on, recording every font Dead Tired sets until you say off.") ~= nil)
+  check("probe on: kept in memory only", P.probe.on == true and c:db().fontprobe.on == nil)
+  c:slash("graveyard")
+  -- the client refuses the gothic file and keeps the old font, as Tim's seemed to
+  Frame.SetFont = function(self, p, size, fl)
+    if p == CYR then return false end
+    real(self, p, size, fl)
+  end
+  c:slash("set core skin deadtired")
+  w:advance(1)
+  Frame.SetFont = real
+  local calls = c:db().fontprobe.calls
+  local title
+  for _, e in ipairs(calls) do if e.site == "fontTo" and e.role == "title" and e.path == CYR then title = e; break end end
+  check("probe: a fontTo title call recorded with every field", title ~= nil and title.skin == "deadtired"
+    and title.size == 16 and title.flags == "" and title.res == false and type(title.before) == "table"
+    and type(title.after) == "table" and type(title.vis) == "boolean" and title.tpl == "GameFontHighlight")
+  check("probe: a refusal keeps the old font (after = before, both Friz)", title ~= nil
+    and title.after[1] == title.before[1] and tostring(title.before[1]):find("FRIZQT", 1, true) ~= nil)
+  local accepted
+  for _, e in ipairs(calls) do if e.site == "fontTo" and e.role == "body" then accepted = e; break end end
+  check("probe: an accepted call records SetFont's own answer (the harness answers nothing: \"nil\")",
+    accepted ~= nil and accepted.res == "nil")
+  check("probe: ui:font still counted at fontTo while recording", (c:db().errors["ui:font"] or 0) >= 1)
+  local refused, kept, sites = 0, 0, {}
+  for _, e in ipairs(calls) do
+    if e.res == false then
+      refused = refused + 1
+      sites[e.site] = (sites[e.site] or 0) + 1
+      if e.after[1] == e.before[1] then kept = kept + 1 end
+    end
+  end
+  local siteList = {}
+  for k, v in pairs(sites) do siteList[#siteList + 1] = k .. " " .. v end
+  table.sort(siteList)
+  c.printed = {}
+  c:slash("debug fontprobe")
+  check("summary: calls and refused", c:said("fontprobe: on, " .. #calls .. " calls, " .. refused .. " refused") ~= nil and refused > 0)
+  check("summary: by site", c:said("fontprobe refused by site: " .. table.concat(siteList, ", ")) ~= nil
+    and (sites.fontTo or 0) > 0)
+  check("summary: by visibility and template", c:said("by template: GameFontHighlight " .. refused) ~= nil)
+  check("summary: the old font kept", c:said("fontprobe refused and the old font kept: " .. kept .. " of " .. refused) ~= nil)
+  -- off stops
+  c:slash("debug fontprobe off")
+  check("probe off: says so", c:said("fontprobe: off. /reload to save what it saw.") ~= nil)
+  local n = #c:db().fontprobe.calls
+  c:slash("set core skin clean"); w:advance(1)
+  check("probe off: records nothing more", #c:db().fontprobe.calls == n)
+  -- the cap, and the tpl a caller names
+  c:slash("debug fontprobe on")
+  check("probe on again: the last recording is overwritten", #c:db().fontprobe.calls == 0)
+  local box = { SetFont = function() return true end, GetFont = function() return "a", 1, "" end, IsVisible = function() return true end }
+  for i = 1, 350 do DTc.fontCall(box, "p" .. i, 12, "", "test", "body", "editbox") end
+  local cc = c:db().fontprobe.calls
+  check("probe: capped at the last 300", #cc == 300 and cc[1].path == "p51" and cc[300].path == "p350")
+  check("probe: the template a caller names is kept", cc[1].tpl == "editbox" and cc[1].res == true)
+  -- never saved on
+  local n2 = c:reload()
+  check("probe: a /reload turns it off", n2.DT._fontprobe.probe.on == false)
+  n2:slash("set core skin deadtired"); n2:slash("set core skin clean")
+  check("probe: nothing recorded after a /reload until on", #n2:db().fontprobe.calls == 300)
+  -- the matrix
+  n2.printed = {}
+  n2:slash("debug fontprobe matrix")
+  local m = n2:db().fontprobe.matrix
+  local labels = {}
+  for _, r in ipairs(m or {}) do labels[#labels + 1] = r.tpl .. "/" .. r.where .. "/" .. r.start end
+  check("matrix: 8 strings, every combination", #labels == 8 and table.concat(labels, ",") ==
+    "GameFontHighlight/shown/fresh,GameFontHighlight/shown/friz,GameFontHighlight/hidden/fresh,GameFontHighlight/hidden/friz,"
+    .. "none/shown/fresh,none/shown/friz,none/hidden/fresh,none/hidden/friz")
+  check("matrix: both paths tried on each, with the font after", m[2].cyr == "nil" and m[2].plain == "nil"
+    and m[2].cyrAfter[1] == CYR and tostring(m[2].plainAfter[1]):find("MORPHEUS.TTF", 1, true) ~= nil
+    and m[2].before[1]:find("FRIZQT", 1, true) ~= nil and m[1].before[1] == nil)
+  check("matrix: one line printed per string", #n2.printed == 8 and n2:said("fontprobe GameFontHighlight shown fresh: CYR nil, plain nil") ~= nil)
+  check("help lists debug fontprobe", n2.DT.helpLine():find("debug fontprobe", 1, true) ~= nil)
+end
+
 H.finish("ui")

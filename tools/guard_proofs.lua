@@ -189,6 +189,11 @@ local GUARDS = {
   { "R-F10-1: ui:font is information", "DeadTired/Selftest.lua", '    if KNOWN[id] then known[#known + 1] = id .. " " .. n .. " (known, not counted)"  -- guard: known ids are information', '    if false then known[#known + 1] = id .. " " .. n .. " (known, not counted)"', "test_selftest" },
   { "R-F10-1: other ids still fail", "DeadTired/Selftest.lua", '    else ids[#ids + 1] = id .. " " .. n end', '    else known[#known + 1] = id .. " " .. n end', "test_selftest" },
   { "R-F10-2: a run's own errors don't count", "DeadTired/Selftest.lua", '  if not session.running then                                              -- guard: a run\'s own errors don\'t count', '  if true then', "test_selftest" },
+  -- dt_fontprobe (COWORK_BRIEF_dt_fontprobe.md, Task 6)
+  { "R-F11-2: the probe records only while on", "DeadTired/UI.lua", '  if probe.on then                                                         -- guard: the probe records only while on', '  if true then', "test_ui" },
+  { "R-F11-2: the probe keeps the last 300", "DeadTired/UI.lua", '    while #calls >= PROBE_CAP do table.remove(calls, 1) end                -- guard: the probe keeps the last 300', '', "test_ui" },
+  { "R-F11-2: on kept in memory", "DeadTired/UI.lua", '  probe.on = true\n  local fp = probeStore()', '  probe.on = true\n  local fp = probeStore(); fp.on = true', "test_ui" },
+  { "R-F11-1: the static check sees a raw :SetFont( (fontTo bypassing the door)", "DeadTired/Skins.lua", '    local ok = DT.fontCall(fs, p, size, flags, "fontTo", role)', '    local ok = fs:SetFont(p, size, flags)', "test_textfit" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end
