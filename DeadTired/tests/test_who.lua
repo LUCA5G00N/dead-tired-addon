@@ -52,7 +52,7 @@ do
   check("the second hears the first's answer", names(b) == "Stromham Hamson/this session")
   check("the first hears the second's login hello", names(a) == "Lilbit High/this session")
   check("each lists the other once, never itself", #others(a) == 1 and #others(b) == 1)
-  check("version shown", others(a)[1].v == "0.3.3")
+  check("version shown", others(a)[1].v == "0.3.4")
   check("the bar object: DT: 1 online", a.DT.objects[2].obj.text == "DT: 1 online" and a.DT.whoCount() == 1)
   check("no reply storm: one login hello and one answer from the first", kinds(a).HELLO == 2 and kinds(b).HELLO == 1)
 end
@@ -172,7 +172,7 @@ do
   a:login()
   local rows = a.DT.whoRows()
   check("R-P6: you are listed first, marked (you)", rows[1] and rows[1].you and rows[1].name == "Stromham Hamson (you)"
-    and rows[1].v == "0.3.3")
+    and rows[1].v == "0.3.4")
   local mine = 0
   for _, r in ipairs(rows) do if a.DT.sameKey(r.key, a:key()) then mine = mine + 1 end end
   check("R-P6: your own entry exactly once, saved copies of you never doubled", mine == 1 and #rows == 1)
@@ -225,6 +225,33 @@ do
   check("R-F4-1: the cut name in full in the tooltip, after the list's own lines",
     tl[#tl] == "Bartholomew Wolfgangus Featherstonehaughsmythe" and tl[#tl - 1] == "Dead Tired 0.2.0")
   check("rows: no row starts inside the one above", not overlap and #shownRows >= 4)
+end
+
+-- ---------------------------------------------------------------- 0.3.4: realmless Who (R-F7-5, G4)
+do
+  local w3 = H.world()
+  local function g(c0) rawset(c0.env, "UnitGUID", function(u) if u == "player" then return c0.guid end end) end
+  local a = w3:client({ guild = G, name = "Stromham", full = "Stromham Hamson", realm = "", setup = g })
+  local b = w3:client({ guild = G, name = "Echo", full = "Echo Nightclaw", realm = "", setup = g })
+  a.guid, b.guid = "Player-6842-001FEF8D", "Player-6842-001FDB3B"
+  a:login(); w3:advance(2); b:login(); w3:advance(10)
+  check("G4: two clients on \"\" see each other in Who", a.DT.whoCount() == 1 and b.DT.whoCount() == 1)
+  local rnSent, hellos = 0, 0
+  for _, m in ipairs(a.sent) do
+    local ok, p = a.DT._comms.decode(m.text)
+    if ok == "ok" and p.k == "HELLO" then hellos = hellos + 1; if p.d and p.d.rn ~= nil then rnSent = rnSent + 1 end end
+  end
+  check("R-F7-5: no realm name from the game: HELLO carries no rn", hellos > 0 and rnSent == 0)
+  local e = a.DT._who.session()["S6842-Echo Nightclaw"]
+  check("R-F7-5: the receiver stores none", e ~= nil and e.rn == nil)
+  a.DT._who.record("OldRealm-Old Client", { v = "0.3.3", rn = "" })
+  a.DT._who.record("OldRealm-Spaces Only", { v = "0.3.3", rn = "   " })
+  check("R-F7-5: an empty (or blank) rn received is never stored", a.DT.realmNames["OldRealm"] == nil
+    and a.DT._who.session()["OldRealm-Old Client"].rn == nil)
+  b.realm = "CAMWOW EU4 Realm 2 PvP"
+  b:reload(); w3:advance(10)
+  check("R-F7-5: a realm name the game gives is sent and stored as before",
+    a.DT.realmNames["CAMWOWEU4Realm2PvP"] == "CAMWOW EU4 Realm 2 PvP")
 end
 
 H.finish("who")

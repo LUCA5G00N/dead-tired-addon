@@ -143,6 +143,20 @@ local GUARDS = {
   { "debug rip records nothing (R-F6-6; a record inserted)", "DeadTired/Debug.lua", '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))', '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))\n  local dd = DT.crypt().deaths; dd[#dd + 1] = { who = key, lvl = 30, zone = "Duskwood", hc = false, at = "x" }', "test_debug" },
   { "debug rip uses the key a real DEATH would carry (walk fix, 21 Nov)", "DeadTired/Debug.lua", '  key = key or (realm and (realm .. "-" .. e.name))                     -- guard: a real key, never "?"', '  key = (e.realm or mine or "?") .. "-" .. e.name', "test_debug" },
   { "debug rip sends nothing (R-F6-6; a send inserted)", "DeadTired/Debug.lua", '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))', '  DT.out(DT.noticeLine(key, 30, "Duskwood", true, roster))\n  DT.send("DEATH", { lvl = "30", zone = "Duskwood", hc = "0" })', "test_debug" },
+  -- dt_realmless (0.3.4), Task 7
+  { "R-F7-1 (2): the character's realm", "DeadTired/Keys.lua", '  if c and not c:match("^S%d+$") then source = "character" return c end   -- (2) guard: the character\'s realm', "", "test_keys" },
+  { "R-F7-1 (2): a saved S<id> is worse than the server's realm", "DeadTired/Keys.lua", '  if c and not c:match("^S%d+$") then source = "character" return c end   -- (2) guard: the character\'s realm', '  if c then source = "character" return c end', "test_keys" },
+  { "R-F7-1 (3): the server's realm", "DeadTired/Keys.lua", "  if v then                                                                 -- (3) guard: the server's realm", "  if false then", "test_keys" },
+  { "R-F7-1 (4): S<id> saved, so it stays", "DeadTired/Keys.lua", '  remember(s.byChar, me, "S" .. sid)                                       -- (4) guard: saved, so it stays', "", "test_keys" },
+  { "R-F7-2: the game's realm remembered", "DeadTired/Keys.lua", "      if me then remember(s.byChar, me, game) end                          -- R-F7-2: remembered", "", "test_keys" },
+  { "realms store cap", "DeadTired/Keys.lua", "    if n >= REALM_CAP then return end                                      -- guard: realms store cap", "", "test_keys" },
+  { "GUID pattern", "DeadTired/Keys.lua", '  return g:match("^Player%-(%d+)%-")                                       -- guard: GUID pattern', '  return g:match("%-(%d+)%-")', "test_keys" },
+  { "R-F7-3: own characters only", "DeadTired/Migrate.lua", "    if type(e) == \"table\" and e.mine == true then                         -- guard: own characters only", "    if type(e) == \"table\" then", "test_migrate" },
+  { "R-F7-3: a name on two realms left out", "DeadTired/Migrate.lua", '    if count == 1 and (cur == nil or tostring(cur):match("^S%d+$")) then  -- guard: two realms, left out', '    if (cur == nil or tostring(cur):match("^S%d+$")) then', "test_migrate" },
+  { "R-F7-3: the seed runs once", "DeadTired/Migrate.lua", "  if M.realm034 then return false end                                    -- guard: the realm seed runs once", "", "test_migrate" },
+  { "R-F7-4: the repair touches mine only", "DeadTired/Crypt.lua", '    if type(e) == "table" and e.who == "?" and e.mine == true then e.who = me end   -- guard: mine only', '    if type(e) == "table" and e.who == "?" then e.who = me end', "test_crypt" },
+  { "R-F7-5: empty rn not sent", "DeadTired/Who.lua", '  if type(rn) ~= "string" or not rn:match("%S") then return nil end      -- guard: empty rn not sent', '  if type(rn) ~= "string" then return nil end', "test_who" },
+  { "R-F7-5: empty rn not stored", "DeadTired/Who.lua", '  local rn = type(d.rn) == "string" and d.rn:match("%S") and DT.safe(d.rn, 40) or nil   -- guard: empty rn not stored', '  local rn = type(d.rn) == "string" and DT.safe(d.rn, 40) or nil', "test_who" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end

@@ -24,8 +24,9 @@ local function names()
     DT.out(unit .. ": UnitName " .. q((try(UnitName, unit))) .. ", UnitFullName " .. q(fn) .. " / " .. q(fr)
       .. ", GetUnitName(true) " .. q((try(GetUnitName, unit, true))))
   end
+  local key = DT.myKey()
   DT.out("realm: GetRealmName " .. q((try(GetRealmName))) .. ", GetNormalizedRealmName "
-    .. q((try(GetNormalizedRealmName))) .. ", key " .. q(DT.myKey()))
+    .. q((try(GetNormalizedRealmName))) .. ", key " .. q(key) .. ", realm from " .. (DT.realmSource() or "nowhere"))
 end
 
 local function senders()

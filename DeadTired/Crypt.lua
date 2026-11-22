@@ -49,6 +49,20 @@ DT.cryptSession = { mine = 0, heard = 0 }
 
 local redraw
 
+-- 0.3.4 (R-F7-4): own deaths saved as "?" while the game gave no realm get this character's key,
+-- once per login, as soon as there is one. Nothing else is rewritten.
+local repaired = false
+local function repair()
+  if repaired then return end
+  local me = DT.myKey()
+  if not me then return end
+  repaired = true
+  for _, e in ipairs(crypt().deaths) do
+    if type(e) == "table" and e.who == "?" and e.mine == true then e.who = me end   -- guard: mine only
+  end
+end
+DT.cryptRepair = repair
+
 local function record(e)
   local list = crypt().deaths
   list[#list + 1] = e
@@ -151,6 +165,7 @@ end)
 -- Port 2 (the Port 1 walk's defect 4): the date column is short ("10 Nov", DT.shortDate) so it
 -- fits on one line; the full date and time are in the row's tooltip (full).
 function DT.graveRows()
+  repair()
   local list, keys = crypt().deaths, {}
   for _, e in ipairs(list) do if type(e) == "table" then keys[#keys + 1] = e.who end end
   local name = DT.namer(keys)
@@ -287,7 +302,7 @@ local function hcLine()
   DT.out(HC_LINE)
 end
 
-DT.listen("greeted", function() hcLine() end)
+DT.listen("greeted", function() repair(); hcLine() end)
 DT.listen("member", function(isMember) if isMember then hcLine() end end)
 
 DT.keySource(function()
@@ -315,7 +330,7 @@ DT.module({
     { verb = "graveyard", usage = "graveyard", fn = function() DT.graveyard() end },
     { verb = "bedtime", usage = "bedtime HH:MM/off", fn = bedtimeVerb },
   },
-  init = function() crypt() end,
+  init = function() crypt(); repair() end,
   fit = function() build(); model:set(DT.graveRows()); list:refresh() end,
   events = {
     PLAYER_DEAD = onDead,

@@ -350,6 +350,40 @@ local function run3()
 end
 DT.migrateSkin = run3
 
+-- 0.3.4 (R-F7-3), once per account (DeadTiredDB.migrated.realm034 = true): seed the realms store's
+-- byChar from the keys DT already saved for the account's own characters (alts-roster keys marked
+-- mine). A full name found on two realms is left out. Called by Keys.lua's store before first use, so
+-- it runs before any fallback (it also replaces an "S<server ID>" stand-in, which is worse).
+local function run4(store)
+  local db = DT.db()
+  if type(db.migrated) ~= "table" then db.migrated = {} end
+  local M = db.migrated
+  if M.realm034 then return false end                                    -- guard: the realm seed runs once
+  M.realm034 = true
+  local roster = type(db.alts) == "table" and type(db.alts.roster) == "table" and db.alts.roster or {}
+  local found = {}                                                        -- lower full name -> { realm = true }
+  for key, e in pairs(roster) do
+    if type(e) == "table" and e.mine == true then                         -- guard: own characters only
+      local r, n = DT.splitKey(key)
+      if r and n then
+        local ln = n:lower():gsub("%s+", " ")
+        found[ln] = found[ln] or {}
+        found[ln][r] = true
+      end
+    end
+  end
+  for ln, realms in pairs(found) do
+    local only, count = nil, 0
+    for r in pairs(realms) do only = r; count = count + 1 end
+    local cur = store.byChar[ln]
+    if count == 1 and (cur == nil or tostring(cur):match("^S%d+$")) then  -- guard: two realms, left out
+      store.byChar[ln] = only
+    end
+  end
+  return true
+end
+DT.migrateRealms = run4
+
 DT.module({
   id = "migrate",
   title = "Legacy move",

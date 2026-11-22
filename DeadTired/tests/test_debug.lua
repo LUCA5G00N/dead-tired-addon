@@ -192,12 +192,37 @@ do
   rawset(d.env, "GetNormalizedRealmName", function() return nil end)
   rawset(d.env, "GetRealmName", function() return nil end)
   d:slash("debug rip Echo Wagyu")
-  check("debug rip: no realm anywhere: no line with a \"?\" realm", not d:said("(?)") and not d:said("died at level"))
+  check("debug rip: the game gives no realm: never a \"?\" realm (0.3.4: the remembered one is used)",
+    not d:said("(?)") and d:said("|cff0070ddEcho Wagyu|r died at level 30") ~= nil)
   rawset(d.env, "GetNormalizedRealmName", realmFn)
   rawset(d.env, "GetRealmName", function() return "CAMWOW EU4 Realm 2 PvP" end)
   d.guild = nil
   d:slash("debug rip Echo Wagyu")
   check("debug rip outside the guild: nothing", #d.printed == 0)
+end
+
+-- ---------------------------------------------------------------- 0.3.4: debug names says where the realm came from (R-F7-6)
+do
+  local w4 = H.world()
+  local x = w4:client({ guild = G, setup = function(c0)
+    rawset(c0.env, "UnitGUID", function(u) if u == "player" then return c0.guid end end) end })
+  x.guid = "Player-6842-001FEF8D"
+  x:login(); w4:advance(2)
+  x:slash("debug names")
+  check("debug names: realm from game", x:said('key "CAMWOWEU4Realm2PvP-Stromham Hamson", realm from game') ~= nil)
+  x.realm = ""
+  x:slash("debug names")
+  check("debug names: the game gives \"\": realm from character", x:said('GetRealmName "", GetNormalizedRealmName "", key "CAMWOWEU4Realm2PvP-Stromham Hamson", realm from character') ~= nil)
+  x:db().realms.byChar = {}
+  x:slash("debug names")
+  check("debug names: realm from server", x:said("realm from server") ~= nil)
+  x:db().realms.byChar, x:db().realms.byServer = {}, {}
+  x:slash("debug names")
+  check("debug names: realm from server-id", x:said('key "S6842-Stromham Hamson", realm from server-id') ~= nil)
+  x:db().realms.byChar, x.guid = {}, nil
+  x:slash("debug names")
+  check("debug names: no realm anywhere: key nil, realm from nowhere", x:said("key nil, realm from nowhere") ~= nil)
+  check("nothing printed unasked by any of this", (function() x.printed = {}; w4:advance(120); return #x.printed == 0 end)())
 end
 
 H.finish("debug")
