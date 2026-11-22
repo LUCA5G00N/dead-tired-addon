@@ -69,14 +69,23 @@ end
 
 -- ---------------------------------------------------------------- errors this session (S5, S6)
 
-local session = { count = 0, ids = {}, init = {} }
+-- R-F10-2 (0.3.6): errors recorded while DT.selftest runs (S7's repaints above all) are still saved by
+-- DT.fail, but never counted here, so they can't fail a later run's S6.
+local session = { count = 0, ids = {}, init = {}, running = false }
 local realFail = DT.fail
 DT.fail = function(id, where, err)
-  session.count = session.count + 1
-  session.ids[tostring(id)] = (session.ids[tostring(id)] or 0) + 1
-  if where == "init" then session.init[tostring(id)] = true end
+  if not session.running then                                              -- guard: a run's own errors don't count
+    session.count = session.count + 1
+    session.ids[tostring(id)] = (session.ids[tostring(id)] or 0) + 1
+    if where == "init" then session.init[tostring(id)] = true end
+  end
   return realFail(id, where, err)
 end
+
+-- R-F10-1 (0.3.6): error ids S6 reports as information, not failure, until their cause is fixed. ui:font:
+-- the client refuses the gothic title font on DT's own strings (walks of 22 Nov); the skin-switch probe
+-- round owns the cause and removes this entry.
+local KNOWN = { ["ui:font"] = true }
 
 -- ---------------------------------------------------------------- helpers
 
@@ -158,13 +167,15 @@ add("S5", "modules", function()
 end)
 
 add("S6", "errors", function()
-  if session.count > 0 then                                                -- guard: S6
-    local ids = {}
-    for id, n in pairs(session.ids) do ids[#ids + 1] = id .. " " .. n end
-    table.sort(ids)
-    return false, table.concat(ids, ", ")
+  local ids, known = {}, {}
+  for id, n in pairs(session.ids) do
+    if KNOWN[id] then known[#known + 1] = id .. " " .. n .. " (known, not counted)"  -- guard: known ids are information
+    else ids[#ids + 1] = id .. " " .. n end
   end
-  return true, "none this session"
+  table.sort(ids); table.sort(known)
+  local note = #known > 0 and ("; " .. table.concat(known, ", ")) or ""
+  if #ids > 0 then return false, table.concat(ids, ", ") .. note end      -- guard: S6
+  return true, "none this session" .. note
 end)
 
 add("S7", "windows", function()
@@ -246,11 +257,12 @@ add("S11", "loopback", function()
   return true, "heard, then laid to rest"
 end)
 
-DT._selftest = { CHECKS = CHECKS, session = session, samples = samples, FLAGS = FLAGS, CAPS = CAPS }
+DT._selftest = { CHECKS = CHECKS, session = session, KNOWN = KNOWN, samples = samples, FLAGS = FLAGS, CAPS = CAPS }
 
 -- ---------------------------------------------------------------- the run
 
 function DT.selftest()
+  session.running = true
   local rec = { at = DT.stamp(), version = DT.VERSION, pass = 0, fail = 0, lines = {} }
   local failed = {}
   for _, c in ipairs(CHECKS) do
@@ -263,6 +275,7 @@ function DT.selftest()
       if okRes then rec.pass = rec.pass + 1 else rec.fail = rec.fail + 1; failed[#failed + 1] = line end
     end
   end
+  session.running = false
   DT.db().selftest = rec                                                   -- guard: the last run only
   return rec, failed
 end

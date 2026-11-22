@@ -353,6 +353,14 @@ your leans" (11:46). Rests on `docs/DECISIONS.md` 0002 (U1, U2), still proposed.
 - **R-F8-5** Never saved: purged on `ghost off`, at logout and at every load; comms counters untouched.
 - **R-F8-6** Guild only; both modules have the On card; the verbs show in `/dt help`. **R-F8-7** 0.3.5.
 
+## Ruled 22 Nov (for `dt_fontinfo`, 0.3.6)
+Brief `docs/COWORK_BRIEF_dt_fontinfo.md`, ratified by Tim's merge of PR #30 and "going with your leans" (14:27).
+Replaces `dt_fontload` (PR #29, closed unmerged: the font is refused mid-session too, not only at load).
+- **R-F10-1** S6 reports `ui:font` as information ("known, not counted"); every other id still fails it.
+  The skin-switch probe round, which owns the cause, removes this.
+- **R-F10-2** Errors recorded during a self-test run don't count in a later run's S6 (still saved).
+- **R-F10-3** Nothing else changes. **R-F10-4** 0.3.6.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A

@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.3.5" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.3.6" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
@@ -257,6 +257,51 @@ do -- S11 forces Who on for its run, even when the player has switched it off
   c:slash("set who enabled off")
   c:slash("selftest")
   check("S11 passes with Who switched off, and Who stays off", passed(c, "S11") and not c.DT.enabled("who"))
+end
+
+-- ---------------------------------------------------------------- R-F10-1, R-F10-2 (0.3.6): ui:font is information
+do -- the client refuses the gothic font at load and on every repaint (as Tim's did, 22 Nov): S6 passes, twice
+  local Frame = H.Frame
+  local real, n = Frame.SetFont, 0
+  Frame.SetFont = function(self, p, size, fl)
+    real(self, p, size, fl)
+    if p == [[Fonts\MORPHEUS_CYR.TTF]] then n = n + 1; return false end
+  end
+  local w, c = up()
+  c:slash("selftest")
+  local first = c:said("Self-test: 10 passed, 0 failed.") ~= nil
+  local l1 = line(c, "S6") or ""
+  local refusedInRun = n
+  c:slash("selftest")
+  Frame.SetFont = real
+  check("R-F10-1 ui:font refused at load: S6 passes, noting it", first and passed(c, "S6")
+    and l1:find("none this session; ui:font 1 (known, not counted)", 1, true) ~= nil)
+  check("R-F10-2 a second run in the same session: 10 passed again", c:said("Self-test: 10 passed, 0 failed.") ~= nil
+    and passed(c, "S6") and refusedInRun > 1)
+  check("R-F10-2 the run's own refusals are not in the next run's note", (line(c, "S6") or ""):find("ui:font 1 (known", 1, true) ~= nil)
+  check("R-F10-3 the run's own refusals are still saved", (c:db().errors["ui:font"] or 0) > 1)
+end
+do -- any other id still fails S6, naming only that id
+  local w, c = up()
+  c.DT.fail("ui:font", "title", "refused")
+  c.DT.fail("bar", "OnEvent", "boom")
+  c:slash("selftest")
+  local l = line(c, "S6") or ""
+  check("R-F10-1 another id with ui:font: S6 fails, naming the other id", failed(c, "S6") and l:find("FAIL - bar 1", 1, true) ~= nil
+    and l:find("ui:font 1 (known, not counted)", 1, true) ~= nil)
+end
+do -- an error recorded during a run (any id) doesn't fail the next run
+  local w, c = up()
+  local CH = c.DT._selftest.CHECKS
+  table.insert(CH, { id = "X1", name = "noisy", fn = function() c.DT.fail("crypt", "paint", "during"); return true, "" end })
+  c:slash("selftest")
+  c:slash("selftest")
+  check("R-F10-2 an error recorded during a run: the next run's S6 passes", passed(c, "S6")
+    and (c:db().errors.crypt or 0) == 2)
+  table.remove(CH)
+  c.DT.fail("crypt", "paint", "after")
+  c:slash("selftest")
+  check("R-F10-2 ...but one recorded after the run fails S6 as before", failed(c, "S6") and line(c, "S6"):find("crypt 1", 1, true) ~= nil)
 end
 
 -- ---------------------------------------------------------------- gates
