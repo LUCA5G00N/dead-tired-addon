@@ -387,5 +387,5 @@ DT.migrateRealms = run4
 DT.module({
   id = "migrate",
   title = "Legacy move",
-  init = function() run(); run2(); run3() end,
+  init = function() run(); run2(); run3(); if DT.ghostPurge then DT.ghostPurge() end end,  -- R-F8-5: every load
 })
