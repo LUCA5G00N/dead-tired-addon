@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.4.0" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.5.0" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
@@ -334,6 +334,23 @@ do
   local req = false
   for _, n in ipairs(c.DT.REQUIRED) do if n == "C_DateAndTime.GetSecondsUntilWeeklyReset" then req = true end end
   check("0.4.0: S4 checks the weekly-reset timer (L3)", req)
+end
+
+-- ---------------------------------------------------------------- 0.5.0: the Waypointer's parts (dt_waypointer Task 4)
+do
+  local w = H.world()
+  local c = w:client({ guild = "DEAD TIRED" })
+  local S = c.DT._selftest
+  local cap
+  for _, k in ipairs(S.CAPS) do if k[1] == "way" and k[2] == "current" then cap = k[3] end end
+  check("0.5.0: S9 checks way.current against 50", cap == 50)
+  local want = { "C_Map.SetUserWaypoint", "C_Map.ClearUserWaypoint", "C_Map.GetUserWaypoint", "C_Map.HasUserWaypoint",
+    "C_Map.CanSetUserWaypointOnMap", "C_Map.GetBestMapForUnit", "C_Map.GetPlayerMapPosition", "C_Map.GetWorldPosFromMapPos",
+    "C_Map.GetMapChildrenInfo", "C_Map.GetMapInfo", "C_SuperTrack.SetSuperTrackedUserWaypoint", "GetPlayerFacing" }
+  local have, missing = {}, {}
+  for _, n in ipairs(c.DT.REQUIRED) do have[n] = true end
+  for _, n in ipairs(want) do if not have[n] then missing[#missing + 1] = n end end
+  check("0.5.0: S4 checks every API the Waypointer calls", #missing == 0)
 end
 
 H.finish("selftest")

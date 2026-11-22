@@ -35,7 +35,10 @@ DT.REQUIRED = {
   "C_AddOns.IsAddOnLoaded", "C_AddOns.GetAddOnMetadata", "C_ChatInfo.SendAddonMessage",
   "C_ChatInfo.RegisterAddonMessagePrefix", "C_ChatInfo.InChatMessagingLockdown",
   "C_ChatInfo.AreOutgoingAddonChatMessagesRestricted", "C_ChatInfo.SendChatMessage",
-  "C_DateAndTime.GetServerTimeLocal", "C_DateAndTime.GetSecondsUntilWeeklyReset", "C_GameRules.IsHardcoreActive", "C_GuildInfo.GuildRoster",
+  "C_DateAndTime.GetServerTimeLocal", "C_DateAndTime.GetSecondsUntilWeeklyReset", "C_Map.SetUserWaypoint", "C_Map.ClearUserWaypoint",
+  "C_Map.GetUserWaypoint", "C_Map.HasUserWaypoint", "C_Map.CanSetUserWaypointOnMap", "C_Map.GetBestMapForUnit",
+  "C_Map.GetPlayerMapPosition", "C_Map.GetWorldPosFromMapPos", "C_Map.GetMapChildrenInfo", "C_Map.GetMapInfo",
+  "C_SuperTrack.SetSuperTrackedUserWaypoint", "GetPlayerFacing", "C_GameRules.IsHardcoreActive", "C_GuildInfo.GuildRoster",
   "C_GuildInfo.IsGuildOfficer", "C_Item.GetItemCount", "C_Item.GetItemInfoInstant",
   "C_Item.GetItemNameByID", "C_Item.IsBound", "C_Item.RequestLoadItemDataByID", "C_Timer.After",
 }
@@ -47,7 +50,7 @@ local FLAGS = { "port1", "port2", "skin031", "realm034" }
 local CAPS = {
   { "crypt", "deaths", 100 }, { "gank", "logs", 500 }, { "realms", "byChar", 200 },
   { "realms", "byServer", 200 }, { "comms", "senders", 50 }, { "comms", "mismatches", 10 },
-  { "deathboard", "board", 200 },
+  { "deathboard", "board", 200 }, { "way", "current", 50 },
 }
 
 -- One sample of every message kind (S8 and S10). Query kinds are safe here: S8 runs with every
