@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.3.5" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.3.6" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
@@ -257,6 +257,21 @@ do -- S11 forces Who on for its run, even when the player has switched it off
   c:slash("set who enabled off")
   c:slash("selftest")
   check("S11 passes with Who switched off, and Who stays off", passed(c, "S11") and not c.DT.enabled("who"))
+end
+
+-- ---------------------------------------------------------------- R-F9-1 (0.3.6): the font refused once at load
+do
+  local Frame = H.Frame
+  local real, n = Frame.SetFont, 0
+  Frame.SetFont = function(self, p, size, fl)
+    real(self, p, size, fl)
+    if p == [[Fonts\MORPHEUS_CYR.TTF]] then n = n + 1; if n == 1 then return false end end
+  end
+  local w, c = up()                                       -- up() logs in and advances 10 s: the retry has run
+  Frame.SetFont = real
+  c:slash("selftest")
+  check("R-F9-1: a font refused once at load, then accepted: 10 passed, S6 passes",
+    c:said("Self-test: 10 passed, 0 failed.") ~= nil and passed(c, "S6") and n == 2)
 end
 
 -- ---------------------------------------------------------------- gates

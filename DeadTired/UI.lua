@@ -96,6 +96,10 @@ end
 -- Fix round 5 (R-F5-5): on the `loaded` signal every skin's fonts are set once on one hidden string,
 -- so a font not yet used this session is ready when a window is re-fonted. Only SetFont, only on
 -- DT's own hidden string. DT.preloaded lists what was set ("skin:role").
+-- R-F9-1 (0.3.6): the client refuses a font file only on its first touch, while it loads (probe, 22 Nov:
+-- refused at login, accepted from then on), so a false here is tried once more 1 s later and counted
+-- only if refused again. fontTo (live windows) still counts at once (R-F9-2).
+local RETRY_FONT = 1
 DT.preloaded = {}
 function DT.preloadFonts()
   local fs = measurer("preload")
@@ -108,7 +112,12 @@ function DT.preloadFonts()
       local p, size, flags = DT.font(role, name)
       if fs.SetFont then
         local ok = fs:SetFont(p, size, flags)
-        if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a false SetFont
+        if ok == false then                                                -- R-F9-1 (0.3.6): once more, then count
+          DT.after(RETRY_FONT, function()                                  -- guard: a refused font is tried once more
+            local again = fs:SetFont(p, size, flags)                       -- guard: one retry only
+            if again == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a second false
+          end)
+        end
         DT.preloaded[#DT.preloaded + 1] = name .. ":" .. role
       end
     end

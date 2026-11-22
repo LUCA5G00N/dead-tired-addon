@@ -137,16 +137,35 @@ do
   -- and at load: a false from the preload's SetFont is counted too
   -- false only for the gothic font, which at load (default skin clean) only the preload asks for,
   -- so fontTo's own count can't cover for it
-  Frame.SetFont = function(self, p, size, fl)
-    real(self, p, size, fl)
-    if p == [[Fonts\MORPHEUS_CYR.TTF]] then return false end
+  -- R-F9-1 (0.3.6) replaces R-F5-5's "a false at load is counted": the client refuses a font only on its
+  -- first touch (probe, 22 Nov), so the preload tries a refused font once more 1 s later and counts only a
+  -- second false. Gothic calls are counted to prove one retry only.
+  local gothic = 0
+  local function refuse(times)
+    Frame.SetFont = function(self, p, size, fl)
+      real(self, p, size, fl)
+      if p == [[Fonts\MORPHEUS_CYR.TTF]] then
+        gothic = gothic + 1
+        if gothic <= times then return false end
+      end
+    end
   end
+  gothic = 0; refuse(1)
   local w6 = H.world()
   local c6 = w6:client({ guild = G })
   c6:login()
+  check("R-F9-1 refused at load: not counted yet", (c6:db().errors["ui:font"] or 0) == 0)
+  w6:advance(2)
+  check("R-F9-1 refused at load, accepted on the retry: counted 0", (c6:db().errors["ui:font"] or 0) == 0)
+  check("R-F9-1 the gothic font asked for twice at load (once, and the one retry)", gothic == 2)
+  gothic = 0; refuse(99)
+  local w7 = H.world()
+  local c7 = w7:client({ guild = G })
+  c7:login()
+  w7:advance(5)
+  check("R-F9-1 refused at load and on the retry: counted once", (c7:db().errors["ui:font"] or 0) == 1)
+  check("R-F9-1 one retry only: never a third try", gothic == 2)
   Frame.SetFont = real
-  check("R-F5-5 a false from SetFont at load (the preload's one gothic font) is counted under ui:font",
-    (c6:db().errors["ui:font"] or 0) == 1)
   check("R-F5-5 a SetFont that answers nothing (the usual case) is not counted", (c5:db().errors["ui:font"] or 0) == before2)
 end
 

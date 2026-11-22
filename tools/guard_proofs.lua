@@ -131,7 +131,7 @@ local GUARDS = {
   { "fonts set at load for every skin (R-F5-5)", "DeadTired/UI.lua", 'DT.listen("loaded", function() DT.preloadFonts() end)               -- guard: fonts set at load for every skin', "", "test_skins" },
   { "the second repaint is scheduled on a skin change (R-F5-5)", "DeadTired/Skins.lua", "    DT.after(0, DT.restyle)                                                -- guard: the second repaint is scheduled", "", "test_skins" },
   { "a false from SetFont is counted (fontTo) (R-F5-5)", "DeadTired/Skins.lua", '    if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: a false from SetFont is counted', "", "test_skins" },
-  { "a false from SetFont is counted (the preload) (R-F5-5)", "DeadTired/UI.lua", '        if ok == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a false SetFont', "", "test_skins" },
+  { "a second false from SetFont at load is counted (the preload) (R-F5-5 as amended by R-F9-1)", "DeadTired/UI.lua", '            if again == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a second false', "", "test_skins" },
   -- dt_classcolours (0.3.3), Task 7
   { "colorStr is 8 hex digits (R-F6-5)", "DeadTired/Guild.lua", 'if type(hex) ~= "string" or not hex:match("^%x%x%x%x%x%x%x%x$") then return nil end', 'if type(hex) ~= "string" then return nil end', "test_guild" },
   { "r/g/b in range (R-F6-5)", "DeadTired/Guild.lua", "  if not (unit(r) and unit(g) and unit(b)) then return nil end             -- guard: r/g/b in range", "", "test_guild" },
@@ -185,6 +185,10 @@ local GUARDS = {
   { "purge site: PLAYER_LOGOUT", "DeadTired/Ghost.lua", "  events = { PLAYER_LOGOUT = function() DT.ghostPurge() end },", "  events = { PLAYER_LOGOUT = function() end },", "test_ghost" },
   { "purge site: every load (Migrate)", "DeadTired/Migrate.lua", "run3(); if DT.ghostPurge then DT.ghostPurge() end end,", "run3() end,", "test_ghost" },
   { "the sent signal (R-F8-4)", "DeadTired/Comms.lua", "  DT.signal(\"sent\", kind, data)", "", "test_ghost" },
+  -- dt_fontload (COWORK_BRIEF_dt_fontload.md, Task 4)
+  { "R-F9-1: the retry (removed: the first refusal is counted)", "DeadTired/UI.lua", '          DT.after(RETRY_FONT, function()                                  -- guard: a refused font is tried once more', '          DT.fail("ui:font", role, "first"); DT.after(RETRY_FONT, function()', "test_skins" },
+  { "R-F9-1: only a second false is counted", "DeadTired/UI.lua", '            if again == false then DT.fail("ui:font", role, "SetFont refused " .. tostring(p)) end   -- guard: preload counts a second false', '            DT.fail("ui:font", role, "SetFont refused " .. tostring(p))', "test_skins" },
+  { "R-F9-1: one retry only", "DeadTired/UI.lua", '            local again = fs:SetFont(p, size, flags)                       -- guard: one retry only', '            fs:SetFont(p, size, flags); local again = fs:SetFont(p, size, flags)', "test_skins" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end

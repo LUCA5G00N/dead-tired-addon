@@ -353,6 +353,13 @@ your leans" (11:46). Rests on `docs/DECISIONS.md` 0002 (U1, U2), still proposed.
 - **R-F8-5** Never saved: purged on `ghost off`, at logout and at every load; comms counters untouched.
 - **R-F8-6** Guild only; both modules have the On card; the verbs show in `/dt help`. **R-F8-7** 0.3.5.
 
+## Ruled 22 Nov (for `dt_fontload`, hotfix 0.3.6)
+Brief `docs/COWORK_BRIEF_dt_fontload.md`, ratified by Tim's merge of PR #28 and "all as leaned" (13:14). Cause:
+the client refuses a font file only on its first touch at login (probe 13:08: refused once, then accepted).
+- **R-F9-1** At load, a refused font is tried once more 1 s later; only a second refusal counts under `ui:font`.
+- **R-F9-2** Live windows (`DT.fontTo`) still count at once; font paths unchanged.
+- **R-F9-3** Saved error counts are history, not reset. **R-F9-4** 0.3.6.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
