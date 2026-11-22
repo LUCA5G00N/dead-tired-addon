@@ -7,8 +7,9 @@ The guild addon for <DEAD TIRED>. Still optional, still quiet. Nothing it does f
 ## New
 - **`/dt selftest`.** Dead Tired checks itself from the inside: that it knows who you are, that the
   game still gives it what it needs, that its windows fit, that switched-off parts stay quiet, that
-  your saved data is in order. One line back: how many checks passed and how many didn't. If something
-  failed and you're asked about it, run it, `/reload`, and say so.
+  your saved data is in order. One line back: how many checks passed and how many didn't. One known
+  failure for now: `S6 errors` names `ui:font`, a font the game refuses at login. Harmless, and the next
+  version fixes it.
 - **A pretend guildie, for the officers who test things.** `/dt debug ghost` raises the Restless
   Ghost, who says hello, dies, holds grudges and answers your stash searches, so a feature can be
   tested without a second person online. It never talks to the guild, and nothing of it is kept:
