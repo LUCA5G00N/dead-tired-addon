@@ -342,6 +342,17 @@ build 71037 (21 Nov) returns "" for the realm, so DT had no key and sent nothing
 - **R-F7-4** Own deaths saved as `?` get the key back. **R-F7-5** Empty realm names neither sent nor stored.
 - **R-F7-6** `/dt debug names` says where the realm came from. **R-F7-7** 0.3.4.
 
+## Ruled 22 Nov (for `dt_selftest`, 0.3.5)
+Brief `docs/COWORK_BRIEF_dt_selftest.md`, ratified by Tim's merge of PR #26 (22 Nov) and "happy to go with
+your leans" (11:46). Rests on `docs/DECISIONS.md` 0002 (U1, U2), still proposed.
+- **R-F8-1** `/dt selftest`: checks S1 to S11 in the live client; one summary line, one line per failure.
+- **R-F8-2** Only the last run is kept, as `DeadTiredDB.selftest` (100 lines at most). Typed only.
+- **R-F8-3** The ghost: Restless Ghost on the reserved realm `DTGHOST`, `/dt debug ghost ...`. Its messages
+  go through Comms' own decode and handlers, never the network.
+- **R-F8-4** While `ghost on` (this session only), it answers your stash search, prep roll call and Who.
+- **R-F8-5** Never saved: purged on `ghost off`, at logout and at every load; comms counters untouched.
+- **R-F8-6** Guild only; both modules have the On card; the verbs show in `/dt help`. **R-F8-7** 0.3.5.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A

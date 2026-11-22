@@ -211,6 +211,7 @@ function DT.send(kind, data)
     heldSaid = true
     DT.out(HELD_LINE)
   end
+  DT.signal("sent", kind, data)                                            -- dt_selftest: the ghost's answers (R-F8-4)
   return true
 end
 
