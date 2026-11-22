@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.3.7" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.4.0" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
@@ -317,6 +317,23 @@ do
   c:slash("set selftest enabled off")
   c:slash("selftest")
   check("switched off: says so, nothing recorded", c:said("selftest.enabled = off") ~= nil and c:db().selftest == nil)
+end
+
+-- ---------------------------------------------------------------- 0.4.0: the deathboard's parts (dt_deathboard Task 5)
+do
+  local w = H.world()
+  local c = w:client({ guild = "DEAD TIRED" })
+  local S = c.DT._selftest
+  local kinds, tally = {}, nil
+  for _, smp in ipairs(S.samples()) do kinds[#kinds + 1] = smp[1]; if smp[1] == "TALLY" then tally = smp[2] end end
+  check("0.4.0: S8 and S10 have a TALLY sample (11 kinds)", tally ~= nil and #kinds == 11)
+  check("0.4.0: the TALLY sample passes the deathboard's own validation", tally and c.DT._deathboard.valid(tally) ~= nil)
+  local cap
+  for _, k in ipairs(S.CAPS) do if k[1] == "deathboard" and k[2] == "board" then cap = k[3] end end
+  check("0.4.0: S9 checks deathboard.board against 200", cap == 200)
+  local req = false
+  for _, n in ipairs(c.DT.REQUIRED) do if n == "C_DateAndTime.GetSecondsUntilWeeklyReset" then req = true end end
+  check("0.4.0: S4 checks the weekly-reset timer (L3)", req)
 end
 
 H.finish("selftest")

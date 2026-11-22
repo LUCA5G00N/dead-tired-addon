@@ -194,6 +194,27 @@ local GUARDS = {
   { "R-F11-2: the probe keeps the last 300", "DeadTired/UI.lua", '    while #calls >= PROBE_CAP do table.remove(calls, 1) end                -- guard: the probe keeps the last 300', '', "test_ui" },
   { "R-F11-2: on kept in memory", "DeadTired/UI.lua", '  probe.on = true\n  local fp = probeStore()', '  probe.on = true\n  local fp = probeStore(); fp.on = true', "test_ui" },
   { "R-F11-1: the static check sees a raw :SetFont( (fontTo bypassing the door)", "DeadTired/Skins.lua", '    local ok = DT.fontCall(fs, p, size, flags, "fontTo", role)', '    local ok = fs:SetFont(p, size, flags)', "test_textfit" },
+  -- dt_deathboard (0.4.0, COWORK_BRIEF_dt_deathboard.md, Task 7)
+  { "deathboard: share gate on sending (L1)", "DeadTired/DeathBoard.lua", "if not sharing() then return false end                                   -- guard: share gate", "", "test_deathboard" },
+  { "deathboard: share off withdraws (L1)", "DeadTired/DeathBoard.lua", "DT.send(\"TALLY\", { off = \"1\" })                                          -- guard: withdrawn when sharing off", "", "test_deathboard" },
+  { "deathboard: the withdraw even while off (L1)", "DeadTired/DeathBoard.lua", "if v == false then withdraw()                                          -- guard: withdraws even while off", "if v == false then if DT.enabled(\"deathboard\") then withdraw() end", "test_deathboard" },
+  { "deathboard: receivers delete on off=1", "DeadTired/DeathBoard.lua", "board()[from] = nil                                                  -- guard: delete on off=1", "", "test_deathboard" },
+  { "deathboard: TALLY validation", "DeadTired/DeathBoard.lua", "if not v then bad() return end                                           -- guard: TALLY validation", "v = v or { n = 1, w = 0, we = 0, hc = false }", "test_deathboard" },
+  { "deathboard: w never over n", "DeadTired/DeathBoard.lua", "if w > n or n > MAXN then return nil end", "if n > MAXN then return nil end", "test_deathboard" },
+  { "deathboard: board cap 200", "DeadTired/DeathBoard.lua", "if b[from] == nil then makeRoom(b) end                                   -- guard: board cap", "", "test_deathboard" },
+  { "deathboard: 30-day drop", "DeadTired/DeathBoard.lua", "if type(e) ~= \"table\" or type(e.t) ~= \"number\" or now - e.t > MAX_AGE then b[key] = nil end   -- guard: 30-day drop", "", "test_deathboard" },
+  { "deathboard: week zeroing, own (L3)", "DeadTired/DeathBoard.lua", "if t.we > 0 and now and now >= t.we then                                 -- guard: week zeroing (own)", "if false then", "test_deathboard" },
+  { "deathboard: week zeroing, received (L3)", "DeadTired/DeathBoard.lua", "if type(e.we) == \"number\" and e.we > 0 and now and now >= e.we then return 0 end   -- guard: week zeroing (received)", "", "test_deathboard" },
+  { "deathboard: we 0 is never zeroed (L3)", "DeadTired/DeathBoard.lua", "if type(e.we) == \"number\" and e.we > 0 and now and now >= e.we then return 0 end   -- guard: week zeroing (received)", "if type(e.we) == \"number\" and now and now >= e.we then return 0 end", "test_deathboard" },
+  { "deathboard: seed once per character (L2)", "DeadTired/DeathBoard.lua", "if type(m[me]) ~= \"table\" then m[me] = seed(me) end                      -- guard: seed once per character", "m[me] = seed(me)", "test_deathboard" },
+  { "deathboard: seed counts own deaths only (L2)", "DeadTired/DeathBoard.lua", "if type(e) == \"table\" and e.mine == true and e.who == me then            -- guard: own deaths only (L2)", "if type(e) == \"table\" then", "test_deathboard" },
+  { "deathboard: off ignores inbound", "DeadTired/DeathBoard.lua", "if not DT.enabled(\"deathboard\") then return end                          -- guard: off ignores inbound (deathboard)", "", "test_deathboard" },
+  { "deathboard: off sends nothing", "DeadTired/DeathBoard.lua", "if not DT.enabled(\"deathboard\") or not DT.enabled(\"crypt\") then return false end   -- guard: module switch (send)", "", "test_deathboard" },
+  { "deathboard: off verb does nothing else", "DeadTired/DeathBoard.lua", "if not DT.enabled(\"deathboard\") then return DT.out(OFF) end        -- guard: off verbs do nothing else (deaths)", "", "test_deathboard" },
+  { "deathboard: guild gate, send", "DeadTired/DeathBoard.lua", "  if not DT.isMember() then return false end", "", "test_deathboard" },
+  { "deathboard: guild gate, inbound", "DeadTired/Comms.lua", "  if not DT.isMember() then return end                                    -- guard: guild gate (inbound)", "", "test_deathboard" },
+  { "deathboard: Crypt's mydeath signal", "DeadTired/Crypt.lua", "  DT.signal(\"mydeath\")", "", "test_deathboard" },
+  { "deathboard: the raw column only where declared (UI)", "DeadTired/UI.lua", "if raw then return tostring(r[key] or \"\") end                            -- guard: raw only where declared", "", "test_deathboard" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end

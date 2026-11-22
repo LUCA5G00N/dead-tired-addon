@@ -111,6 +111,7 @@ local function onDead()
   if DT.get("crypt", "share") == true then                             -- guard: sent only when share is on (A2)
     DT.send("DEATH", { lvl = tostring(lvl), zone = z, hc = hc and "1" or "0" })
   end
+  DT.signal("mydeath")                                                 -- 0.4.0: the deathboard counts it (DeathBoard.lua)
 end
 
 -- ---------------------------------------------------------------- received deaths
