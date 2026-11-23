@@ -10,9 +10,6 @@ The guild addon for <DEAD TIRED>. Still optional, still quiet.
 - Get there and it clears itself. `/dt way clear` gives up early. Drag the arrow wherever suits you; `/dt way arrow off` or `/dt way pin off` if you only want one of them.
 - Your waypoint survives a `/reload`. Nobody else sees it.
 
-## Known scruffiness
-- **Switching skin** still doesn't repaint a window that's already open. Close it and open it again.
-
 ## Install
 1. Quit WoW. Back up `WTF\Account\<you>\SavedVariables\DeadTired.lua`.
 2. Delete the old `Interface\AddOns\DeadTired` folder.
