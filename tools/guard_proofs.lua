@@ -215,6 +215,19 @@ local GUARDS = {
   { "deathboard: guild gate, inbound", "DeadTired/Comms.lua", "  if not DT.isMember() then return end                                    -- guard: guild gate (inbound)", "", "test_deathboard" },
   { "deathboard: Crypt's mydeath signal", "DeadTired/Crypt.lua", "  DT.signal(\"mydeath\")", "", "test_deathboard" },
   { "deathboard: the raw column only where declared (UI)", "DeadTired/UI.lua", "if raw then return tostring(r[key] or \"\") end                            -- guard: raw only where declared", "", "test_deathboard" },
+  -- dt_waypointer (0.5.0, COWORK_BRIEF_dt_waypointer.md, Task 7)
+  { "way: coordinate range (W1)", "DeadTired/Way.lua", "if x < 0 or x > 100 or y < 0 or y > 100 then return nil end              -- guard: coordinate range", "", "test_way" },
+  { "way: ambiguous zone refused (W1)", "DeadTired/Way.lua", "if n > 1 then return nil, \"many\" end                                     -- guard: ambiguous zone refused", "", "test_way" },
+  { "way: CanSetUserWaypointOnMap (W2)", "DeadTired/Way.lua", "if can ~= true then DT.out(NO_PIN) return false end                     -- guard: CanSetUserWaypointOnMap", "", "test_way" },
+  { "way: clear only DT's own pin (W2)", "DeadTired/Way.lua", "if not ours(w) then return false end                                     -- guard: clear only ours", "", "test_way" },
+  { "way: a secret or missing read hides the needle (W3)", "DeadTired/Way.lua", "if not pc then return nil, nil, \"lost\" end                               -- guard: a secret or missing read hides the needle", "", "test_way" },
+  { "way: arrival radius (W5)", "DeadTired/Way.lua", "if dist <= ARRIVE then                                                 -- guard: arrival radius", "if dist <= ARRIVE + 2 then", "test_way" },
+  { "way: OnUpdate throttle (W3)", "DeadTired/Way.lua", "if acc < TICK then return end                                          -- guard: OnUpdate throttle", "", "test_way" },
+  { "way: hidden does nothing (W3)", "DeadTired/Way.lua", "if not arrow:IsShown() or not current() then return end                -- guard: hidden does nothing", "", "test_way" },
+  { "way: store cap (W6)", "DeadTired/Way.lua", "while n > CAP do                                                         -- guard: store cap", "while false do", "test_way" },
+  { "way: guild gate (set)", "DeadTired/Way.lua", "if not DT.isMember() or not DT.enabled(\"way\") then return false end    -- guard: guild gate and module switch (set)", "if not DT.enabled(\"way\") then return false end", "test_way" },
+  { "way: module switch (set)", "DeadTired/Way.lua", "if not DT.isMember() or not DT.enabled(\"way\") then return false end    -- guard: guild gate and module switch (set)", "if not DT.isMember() then return false end", "test_way" },
+  { "way: off verbs do nothing else", "DeadTired/Way.lua", "if not DT.enabled(\"way\") then return DT.out(OFF) end                     -- guard: off verbs do nothing else (way)", "", "test_way" },
 }
 
 local function read(p) local f = assert(io.open(p, "rb")); local s = f:read("*a"); f:close(); return s end

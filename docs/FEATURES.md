@@ -386,6 +386,18 @@ built before the Waypointer (Tim, 19:24). Liliac's leaderboard, design block G.
   total, name; 30-day drop; 200 entries.
 - **L6** 0.4.0.
 
+## Ruled 22 Nov (for `dt_waypointer`, 0.5.0)
+Brief `docs/COWORK_BRIEF_dt_waypointer.md`, W1–W7 ratified by Tim's merge of PR #36 (20:37). Block F (F1–F4,
+20 Nov); F6 answered from OpenMap's repo; F5 probed by Tim in Tanaris (20:28); option (b), our arrow and
+Blizzard's pin (Tim, 20:29).
+- **W1** `/dt way <x> <y> [zone]` (a zone by name or unique prefix) and `/dt way list`. Round one's list is the
+  39 library books (`WayBooks.lua`); trainers, flight masters and event spots wait for sourced coordinates.
+- **W2** Blizzard's pin, set and tracked only where the game allows one; cleared only while it's still DT's.
+- **W3** DT's arrow: a needle, the yards, and the place under it; draggable; at most 10 updates a second;
+  a secret or missing position hides the needle.
+- **W4** `way.arrow` and `way.pin`, both on. **W5** Within 5 yards it clears itself; `/dt way clear`.
+- **W6** One waypoint per character, kept over a `/reload`, never shared. **W7** 0.5.0.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A
