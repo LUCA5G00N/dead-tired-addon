@@ -260,7 +260,9 @@ end
 
 local games = {}            -- [id] = game, this session only
 local order = {}            -- ids, newest last
-local selected              -- the game the table window shows (a click, or a new challenge to you)
+local selected              -- the game you last clicked in the table window
+local selectedAt = 0        -- `ticks` when you clicked it
+local ticks = 0             -- goes up with every line any game logs: which game changed last
 local timeout = TIMEOUT
 local redraw
 local listener
@@ -268,6 +270,8 @@ local listener
 local function gameId(host, n) return host .. "#" .. n end
 
 local function addLog(g, line)
+  ticks = ticks + 1
+  g.changed = ticks
   g.log[#g.log + 1] = line
   while #g.log > LOG_MAX do table.remove(g.log, 1) end
 end
@@ -839,7 +843,7 @@ DT.on("GAME", function(from, f)
       or f.re == "2" and (DOUBLE_LINE:format(hostName, s) .. " Accept or decline.")
       or f.k == "dr" and (hostName .. " challenges you to a deathroll for " .. s .. ". Accept or decline.")
       or (hostName .. " opens a high-low table at " .. s .. ". Join if you dare."))
-    if f.k == "dr" then selected = g.id; DT.out(g.log[#g.log]) end
+    if f.k == "dr" then DT.out(g.log[#g.log]) end
   end
   if redraw then redraw() end
 end)
@@ -1090,21 +1094,21 @@ function DT.gambleGameRows()
   return rows
 end
 
--- The game the window shows: the one clicked while it's still live; else the newest you're in or can join;
--- else the one clicked; else the newest.
+-- The game the window shows (walk, 24 Nov 23:52: a joiner's window fell back to an older deathroll after a
+-- high-low settled): the newest-changed game you're in, were challenged to, or can join; a game you clicked
+-- stays until something newer happens in one of those. With none of yours, the clicked one, then the newest.
 local function current()
-  local g = selected and games[selected]
-  if g and live(g) then return g end
-  for i = #order, 1, -1 do
-    local c = games[order[i]]
-    if c and live(c) and (c.mine or c.joined or joinable(c)) then return c end
+  local best
+  for _, id in ipairs(order) do
+    local c = games[id]
+    if c and (involved(c) or amIn(c) or joinable(c)) and (not best or (c.changed or 0) > (best.changed or 0)) then
+      best = c
+    end
   end
-  if g then return g end
-  for i = #order, 1, -1 do
-    local c = games[order[i]]
-    if c and (c.mine or c.joined or amIn(c)) then return c end
-  end
-  for i = #order, 1, -1 do if games[order[i]] then return games[order[i]] end end
+  local clicked = selected and games[selected]
+  if clicked and (not best or selectedAt >= (best.changed or 0)) then return clicked end   -- guard: a click holds until something newer
+  if best then return best end
+  return clicked or (order[#order] and games[order[#order]])
 end
 
 local function rollRange(g) return myRange(g) end
@@ -1373,7 +1377,7 @@ local function build()
   vp = DT.viewport({ id = "gamble", title = TITLE, width = 420, height = 380, footer = TABLE_FOOTER })
   list = DT.list(vp.body, model, { count = 4, tipCovers = { "name" },
     empty = function(m) if #m.rows == 0 then return EMPTY end end,
-    onClick = function(row) selected = row.id; fill() end,
+    onClick = function(row) selected = row.id; selectedAt = ticks; fill() end,
     tip = function(row, tt) tt:AddLine(DT.safe(row.name, 64)); tt:AddLine("Click to show this game.", 0.6, 0.6, 0.6) end,
     columns = { { key = "name", flex = true }, { key = "stake", fixed = true, colour = "muted" },
       { key = "state", fixed = true } } })
@@ -1410,7 +1414,7 @@ end
 function DT.gambleView(id)
   if not DT.isMember() then return end
   build()
-  if id then selected = id end
+  if id then selected = id; selectedAt = ticks end
   fill()
   vp:Show()
 end
@@ -1541,6 +1545,6 @@ DT._gamble = { games = function() return games end, order = function() return or
   BEATDOWN = BEATDOWN, NO_RESET = NO_RESET, OUT_OF_TURN = OUT_OF_TURN, WRONG_RANGE = WRONG_RANGE,
   DISPUTED = DISPUTED, FOLDED = FOLDED, TIMED_OUT = TIMED_OUT, OFF = OFF, POOR = POOR, STAKE_LINE = STAKE_LINE,
   NO_PARTY = NO_PARTY, TIMEOUT = TIMEOUT, CLOSE_AFTER = CLOSE_AFTER, BOARD_CAP = BOARD_CAP, WALLET_CAP = WALLET_CAP,
-  timeout = function() return timeout end, select = function(id) selected = id end,
+  timeout = function() return timeout end, select = function(id) selected = id; selectedAt = ticks end,
   panel = function() return panel end, plist = function() return plist end, pstake = function() return pstake end,
   OVER_CAP = OVER_CAP, NO_TARGET = NO_TARGET }

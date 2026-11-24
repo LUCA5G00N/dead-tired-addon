@@ -112,8 +112,8 @@ check could never turn anything red. So I removed it, and proved the shared chec
 - **Bar tooltip:** `The Crypt's Table` / `You hold <n> chips.` / `Click: the table. Right-click: the ledger.`
 
 ## The zip
-`dist/DeadTired-0.7.0.zip`: 220,718 bytes, sha256 `62ee3a40cc7ae42a6b384c08d469cd35d2dc9210106dfe8a1f14e8aca98add14`
-(rebuilt after the walk fix below; the first build was `fc0dd1a9…88ef`).
+`dist/DeadTired-0.7.0.zip`: 220,912 bytes, sha256 `b8848cb2785123246db81623e83b73293056e2ab0ff24dc4fa2e854e2415ef94`
+(rebuilt after the walk fixes below; earlier builds `fc0dd1a9…88ef`, `62ee3a40…dd14`).
 Unzipped, `diff -r -x tests` is clean.
 
 ## What the brief got wrong, and where I departed from it
@@ -152,5 +152,16 @@ New checks:
 
 Both new guards were proved red: "a button fits its label", and "nothing shows through the panel". The offline fit
 check couldn't have caught the first problem, because button labels don't go through `DT.text`.
+
+## Walk fix 2 (24 Nov, 23:52)
+**The bug:** the joiner's window showed the wrong game's log after a high-low settled. Tim joined Lilbit's 250 table,
+and after it settled his window showed the earlier deathroll's log. His balance was right: 710 − 40 = 670.
+- **Cause:** a challenge to you pinned the window to that game (departure 4), and once no game was live, the window
+  fell back to the pinned one.
+- **Fix:** the window shows the most recently changed game you're in, were challenged to, or can join. A game you
+  click stays shown until something newer happens in one of those.
+- The check `window: after the high-low settles, the joiner sees the high-low's result` reproduces Tim's sequence.
+  It failed before the fix and passes after.
+- The "a click holds until something newer" guard was proved red.
 
 Never wrote a `_results.md` file.

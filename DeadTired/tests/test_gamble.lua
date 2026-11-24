@@ -929,6 +929,35 @@ do
   check("T9: the old host's table times out; nothing moved", lastGameOf(x).state == "folded" and bal(x) == 1000 and bal(y) == 1000)
 end
 
+-- ---------------------------------------------------------------- the window follows your latest game (walk, 24 Nov 23:52)
+do
+  -- Tim's sequence: Lilbit challenges him to a deathroll (it settles), then opens a high-low; he joins; it settles.
+  local w, a, b = table3()
+  w.party = { a, b }
+  a:slash("gamble")
+  b:slash("gamble deathroll Stromham 50"); w:advance(1)
+  a:slash("gamble join"); w:advance(1)
+  b.rolls = { 1 }; b:slash("gamble roll"); w:advance(1)
+  local raw = function() return a.DT.textRecord(a.DT._gamble.status()).raw end
+  check("window: the settled deathroll shows", raw():find("Deathroll:", 1, true) ~= nil)
+  b:slash("gamble highlow 250"); w:advance(1)
+  check("window: a new table in the party takes over the window", raw():find("opens a high-low table at 250", 1, true) ~= nil)
+  a:slash("gamble join"); w:advance(1)
+  b:slash("gamble call"); w:advance(1)
+  b.rolls = { 164 }; b:slash("gamble roll"); w:advance(1)
+  a.rolls = { 124 }; a:slash("gamble roll"); w:advance(1)
+  check("window: after the high-low settles, the joiner sees the high-low's result, not the old deathroll",
+    raw():find("High-low: Stromham Hamson pays Sap Hapi 40 chips.", 1, true) ~= nil and raw():find("Deathroll:", 1, true) == nil)
+  -- a click still wins until something newer happens
+  local L = a.DT._gamble.list()
+  local dr
+  for _, r in ipairs(L.rows) do if r.row and r.row.name:find("Deathroll", 1, true) then dr = r end end
+  dr.scripts.OnClick(dr, "LeftButton")
+  check("window: clicking an older game shows it", raw():find("Deathroll:", 1, true) ~= nil)
+  b:slash("gamble highlow 30"); w:advance(1)
+  check("window: ...until a newer game happens", raw():find("opens a high-low table at 30", 1, true) ~= nil)
+end
+
 -- ---------------------------------------------------------------- buttons fit their labels (walk, 24 Nov 23:16)
 do
   local w, a, b = table3()
