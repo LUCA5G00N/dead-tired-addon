@@ -41,6 +41,8 @@ DT.REQUIRED = {
   "C_SuperTrack.SetSuperTrackedUserWaypoint", "GetPlayerFacing", "C_GameRules.IsHardcoreActive", "C_GuildInfo.GuildRoster",
   "C_GuildInfo.IsGuildOfficer", "C_Item.GetItemCount", "C_Item.GetItemInfoInstant",
   "C_Item.GetItemNameByID", "C_Item.IsBound", "C_Item.RequestLoadItemDataByID", "C_Timer.After",
+  -- 0.6.0 (dt_gamble): the game's own roll, and the party it is read in.
+  "RandomRoll", "GetNumGroupMembers", "IsInRaid",
 }
 
 -- Every migration flag DT defines (Migrate.lua; realm034 is set by Keys' store on first use).
@@ -50,7 +52,7 @@ local FLAGS = { "port1", "port2", "skin031", "realm034" }
 local CAPS = {
   { "crypt", "deaths", 100 }, { "gank", "logs", 500 }, { "realms", "byChar", 200 },
   { "realms", "byServer", 200 }, { "comms", "senders", 50 }, { "comms", "mismatches", 10 },
-  { "deathboard", "board", 200 }, { "way", "current", 50 },
+  { "deathboard", "board", 200 }, { "way", "current", 50 }, { "gamble", "board", 200 }, { "gamble", "wallet", 50 },
 }
 
 -- One sample of every message kind (S8 and S10). Query kinds are safe here: S8 runs with every
@@ -69,6 +71,12 @@ local function samples(me)
     { "PREPQ", { q = "1" } },
     { "PREP", { q = "1", to = me, ok = "1", short = "0" } },
     { "PREPLIST", { ver = "1", items = { { id = 2589, need = 20, name = "Linen Cloth" } } } },
+    { "GAME", { g = "1", k = "hl", s = "50" } },
+    { "JOIN", { h = me, g = "1" } },
+    { "CALL", { g = "1", p = DT.GHOST.name .. ",Some One" } },
+    { "RESULT", { g = "1", r = "1:Restless Ghost:40:50;1:Some One:12:50" } },
+    { "FOLD", { g = "1" } },
+    { "CHIPS", { b = "1250", w = "250", bb = "40", we = "1794600000" } },
   }
 end
 

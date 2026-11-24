@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.5.0" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.6.0" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
@@ -326,7 +326,7 @@ do
   local S = c.DT._selftest
   local kinds, tally = {}, nil
   for _, smp in ipairs(S.samples()) do kinds[#kinds + 1] = smp[1]; if smp[1] == "TALLY" then tally = smp[2] end end
-  check("0.4.0: S8 and S10 have a TALLY sample (11 kinds)", tally ~= nil and #kinds == 11)
+  check("0.4.0: S8 and S10 have a TALLY sample (17 kinds since 0.6.0)", tally ~= nil and #kinds == 17)
   check("0.4.0: the TALLY sample passes the deathboard's own validation", tally and c.DT._deathboard.valid(tally) ~= nil)
   local cap
   for _, k in ipairs(S.CAPS) do if k[1] == "deathboard" and k[2] == "board" then cap = k[3] end end
@@ -351,6 +351,25 @@ do
   for _, n in ipairs(c.DT.REQUIRED) do have[n] = true end
   for _, n in ipairs(want) do if not have[n] then missing[#missing + 1] = n end end
   check("0.5.0: S4 checks every API the Waypointer calls", #missing == 0)
+end
+
+-- ---------------------------------------------------------------- 0.6.0: the Crypt's Table (dt_gamble Task 7)
+do
+  local w = H.world()
+  local c = w:client({ guild = "DEAD TIRED" })
+  local S = c.DT._selftest
+  local caps = {}
+  for _, k in ipairs(S.CAPS) do if k[1] == "gamble" then caps[k[2]] = k[3] end end
+  check("0.6.0: S9 checks gamble.board against 200 and gamble.wallet against 50", caps.board == 200 and caps.wallet == 50)
+  local have = {}
+  for _, n in ipairs(c.DT.REQUIRED) do have[n] = true end
+  check("0.6.0: S4 checks RandomRoll, GetNumGroupMembers and IsInRaid",
+    have.RandomRoll and have.GetNumGroupMembers and have.IsInRaid)
+  local kinds = {}
+  for _, smp in ipairs(S.samples()) do kinds[smp[1]] = smp[2] end
+  check("0.6.0: S8 and S10 have every gamble kind", kinds.GAME and kinds.JOIN and kinds.CALL and kinds.RESULT and kinds.FOLD
+    and kinds.CHIPS)
+  check("0.6.0: the CHIPS sample passes the gamble's own validation", c.DT._gamble.validChips(kinds.CHIPS) ~= nil)
 end
 
 H.finish("selftest")
