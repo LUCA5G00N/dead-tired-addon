@@ -1,4 +1,4 @@
-# Cowork brief: guild quests, the first two arcs (0.7.0)
+# Cowork brief: guild quests, the first two arcs (0.8.0)
 
 You are in `LUCA5G00N/dead-tired-addon`, building in a cloud session; Tim walks the result in game.
 Read first, in order:
@@ -14,8 +14,9 @@ Read first, in order:
 6. `reference/SPEC_forever_namespaces.md`: `C_QuestLog` (`IsQuestFlaggedCompleted`, `IsOnQuest`).
 
 **Draft status: written 23 Nov 2026, 20:40, against `main` at `afbf0d6` (0.5.0 released; the `dt_gamble` brief
-merged, not built).** This round builds **after** `dt_gamble` (0.6.0) is merged; if Tim reorders, the version
-becomes 0.6.0 and nothing else changes. Every name above is re-read against the tree as Task 1's first act.
+merged, not built).** This round builds **after** `dt_gamble` (0.6.0) and `dt_gamble2` (0.7.0) are merged (Tim, 24 Nov 22:26: the
+order is gamble2, then guild quests, then the ledger); the version moved from 0.7.0 to 0.8.0 with that, and nothing
+else changed. Every name above is re-read against the tree as Task 1's first act.
 
 ## Origin
 - Tim, 22 Nov 18:56, "The Sweaty SoD Achievement": the first guild quests borrow two quest lines that came to
@@ -30,7 +31,7 @@ becomes 0.6.0 and nothing else changes. Every name above is re-read against the 
   running the addon sees progress, with an opt-out; and a hand-off to the Waypointer.
 
 ## Precondition
-`main` carrying `dt_gamble` merged (0.6.0) and this brief and its walk-sheet; `run_all.sh` `ALL GREEN`.
+`main` carrying `dt_gamble2` merged (0.7.0) and this brief and its walk-sheet; `run_all.sh` `ALL GREEN`.
 
 ## Rulings in force (cited, not restated)
 - `CLAUDE.md`: module rules 1–14 (rule 5 is widened, below); guarded reads; no combat data; no hooks.
@@ -88,10 +89,10 @@ becomes 0.6.0 and nothing else changes. Every name above is re-read against the 
   with its own part of the board (Q6). Draggable, place remembered, Escape closes. Empty state on the board:
   `Nobody's sharing yet. Be the first fool on the road.`
 - **Q8 Quiet.** Nothing prints unasked. Finishing the bag arc or a book tier prints nothing; the window shows it.
-- **Q9 Version.** 0.7.0, a new feature.
+- **Q9 Version.** 0.8.0, a new feature.
 
 ## Deliverable
-On `claude/dt-guildquests` from `main`, DeadTired **0.7.0**. A new module, `quests` (`Quests.lua`, data in
+On `claude/dt-guildquests` from `main`, DeadTired **0.8.0**. A new module, `quests` (`Quests.lua`, data in
 `QuestArcs.lua`), with:
 - the verbs `/dt quests`, `/dt quests share on|off`, and the window's **Next step** and **Nearest book** buttons;
 - the window (two tabs, your progress and the guild board).
@@ -106,7 +107,7 @@ In the harness, with `IsQuestFlaggedCompleted`, `IsOnQuest` and the player's fac
 The round is done when:
 - `run_all.sh` is `ALL GREEN`;
 - every Task 7 guard has been removed once and turned a named check red;
-- `dist/DeadTired-0.7.0.zip` passes `diff -r`.
+- `dist/DeadTired-0.8.0.zip` passes `diff -r`.
 
 ## Working rules
 - No module but `quests` changes, apart from:
@@ -133,7 +134,7 @@ The round is done when:
    IDs> }`, so the board can be walked alone.
 6. **`Selftest.lua`, `.toc`, `Core.lua`:** `C_QuestLog.IsQuestFlaggedCompleted`, `C_QuestLog.IsOnQuest` and
    `UnitFactionGroup` in `DT.REQUIRED`; `quests.board` (cap 200) in `CAPS`; the two files after `Gamble.lua`;
-   0.7.0.
+   0.8.0.
 7. **Tests and guard proofs** (`tests/test_quests.lua`; additions to `test_selftest`).
    - **Tests:**
      - the bag: 0, 3 and 7 steps done; Rekindle done or not changes neither Next step nor finished; Horde and
@@ -149,10 +150,10 @@ The round is done when:
      - the faction pick; the Rekindle skip; the failed-read-is-not-done; the tier thresholds;
      - the turn-in ID filter; withdraw on `off`; inbound validation; the board cap; the 30-day drop;
      - the Nearest continent check; the guild gate; the module switch;
-     - every guard 0.6.0 proved.
-8. **Docs:** `FEATURES.md` *Ruled 23 Nov (for `dt_guildquests`, 0.7.0)*, and `CLAUDE.md`'s *Ruled exceptions*
-   gains the line for Q4 (the widening below); `docs/RELEASE_0.7.0.md` (DT's voice, a few lines).
-9. **Version and zip:** `dist/DeadTired-0.7.0.zip`, `diff -r` clean.
+     - every guard 0.7.0 proved.
+8. **Docs:** `FEATURES.md` *Ruled 23 Nov (for `dt_guildquests`, 0.8.0)*, and `CLAUDE.md`'s *Ruled exceptions*
+   gains the line for Q4 (the widening below); `docs/RELEASE_0.8.0.md` (DT's voice, a few lines).
+9. **Version and zip:** `dist/DeadTired-0.8.0.zip`, `diff -r` clean.
 10. **Report** `docs/COWORK_REPORT_dt_guildquests.md`; PR to `main`, not stacked.
 
 ## Out of scope
