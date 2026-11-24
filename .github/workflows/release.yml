@@ -1,7 +1,7 @@
 # Publishes a GitHub release when main carries a version that has none yet (ruled 20 Nov, R1:
 # Tim's merge is the go-ahead). Docs-only merges and brief merges leave the version alone, so
 # they release nothing. Checks first: .toc and DT.VERSION agree, every suite is green, the zip
-# in dist/ is the source, and the release notes exist. Any failure stops it with nothing published.
+# in dist/ is the source (built here if none is committed, 24 Nov), and the release notes exist. Any failure stops it with nothing published.
 name: Release
 
 on:
@@ -50,8 +50,12 @@ jobs:
         run: |
           v="${{ steps.v.outputs.version }}"
           zip="dist/DeadTired-$v.zip"; notes="docs/RELEASE_$v.md"
-          [ -f "$zip" ] || { echo "::error::$zip missing"; exit 1; }
           [ -f "$notes" ] || { echo "::error::$notes missing"; exit 1; }
+          if [ ! -f "$zip" ]; then                                   # 24 Nov: built here when not committed
+            mkdir -p dist /tmp/zb && cp -r DeadTired /tmp/zb/ && rm -rf /tmp/zb/DeadTired/tests
+            (cd /tmp/zb && zip -qr -X "$GITHUB_WORKSPACE/$zip" DeadTired)
+            echo "built $zip from the source"
+          fi
           mkdir -p /tmp/z && unzip -q "$zip" -d /tmp/z
           diff -r -x tests /tmp/z/DeadTired DeadTired || { echo "::error::$zip is not the source"; exit 1; }
           head -1 "$notes" | sed 's/^# *//' > /tmp/title.txt

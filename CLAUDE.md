@@ -14,6 +14,10 @@ Owner: Tim (in game: Stromham). Built from briefs in `docs/` by cloud sessions; 
    stacked on another PR), draft the #dt-crypt-workshop post in the PR. Tim's merge publishes, via
    the Release workflow. Never merge your own PR, push to `main`, force-push, or delete a tag or
    release unless Tim asks; fix a bad release forward with a new patch version.
+5. **The merge gate** (Tim, 24 Nov): every PR to `main` runs `.github/workflows/checks.yml` (version agrees,
+   `run_all.sh`, and on a version bump the release notes and any committed zip). Branch protection on `main`
+   requires it to pass, and refuses force-pushes and deletion. A build PR from `claude/<slug>` gets its walk-sheet
+   posted as a comment (`walksheet.yml`). If no zip is committed, the Release workflow builds it from the source.
 
 ## The client, and what that rules out
 - **WoW Forever** is classic content on **retail's addon API** (interface **16001** on the beta,
