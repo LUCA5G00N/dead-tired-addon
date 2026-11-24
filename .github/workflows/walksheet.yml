@@ -1,0 +1,30 @@
+# When a build PR opens (branch claude/<slug>, e.g. claude/dt-gamble), post its walk-sheet
+# (docs/UAT_<slug with - as _>.md) as a comment, so the walk can be ticked off on the PR itself.
+# A branch with no walk-sheet gets no comment.
+name: Walk-sheet
+
+on:
+  pull_request:
+    types: [opened, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  walksheet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post the walk-sheet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ github.head_ref }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          slug="${HEAD#claude/}"
+          sheet="docs/UAT_$(echo "$slug" | tr '-' '_').md"
+          if [ ! -f "$sheet" ]; then echo "no $sheet: nothing to post"; exit 0; fi
+          { echo "**Walk-sheet** (\`$sheet\`): tick as you walk."; echo; cat "$sheet"; } > /tmp/body.md
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/body.md

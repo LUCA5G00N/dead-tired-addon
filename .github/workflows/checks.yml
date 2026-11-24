@@ -1,0 +1,54 @@
+# The merge gate (Tim, 24 Nov): every pull request to main runs the same checks the release runs,
+# before the merge rather than after it. Branch protection on main requires the "checks" job to pass.
+#   - the .toc and DT.VERSION agree;
+#   - every offline suite is green (run_all.sh: tests, taint scan, text fit, library hashes);
+#   - when the PR changes the version: the release notes exist, and if a zip is committed it is the source.
+# A brief or docs-only PR leaves the version alone, so only the first two apply.
+name: Checks
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Version agrees
+        id: v
+        run: |
+          v=$(sed -n 's/^## Version: *//p' DeadTired/DeadTired.toc | tr -d '\r ')
+          core=$(sed -n 's/^DT.VERSION = "\(.*\)".*/\1/p' DeadTired/Core.lua)
+          echo "toc $v, Core.lua $core"
+          [ -n "$v" ] && [ "$v" = "$core" ] || { echo "::error::.toc and DT.VERSION disagree"; exit 1; }
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          base=$(git show "origin/${{ github.base_ref || 'main' }}:DeadTired/DeadTired.toc" 2>/dev/null | sed -n 's/^## Version: *//p' | tr -d '\r ')
+          echo "main is at $base"
+          [ "$v" != "$base" ] && echo "bump=true" >> "$GITHUB_OUTPUT" || echo "bump=false" >> "$GITHUB_OUTPUT"
+
+      - name: Tests
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+          sh DeadTired/tests/run_all.sh
+
+      - name: Release notes and zip (version bumped)
+        if: steps.v.outputs.bump == 'true'
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          notes="docs/RELEASE_$v.md"; zip="dist/DeadTired-$v.zip"
+          [ -f "$notes" ] || { echo "::error::$notes missing"; exit 1; }
+          if [ -f "$zip" ]; then
+            mkdir -p /tmp/z && unzip -q "$zip" -d /tmp/z
+            diff -r -x tests /tmp/z/DeadTired DeadTired || { echo "::error::$zip is not the source"; exit 1; }
+            echo "$zip is the source"
+          else
+            echo "no committed zip: the release workflow builds it"
+          fi
