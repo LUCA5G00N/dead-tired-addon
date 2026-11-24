@@ -1,15 +1,15 @@
-# Walk-sheet: guild quests, the first two arcs (0.7.0)
+# Walk-sheet: guild quests, the first two arcs (0.8.0)
 
 Brief: `docs/COWORK_BRIEF_dt_guildquests.md`.
 - **[G]** offline: the build session proves it in its report.
 - **[G]** in game: Tim types, and what's on screen decides.
 - **[H]**: Tim's judgement.
 
-**5 [G] offline, 5 [G] in game, 2 [H].** Back up first, into `_dt_backups\<date>_before_0.7.0`. Walk on Stromham
+**5 [G] offline, 5 [G] in game, 2 [H].** Back up first, into `_dt_backups\<date>_before_0.8.0`. Walk on Stromham
 (bag arc finished 22 Nov). G9 needs one library book handed in to Owen Thadd beforehand.
 
 ## Offline [G]
-- [ ] G1 `run_all.sh` is ALL GREEN, with counts. The zip is `diff -r` clean. `.toc` and `DT.VERSION` read 0.7.0.
+- [ ] G1 `run_all.sh` is ALL GREEN, with counts. The zip is `diff -r` clean. `.toc` and `DT.VERSION` read 0.8.0.
 - [ ] G2 The bag arc:
       - 0, 3 and 7 steps read right; Rekindle never changes Next step or finished;
       - step 1 follows the faction, and its waypoint follows `IsOnQuest`;
