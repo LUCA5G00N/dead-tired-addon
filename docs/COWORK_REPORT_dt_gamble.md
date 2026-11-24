@@ -160,7 +160,8 @@ didn't remove each of them again.
 - **Buttons:** `Join`, `Roll`, `Final call`. **Settings card:** `On the board`.
 
 ## The zip
-`dist/DeadTired-0.6.0.zip`: 215,737 bytes, sha256 `9617b880c79543d1d85f3414029c7313974742a1530884e44c49329af2daa2fd`.
+`dist/DeadTired-0.6.0.zip`: 215,765 bytes, sha256 `7fb6e26443da56f60240eda6592a7907e42f33f726dd2f3d0cd4ef46726851fd`
+(rebuilt after the walk fix below; the walked build was `9617b880…2fd`).
 Unzipped, `diff -r -x tests` against `DeadTired/` is clean.
 
 ## What the brief got wrong, and where I departed from it
@@ -189,5 +190,10 @@ Unzipped, `diff -r -x tests` against `DeadTired/` is clean.
   Say if it should be hidden.
 - **Join and Final call can't be undone.** There's no Leave button. A player who joins and walks away gets the 2-minute
   time-out (nothing moves). Is that enough?
+
+## After the walk (24 Nov, 19:21–21:04)
+Tim's G6 screenshot showed the table's empty line twice, once in the list and once in the status block. Fix: with no
+game, the status block shows only `You hold <n> chips.`. The window test was changed to check for this. The change
+is one function, `statusText`, and nothing else; the suite is still ALL GREEN. The walk results are on PR #40.
 
 Never wrote a `_results.md` file.

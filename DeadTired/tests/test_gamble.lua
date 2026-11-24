@@ -582,7 +582,9 @@ do
   check("window: /dt gamble opens the table", vp and vp:IsShown())
   local L = a.DT._gamble.list()
   check("window: the list's empty state", L.empty.text == a.DT._gamble.EMPTY and L.empty.shown)
-  check("window: the status says the empty line too", a.DT.textRecord(a.DT._gamble.status()).raw:find(a.DT._gamble.EMPTY, 1, true) ~= nil)
+  local raw = a.DT.textRecord(a.DT._gamble.status()).raw
+  check("window: with no game the status shows your balance, not the empty line again (walk, 24 Nov)",
+    raw == "You hold 1000 chips." and raw:find(a.DT._gamble.EMPTY, 1, true) == nil)
   local esc = false
   for _, n in ipairs(a.env.UISpecialFrames) do if n == "DeadTiredViewport_gamble" then esc = true end end
   check("window: Escape closes it (in UISpecialFrames)", esc)

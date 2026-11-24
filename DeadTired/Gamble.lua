@@ -926,10 +926,10 @@ local function doRoll()
 end
 
 local function statusText(g)
-  if not g then return EMPTY end
   local lines = {}
   local t = wallet(true)
   lines[#lines + 1] = "You hold " .. (t and t.b or START) .. " chips."
+  if not g then return lines[1] end                                        -- the list already says it's empty (walk, 24 Nov)
   for _, l in ipairs(g.log) do lines[#lines + 1] = l end
   if g.state == "rolling" then
     if g.kind == "dr" then lines[#lines + 1] = g.players[g.turn] .. " to roll, 1-" .. g.cur .. "."
