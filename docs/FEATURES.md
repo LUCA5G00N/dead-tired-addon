@@ -398,6 +398,20 @@ Blizzard's pin (Tim, 20:29).
 - **W4** `way.arrow` and `way.pin`, both on. **W5** Within 5 yards it clears itself; `/dt way clear`.
 - **W6** One waypoint per character, kept over a `/reload`, never shared. **W7** 0.5.0.
 
+## Ruled 23 Nov (for `dt_gamble`, 0.6.0)
+Brief `docs/COWORK_BRIEF_dt_gamble.md`, D1–D10 ratified by Tim's merge of PR #38 (23 Nov). Tim's answers at 20:10;
+the roll probe at 20:14–20:16 (`RANDOM_ROLL_RESULT` = `%s rolls %d (%d-%d)`; own and a party member's rolls
+readable, not secret). Settles the three questions *Guild gambling* (below) left open.
+- **D1** Chips, not gold: 1,000 to start, per character (Tim merged "as is": an alt is a second wallet).
+- **D2** Party only; game messages on the GUILD channel, Comms unchanged. **D3** At the weekly reset anyone under
+  1,000 is topped up to 1,000; nobody when the reset can't be read.
+- **D4** Deathroll. **D5** High-low: Final call or 20 s after the last join; ties rolled off by the tied; fewer
+  than two folds. **D6** Stakes 2–500, never more than you hold.
+- **D7** Only the game's roll counts; every client reads the rolls itself; a disagreement is disputed and moves
+  nothing; only your own client changes your balance.
+- **D8** `/dt gamble board`: playing is the opt-in, `board off` withdraws. **D9** Nothing to chat. **D10** 0.6.0.
+- Open for later rounds: Liliac's donate-for-chips idea, a host's one-click Announce, an all-time board.
+
 ## Versions and releases (Tim, 11 Nov)
 Semantic versioning, MAJOR.MINOR.PATCH: MINOR for new features, PATCH for fixes only, MAJOR when
 saved data or the protocol breaks compatibility (and **1.0.0** when the first pass is done). A

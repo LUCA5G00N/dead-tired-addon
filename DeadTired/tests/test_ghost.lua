@@ -141,7 +141,7 @@ do
   w:advance(2)
   a:slash("debug ghost on")
   a:slash("debug ghost all")
-  check("all: the ghost said its five (no question open; 0.4.0 adds its tally)", a:said("The Restless Ghost said 5 things.") ~= nil)
+  check("all: the ghost said its six (no question open; 0.4.0 adds its tally, 0.6.0 its chips)", a:said("The Restless Ghost said 6 things.") ~= nil)
   check("all: the ghost's tally is on the death board", a.DT.deathBoard()[GKEY] ~= nil)
   check("before off: the ghost is in the saved data", ghostly(a:db()))
   a:slash("debug ghost off")
