@@ -112,7 +112,8 @@ check could never turn anything red. So I removed it, and proved the shared chec
 - **Bar tooltip:** `The Crypt's Table` / `You hold <n> chips.` / `Click: the table. Right-click: the ledger.`
 
 ## The zip
-`dist/DeadTired-0.7.0.zip`: 220,283 bytes, sha256 `fc0dd1a9de1ba28aecbef03678b52a4d802b882a7e3de27383b6300d86ec88ef`.
+`dist/DeadTired-0.7.0.zip`: 220,718 bytes, sha256 `62ee3a40cc7ae42a6b384c08d469cd35d2dc9210106dfe8a1f14e8aca98add14`
+(rebuilt after the walk fix below; the first build was `fc0dd1a9…88ef`).
 Unzipped, `diff -r -x tests` is clean.
 
 ## What the brief got wrong, and where I departed from it
@@ -132,5 +133,24 @@ Unzipped, `diff -r -x tests` is clean.
 ## Questions for Tim
 - **The bar button: shown by default, or off until ticked** (as built)?
 - **Is the bell (READY_CHECK) the right sound?** H2 decides.
+
+## Walk fix (24 Nov, 23:16)
+Tim's first screenshot of the New game panel showed two problems:
+- **"Challenge target" and "Open high-low" overran their fixed 92-pixel buttons** and ran into each other. "Double
+  or nothing" would have done the same.
+- The status line showed faintly through the panel.
+
+Fixes:
+- **Every button now sizes itself to its label:** its own font string's width plus 24, at least 70. Rows are laid
+  out from those widths.
+- **The status, the game list and the action buttons hide while the panel is open.** Back brings them back.
+
+New checks:
+- every label fits its button;
+- the widest rows fit the window;
+- the panel hides the status, the list and the buttons, and Back restores them.
+
+Both new guards were proved red: "a button fits its label", and "nothing shows through the panel". The offline fit
+check couldn't have caught the first problem, because button labels don't go through `DT.text`.
 
 Never wrote a `_results.md` file.

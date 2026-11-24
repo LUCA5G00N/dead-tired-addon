@@ -1137,7 +1137,7 @@ local function statusText(g)
 end
 
 local STATUS_TOP, BUTTON_ROOM = 110, 28
-local BUTTON_W, BUTTON_GAP = 92, 6
+local BUTTON_W, BUTTON_GAP, BUTTON_PAD = 70, 6, 24      -- the least width; a label's own width + padding sets the rest
 
 -- The status block keeps to the room between the list and the buttons: the oldest log lines go
 -- first (the balance line and the whose-turn line stay).
@@ -1155,7 +1155,20 @@ end
 
 -- ---------------------------------------------------------------- the New game panel (T1)
 
+-- A button as wide as its label needs (walk, 24 Nov 23:16: "Challenge target" and "Open high-low" ran into each
+-- other at a fixed 92). The button's own font string measures it; DT.measure stands in where that can't.
+local function fitWidth(b, label)
+  local fs = clean(try(b.GetFontString, b))
+  local w = fs and clean(try(fs.GetStringWidth, fs))
+  if type(w) ~= "number" or w <= 0 then w = (DT.measure(label, "body") or (#label * 7)) * 1.15 end
+  local width = math.max(BUTTON_W, math.ceil(w) + BUTTON_PAD)              -- guard: a button fits its label
+  b:SetSize(width, 22)
+  b.dtWidth = width
+  return width
+end
+
 local panel, pmodel, plist, pstake, phead
+local fill                                      -- defined below; showPanel needs it
 local stake = 50                                -- the last stake used, this session only
 
 local function runningNow()
@@ -1198,6 +1211,13 @@ end
 local function showPanel(on)
   if not panel then return end
   panel:SetShown(on)
+  status:SetShown(not on)                                                  -- walk, 24 Nov: nothing shows through the panel
+  list.frame:SetShown(not on)
+  if on then
+    for _, b in pairs(buttons) do b:Hide() end
+  else
+    fill()
+  end
   if on then
     pmodel:set(DT.gamblePartyRows())
     plist:refresh()
@@ -1216,15 +1236,17 @@ end
 
 -- ---------------------------------------------------------------- the action buttons
 
-local function layout(shown)
+local function layout(shown, parent)
   local x = 0
   for _, b in ipairs(shown) do
     b:ClearAllPoints()
-    b:SetPoint("BOTTOMLEFT", vp.body, "BOTTOMLEFT", x, 0)
+    b:SetPoint("BOTTOMLEFT", parent or vp.body, "BOTTOMLEFT", x, 0)
     b:Show()
-    x = x + BUTTON_W + BUTTON_GAP
+    x = x + (b.dtWidth or BUTTON_W) + BUTTON_GAP
   end
+  return x - BUTTON_GAP
 end
+DT._gambleRowWidth = function(list) local x = 0 for _, b in ipairs(list) do x = x + b.dtWidth + BUTTON_GAP end return x - BUTTON_GAP end
 
 local function setOn(b, on, why)
   b.dtDisabled = not on
@@ -1232,17 +1254,20 @@ local function setOn(b, on, why)
   if on then try(b.Enable, b) else try(b.Disable, b) end
 end
 
-local function fill()
+fill = function()
   model:set(DT.gambleGameRows())
   list:refresh()
   local g = current()
   setStatus(statusText(g))
   if not buttons then return end
   for _, b in pairs(buttons) do b:Hide() end
+  if panel and panel:IsShown() then return end
   local shown = {}
   local function add(b) shown[#shown + 1] = b end
   if g and joinable(g) then
-    buttons.join:SetText(g.kind == "dr" and "Accept" or "Join")
+    local label = g.kind == "dr" and "Accept" or "Join"
+    buttons.join:SetText(label)
+    fitWidth(buttons.join, label)
     add(buttons.join)
     if challengedOpen(g) then add(buttons.decline) end
   end
@@ -1266,8 +1291,8 @@ redraw = function() if model and vp and vp:IsShown() then fill() end end
 
 local function button(parent, label, fn, tip)
   local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-  b:SetSize(BUTTON_W, 22)
   b:SetText(label)
+  fitWidth(b, label)
   b:SetScript("OnClick", function()
     if b.dtDisabled then if b.dtWhy then DT.out(b.dtWhy) end return end
     local ok, err = pcall(fn)
@@ -1337,9 +1362,7 @@ local function buildPanel()
       "A high-low table for your party at the stake above."),
     back = button(panel, "Back", function() showPanel(false) end),
   }
-  panel.buttons.target:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 0, 0)
-  panel.buttons.table:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", BUTTON_W + BUTTON_GAP, 0)
-  panel.buttons.back:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 2 * (BUTTON_W + BUTTON_GAP), 0)
+  layout({ panel.buttons.target, panel.buttons.table, panel.buttons.back }, panel)
   panel.stakes = stakes
   panel:Hide()
 end

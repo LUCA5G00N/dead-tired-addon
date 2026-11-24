@@ -929,6 +929,36 @@ do
   check("T9: the old host's table times out; nothing moved", lastGameOf(x).state == "folded" and bal(x) == 1000 and bal(y) == 1000)
 end
 
+-- ---------------------------------------------------------------- buttons fit their labels (walk, 24 Nov 23:16)
+do
+  local w, a, b = table3()
+  a:slash("gamble"); click(btn(a, "new"))
+  local P = a.DT._gamble.panel()
+  local all = {}
+  for _, k in ipairs({ "join", "decline", "roll", "call", "cancel", "leave", "rematch", "double", "again", "new" }) do
+    all[#all + 1] = btn(a, k)
+  end
+  for _, k in ipairs({ "target", "table", "back" }) do all[#all + 1] = P.buttons[k] end
+  local bad_ = {}
+  for _, bt in ipairs(all) do
+    local need = a.DT.measure(bt:GetText(), "body")
+    if not (bt.dtWidth and need and bt.dtWidth >= need + 16) then bad_[#bad_ + 1] = bt:GetText() end
+  end
+  check("buttons: every label fits inside its button", #bad_ == 0)
+  if #bad_ > 0 then print("  too narrow: " .. table.concat(bad_, ", ")) end
+  local body = a.DT._gamble.vp().body.dtWidth
+  check("buttons: the panel's row fits the window", a.DT._gambleRowWidth({ P.buttons.target, P.buttons.table, P.buttons.back }) <= body)
+  check("buttons: the widest action row fits the window (Rematch, Double or nothing, New game)",
+    a.DT._gambleRowWidth({ btn(a, "rematch"), btn(a, "double"), btn(a, "new") }) <= body)
+  check("buttons: ...and Accept, Decline, New game; Final call, Cancel, New game",
+    a.DT._gambleRowWidth({ btn(a, "join"), btn(a, "decline"), btn(a, "new") }) <= body
+    and a.DT._gambleRowWidth({ btn(a, "call"), btn(a, "cancel"), btn(a, "new") }) <= body)
+  check("panel: the status and the game list hide under it", not a.DT._gamble.status():IsShown() and not a.DT._gamble.list().frame:IsShown())
+  check("panel: the action buttons hide under it", not btn(a, "new"):IsShown())
+  click(P.buttons.back)
+  check("panel: Back brings them all back", a.DT._gamble.status():IsShown() and a.DT._gamble.list().frame:IsShown() and btn(a, "new"):IsShown())
+end
+
 -- ---------------------------------------------------------------- the round's text fits
 do
   local w, a = table3()
