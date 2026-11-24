@@ -47,8 +47,13 @@ local function stub(c)
       local p = others[i]
       return p and (showRealm and p.full or p.name) or nil
     end
+    if u == "target" and c.targetName ~= nil then return c.targetName end
     return base(u, showRealm)
   end)
+  rawset(env, "UnitIsPlayer", function(u) if u == "target" then return c.targetIsPlayer == true end return true end)
+  rawset(env, "SOUNDKIT", { READY_CHECK = 8960 })
+  c.played = {}
+  rawset(env, "PlaySound", function(kit) c.played[#c.played + 1] = kit end)
   c.rolls = {}
   rawset(env, "RandomRoll", function(lo, hi)
     local v = table.remove(c.rolls, 1) or lo
@@ -617,7 +622,7 @@ do
   check("fit: under a big font the status still keeps to its room", a.DT.textHeight(st, body.dtWidth) <= body.dtHeight - 110 - 28)
   check("fit: ...by dropping log lines, keeping the balance line", a.DT.textRecord(st).raw:find("^You hold") ~= nil)
   local help = x.DT.helpLine()
-  check("help: /dt gamble is listed", help:find("gamble [join|deathroll <name> <stake>|highlow <stake>|call|roll|board]", 1, true) ~= nil)
+  check("help: /dt gamble is listed", help:find("gamble [join|decline|leave|cancel|deathroll [<name>] <stake>|highlow <stake>|call|roll|rematch|double|again|board|sound]", 1, true) ~= nil)
   check("settings: the board card has a typed form and a description", x.DT.setting("gamble", "board").verb == "gamble board on|off"
     and x.DT.setting("gamble", "board").desc ~= "")
 end
@@ -631,6 +636,308 @@ do
     and rows[1].b == 1250 and rows[1].w == 250)
   a:slash("debug ghost off")
   check("ghost: laid to rest, it leaves the board", #a.DT.gambleRows() == 0)
+end
+
+-- ================================================================ round 2 (dt_gamble2, 0.7.0; T1-T12)
+
+local function btn(c, name) return c.DT._gamble.buttons()[name] end
+local function click(b) b.scripts.OnClick(b) end
+local function shownButtons(c)
+  local out = {}
+  for _, k in ipairs({ "join", "decline", "roll", "call", "cancel", "leave", "rematch", "double", "again", "new" }) do
+    if btn(c, k):IsShown() then out[#out + 1] = k end
+  end
+  return table.concat(out, ",")
+end
+local function lastGameOf(c) local o = c.DT._gamble.order(); return c.DT._gamble.games()[o[#o]] end
+
+-- ---------------------------------------------------------------- T1: the New game panel
+do
+  local w, a, b, c = table3()
+  a:slash("gamble")
+  click(btn(a, "new"))
+  local P = a.DT._gamble.panel()
+  check("T1: New game opens the panel", P:IsShown())
+  local rows = a.DT.gamblePartyRows()
+  check("T1: the party, without you, DT runners first", #rows == 2 and rows[1].runs and rows[2].runs)
+  click(P.stakes[3])                                                       -- 100
+  local L = a.DT._gamble.plist()
+  local row
+  for _, r in ipairs(L.rows) do if r.row and r.row.name == "Sap Hapi" then row = r end end
+  row.scripts.OnClick(row, "LeftButton")
+  w:advance(1)
+  local g = lastGameOf(a)
+  check("T1: a name click starts a deathroll at the chosen stake", g and g.kind == "dr" and g.s == 100 and g.opp == "Sap Hapi")
+  check("T1: the panel closes after starting", not P:IsShown())
+  check("T1: the same as the typed command (GAME to the party)", #sentKind(a, "GAME") == 1 and sentKind(a, "GAME")[1].o == "Sap Hapi")
+  click(btn(a, "cancel")); w:advance(1)
+  click(btn(a, "new"))
+  a.DT._gamble.pstake():SetText("37")
+  click(P.buttons.table); w:advance(1)
+  g = lastGameOf(a)
+  check("T1: Open high-low uses the typed stake", g.kind == "hl" and g.s == 37)
+  click(btn(a, "cancel")); w:advance(1)
+  click(btn(a, "new"))
+  a.DT._gamble.pstake():SetText("900")
+  click(P.buttons.table)
+  check("T1: a stake over 500 in the box is refused", a:said(a.DT._gamble.STAKE_LINE) ~= nil and P:IsShown())
+  -- a party member not running DT
+  local w2 = H.world()
+  local x = mk(w2, { name = "Stromham", full = "Stromham Hamson" })
+  local y = mk(w2, { name = "Sap", full = "Sap Hapi" })
+  local z = mk(w2, { name = "Nobody", full = "Nobody Atall", guild = false })
+  w2.party = { x, y, z }
+  w2:advance(30)
+  local r2 = x.DT.gamblePartyRows()
+  check("T1: a member not running DT is listed last, greyed", #r2 == 2 and r2[1].name == "Sap Hapi" and r2[2].name == "Nobody Atall"
+    and not r2[2].runs and r2[2].state == "no addon")
+  x:slash("gamble"); click(btn(x, "new"))
+  local L2 = x.DT._gamble.plist()
+  for _, r in ipairs(L2.rows) do if r.row and r.row.name == "Nobody Atall" then r.scripts.OnClick(r, "LeftButton") end end
+  check("T1: clicking them starts nothing and says why", x:said("Nobody Atall isn't running Dead Tired.") ~= nil and #sentKind(x, "GAME") == 0)
+end
+
+-- ---------------------------------------------------------------- T2: Accept and Decline
+do
+  local w, a, b = table3()
+  a:slash("gamble deathroll Sap 40"); w:advance(1)
+  check("T2: the challenge is printed to the challenged", b:said("Stromham Hamson challenges you to a deathroll for 40. Accept or decline.") ~= nil)
+  b:slash("gamble")
+  check("T2: a challenge shows Accept and Decline", shownButtons(b) == "join,decline,new" and btn(b, "join"):GetText() == "Accept")
+  click(btn(b, "decline")); w:advance(1)
+  check("T2: Decline sends DECLINE", #sentKind(b, "DECLINE") == 1)
+  check("T2: the challenger's game folds, with the line", lastGameOf(a).state == "folded" and a:said("Sap Hapi declined.") ~= nil)
+  check("T2: nothing moved", bal(a) == 1000 and bal(b) == 1000)
+  -- a high-low keeps Join
+  a:slash("gamble highlow 20"); w:advance(1)
+  b:slash("gamble")
+  check("T2: a high-low table shows Join, no Decline", shownButtons(b) == "join,new" and btn(b, "join"):GetText() == "Join")
+  -- decline only from the challenged player
+  local w2, x, y, z = table3()
+  x:slash("gamble deathroll Sap 40"); w2:advance(1)
+  inject(x, "DECLINE", z:key(), { h = x:key(), g = tostring(lastGameOf(x).n) })
+  check("T2: a DECLINE from someone else is ignored", lastGameOf(x).state == "open")
+  local before = bad(x)
+  inject(x, "DECLINE", y:key(), { h = x:key(), g = "nope" })
+  check("T10: a bad DECLINE is counted", bad(x) == before + 1 and lastGameOf(x).state == "open")
+  before = bad(y)
+  inject(y, "LEAVE", z:key(), { h = string.rep("k", 81), g = "1" })
+  inject(y, "LEAVE", z:key(), { g = "1" })
+  check("T10: a bad LEAVE is counted", bad(y) == before + 2)
+  before = bad(z)
+  inject(z, "GAME", x:key(), { g = "50", k = "dr", s = "20", o = "Liliac Thorne", re = "7" })
+  inject(z, "GAME", x:key(), { g = "51", k = "hl", s = "20", re = "1" })
+  check("T10: re other than 1 or 2, or on a high-low, is counted and dropped", bad(z) == before + 2
+    and z.DT._gamble.games()[x:key() .. "#50"] == nil and z.DT._gamble.games()[x:key() .. "#51"] == nil)
+end
+
+-- ---------------------------------------------------------------- T3: Cancel and Leave
+do
+  local w, a, b, c = table3()
+  a:slash("gamble highlow 30"); w:advance(1)
+  b:slash("gamble join"); c:slash("gamble join"); w:advance(1)
+  check("T3: the host sees Final call and Cancel", (function() a:slash("gamble"); return shownButtons(a) == "call,cancel,new" end)())
+  b:slash("gamble")
+  check("T3: a joiner sees Leave", shownButtons(b) == "leave,new")
+  click(btn(b, "leave")); w:advance(1)
+  local g = lastGameOf(a)
+  check("T3: Leave drops the joiner from the host's table", #g.players == 2 and g.players[2] == "Liliac Thorne")
+  check("T3: the host is told", a:said("Sap Hapi left the table.") ~= nil)
+  w:advance(15)
+  check("T3: and the 20 s close starts again", lastGameOf(a).state == "open")
+  w:advance(6)
+  check("T3: closes 20 s after the leave", lastGameOf(a).state == "rolling")
+  check("T3: the leaver isn't pulled back in", lastGameOf(b).state == "closed" or lastGameOf(b).state == "open")
+  b:slash("gamble leave")
+  check("T3: no Leave once rolling", b:said("No table to leave.") ~= nil)
+  c:slash("gamble"); click(btn(c, "leave"))
+  check("T3: not even from a stale Leave button: no LEAVE sent once rolling", #sentKind(c, "LEAVE") == 0)
+  local gr = lastGameOf(a)
+  inject(a, "LEAVE", c:key(), { h = a:key(), g = tostring(gr.n) })
+  check("T3: a LEAVE reaching the host after the call changes nothing", #gr.players == 2)
+  a:slash("gamble cancel")
+  check("T3: no Cancel once rolling", a:said("No game of yours to cancel.") ~= nil and lastGameOf(a).state == "rolling")
+  click(btn(a, "cancel"))
+  check("T3: not even from a stale Cancel button: no FOLD sent once rolling", #sentKind(a, "FOLD") == 0)
+  -- cancel before rolling reaches everyone
+  local w2, x, y, z = table3()
+  x:slash("gamble highlow 30"); w2:advance(1)
+  y:slash("gamble join"); w2:advance(1)
+  x:slash("gamble cancel"); w2:advance(1)
+  check("T3: Cancel folds for everyone, with the line", lastGameOf(x).state == "folded" and lastGameOf(y).state == "folded"
+    and y:said("Stromham Hamson cancelled.") ~= nil)
+  local f = sentKind(x, "FOLD")
+  check("T3: as a FOLD with why=cancel (0.6.0 clients read a fold)", f[#f].why == "cancel")
+  check("T3: a bystander isn't told", not z:said("cancelled"))
+  local before = bad(y)
+  inject(y, "FOLD", x:key(), { g = "1", why = "bored" })
+  check("T10: a FOLD with an unknown why is counted", bad(y) == before + 1)
+end
+
+-- ---------------------------------------------------------------- T4, T7: Rematch, Double or nothing, Same again
+do
+  local w, a, b = table3()
+  a:slash("gamble deathroll Sap 100"); w:advance(1)
+  b:slash("gamble join"); w:advance(1)
+  a.rolls = { 1 }; a:slash("gamble roll"); w:advance(1)                     -- a loses 100
+  a:slash("gamble"); b:slash("gamble")
+  check("T4: after a deathroll both see Rematch and Double or nothing", shownButtons(a) == "rematch,double,new"
+    and shownButtons(b) == "rematch,double,new")
+  click(btn(a, "double")); w:advance(1)
+  local g = lastGameOf(b)
+  check("T4/T7: the loser may offer double or nothing: a new challenge at 200", g.kind == "dr" and g.s == 200 and g.state == "open"
+    and sentKind(a, "GAME")[2].re == "2")
+  check("T4: with its own line", b:said("Stromham Hamson says double or nothing: 200. Accept or decline.") ~= nil)
+  check("T7: it needs Accept: nothing rolls yet", g.state == "open" and lastGameOf(a).state == "open")
+  b:slash("gamble join"); w:advance(1)
+  check("T7: accepted, it plays", lastGameOf(a).state == "rolling")
+  b.rolls = { 1 }; w:advance(1)
+  a.rolls = { 5 }; a:slash("gamble roll"); b.rolls = { 1 }; b:slash("gamble roll"); w:advance(1)
+  check("T4: double or nothing settles at 200", bal(a) == 1100 and bal(b) == 900)
+  b:slash("gamble rematch"); w:advance(1)
+  check("T4: the winner... the loser offers a rematch at the same stake", lastGameOf(a).s == 200 and sentKind(b, "GAME")[1].re == "1"
+    and a:said("Sap Hapi wants a rematch for 200. Accept or decline.") ~= nil)
+  -- double over the cap, or over what you hold
+  local w2, x, y = table3()
+  x:slash("gamble deathroll Sap 300"); w2:advance(1)
+  y:slash("gamble join"); w2:advance(1)
+  x.rolls = { 1 }; x:slash("gamble roll"); w2:advance(1)
+  x:slash("gamble")
+  check("T4: double over 500 is greyed with the reason", btn(x, "double").dtDisabled and btn(x, "double").dtWhy == x.DT._gamble.OVER_CAP)
+  click(btn(x, "double"))
+  check("T4: and clicking it only says why", x:said(x.DT._gamble.OVER_CAP) ~= nil and #sentKind(x, "GAME") == 1)
+  local w3, p, q = table3()
+  p:slash("gamble deathroll Sap 200"); w3:advance(1)
+  q:slash("gamble join"); w3:advance(1)
+  p.DT.gambleWallet().b = 300
+  p.rolls = { 1 }; p:slash("gamble roll"); w3:advance(1)               -- p now holds 100
+  p:slash("gamble")
+  check("T4: double over what you hold is greyed, with the reason", btn(p, "double").dtDisabled and btn(p, "double").dtWhy:find("You hold 100", 1, true))
+  p:slash("gamble double")
+  check("T4: double over what you hold is refused", p:said("You hold 100 chips.") ~= nil and #sentKind(p, "GAME") == 1)
+  -- Same again
+  local w4, h, j = table3()
+  h:slash("gamble highlow 25"); w4:advance(1)
+  j:slash("gamble join"); w4:advance(1)
+  h:slash("gamble call"); w4:advance(1)
+  h.rolls = { 20 }; h:slash("gamble roll"); j.rolls = { 3 }; j:slash("gamble roll"); w4:advance(1)
+  h:slash("gamble"); j:slash("gamble")
+  check("T4: after a high-low the host sees Same again", shownButtons(h) == "again,new" and shownButtons(j) == "new")
+  click(btn(h, "again")); w4:advance(1)
+  check("T4: Same again opens a new table at the same stake", lastGameOf(j).kind == "hl" and lastGameOf(j).s == 25 and lastGameOf(j).state == "open")
+end
+
+-- ---------------------------------------------------------------- T5: challenge your target
+do
+  local w, a, b, c = table3()
+  a.targetName, a.targetIsPlayer = "Sap Hapi", true
+  a:slash("gamble deathroll 60"); w:advance(1)
+  check("T5: /dt gamble deathroll <stake> challenges your party target", lastGameOf(b).opp == "Sap Hapi" and lastGameOf(b).s == 60)
+  a:slash("gamble cancel"); w:advance(1)
+  a.targetName, a.targetIsPlayer = "Mottled Boar", false
+  a:slash("gamble deathroll 60")
+  check("T5: an NPC target: refused", a:said(a.DT._gamble.NO_TARGET) ~= nil and #sentKind(a, "GAME") == 1)
+  a.targetName, a.targetIsPlayer = nil, false
+  a:slash("gamble deathroll 60")
+  check("T5: no target: refused", #sentKind(a, "GAME") == 1)
+  local outsider = mk(w, { name = "Echo", full = "Echo Nightclaw" })
+  a.targetName, a.targetIsPlayer = "Echo Nightclaw", true
+  a:slash("gamble deathroll 60")
+  check("T5: a player outside your party: refused", a:said("Echo Nightclaw isn't in your party.") ~= nil and #sentKind(a, "GAME") == 1)
+  a.targetName = "Stromham Hamson"
+  a:slash("gamble deathroll 60")
+  check("T5: yourself: refused", #sentKind(a, "GAME") == 1)
+  a.targetName, a.targetIsPlayer = "Liliac Thorne", true
+  a:slash("gamble"); click(btn(a, "new"))
+  a.DT._gamble.pstake():SetText("15")
+  click(a.DT._gamble.panel().buttons.target); w:advance(1)
+  check("T5: the panel's Challenge target does the same", lastGameOf(c).opp == "Liliac Thorne" and lastGameOf(c).s == 15)
+  -- the target is read in one function only
+  local src = io.open("DeadTired/Gamble.lua"):read("*a")
+  local n = 0
+  for _ in src:gmatch('"target"') do n = n + 1 end
+  check("T5: the target is read in exactly one place (readTarget)", n == 2 and src:find('local function readTarget()', 1, true) ~= nil)
+  local _, after = src:find('local function readTarget()', 1, true)
+  local body = src:sub(after, (src:find("\nend\n", after, true)))
+  local inBody = 0
+  for _ in body:gmatch('"target"') do inBody = inBody + 1 end
+  check("T5: ...and both reads are inside it (UnitIsPlayer, GetUnitName)", inBody == 2)
+end
+
+-- ---------------------------------------------------------------- T6: your turn
+do
+  local w, a, b = table3()
+  a:slash("gamble"); b:slash("gamble")
+  a:slash("gamble deathroll Sap 50"); w:advance(1)
+  b:slash("gamble join"); w:advance(1)
+  check("T6: the glow is on for the player whose turn it is", btn(a, "glow"):IsShown() and not btn(b, "glow"):IsShown())
+  check("T6: the sound is off by default: nothing played", #a.played == 0 and a.DT._gambleSounds() == 0)
+  a.rolls = { 30 }; a:slash("gamble roll"); w:advance(1)
+  check("T6: the glow moves with the turn", not btn(a, "glow"):IsShown() and btn(b, "glow"):IsShown())
+  check("T6: still no sound with it off", #b.played == 0)
+  b:slash("gamble sound on")
+  check("T6: /dt gamble sound on", b.DT.get("gamble", "sound") == true)
+  b.rolls = { 10 }; b:slash("gamble roll"); w:advance(1)
+  a:slash("gamble sound on")
+  check("T6: (a switched on after its turn came: no sound for that turn)", #a.played == 0)
+  a.rolls = { 4 }; a:slash("gamble roll"); w:advance(1)
+  check("T6: with it on, the turn coming round plays one sound (READY_CHECK)", #b.played == 1 and b.played[1] == 8960)
+  b.rolls = { 1 }; b:slash("gamble roll"); w:advance(1)
+  check("T6: the glow goes when the game ends", not btn(a, "glow"):IsShown() and not btn(b, "glow"):IsShown())
+  check("T6: the sound card: typed form and description", b.DT.setting("gamble", "sound").verb == "gamble sound on|off"
+    and b.DT.setting("gamble", "sound").default == false)
+end
+
+-- ---------------------------------------------------------------- T8: the bar
+do
+  local w, a = table3()
+  local found
+  for _, e in ipairs(a.DT.barList()) do if e.name == "gamble" then found = e end end
+  check("T8: the table has a bar launcher (off until ticked, like Session)", found ~= nil and not found.on)
+  local o = a.DT._bar and a.DT.objects
+  local ldb
+  for _, x in ipairs(a.DT.objects) do if x.name == "gamble" then ldb = x.obj end end
+  ldb.OnClick(nil, "LeftButton")
+  check("T8: left-click opens the table", a.DT._gamble.vp():IsShown())
+  ldb.OnClick(nil, "RightButton")
+  check("T8: right-click opens the ledger", a.DT._gamble.bvp():IsShown())
+  local tt = { lines = {}, AddLine = function(self, l) self.lines[#self.lines + 1] = l end }
+  ldb.OnTooltipShow(tt)
+  check("T8: the tooltip shows your chips", tt.lines[2] == "You hold 1000 chips.")
+end
+
+-- ---------------------------------------------------------------- T9: a 0.6.0 peer
+do
+  local w, a, b, c = table3()
+  -- b behaves as 0.6.0: it never sends DECLINE or LEAVE and has no Decline; it joins and rolls as before
+  inject(b, "GAME", a:key(), { g = "999", k = "dr", s = "50", o = "Sap Hapi", re = "1" })
+  check("T9: a GAME with re passes 0.6.0's checks (here: accepted as a challenge)", b.DT._gamble.games()[a:key() .. "#999"] ~= nil)
+  a:slash("gamble deathroll Sap 50"); w:advance(1)
+  b:slash("gamble join"); w:advance(1)
+  a.rolls = { 9 }; a:slash("gamble roll"); b.rolls = { 1 }; b:slash("gamble roll"); w:advance(1)
+  check("T9: a deathroll between them settles", bal(a) == 1050 and bal(b) == 950)
+  -- the leaver on a 0.6.0 host: the host keeps them; the leaver isn't pulled back in; the time-out covers it
+  local w2, x, y = table3()
+  w2.party = { x, y }
+  x:slash("gamble highlow 20"); w2:advance(1)
+  y:slash("gamble join"); w2:advance(1)
+  y.DT._gamble.games()[x:key() .. "#" .. lastGameOf(x).n].left = true                  -- y left; x (0.6.0) never heard
+  y.DT._gamble.games()[x:key() .. "#" .. lastGameOf(x).n].joined = false
+  x:slash("gamble call"); w2:advance(1)
+  check("T9: a leaver named in an old host's CALL stays out", lastGameOf(y).state == "closed")
+  w2:advance(125)
+  check("T9: the old host's table times out; nothing moved", lastGameOf(x).state == "folded" and bal(x) == 1000 and bal(y) == 1000)
+end
+
+-- ---------------------------------------------------------------- the round's text fits
+do
+  local w, a = table3()
+  a:slash("gamble"); click(btn(a, "new"))
+  check("fit: the panel and the new buttons fit under every skin", (function()
+    local last = a.DT.fitCheck()
+    return last[#last]:find(" 0 over,", 1, true) ~= nil and last[#last]:find("measure failures 0", 1, true) ~= nil
+  end)())
+  check("nothing errors in round 2's runs", #a.errors == 0)
 end
 
 H.finish("gamble")

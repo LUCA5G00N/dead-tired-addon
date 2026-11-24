@@ -43,6 +43,8 @@ DT.REQUIRED = {
   "C_Item.GetItemNameByID", "C_Item.IsBound", "C_Item.RequestLoadItemDataByID", "C_Timer.After",
   -- 0.6.0 (dt_gamble): the game's own roll, and the party it is read in.
   "RandomRoll", "GetNumGroupMembers", "IsInRaid",
+  -- 0.7.0 (dt_gamble2): the target check (T5) and the your-turn sound (T6).
+  "UnitIsPlayer", "PlaySound",
 }
 
 -- Every migration flag DT defines (Migrate.lua; realm034 is set by Keys' store on first use).
@@ -76,6 +78,8 @@ local function samples(me)
     { "CALL", { g = "1", p = DT.GHOST.name .. ",Some One" } },
     { "RESULT", { g = "1", r = "1:Restless Ghost:40:50;1:Some One:12:50" } },
     { "FOLD", { g = "1" } },
+    { "DECLINE", { h = me, g = "1" } },
+    { "LEAVE", { h = me, g = "1" } },
     { "CHIPS", { b = "1250", w = "250", bb = "40", we = "1794600000" } },
   }
 end

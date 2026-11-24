@@ -61,7 +61,8 @@ and do not widen them. A new exception needs its own ruling in a brief.
   once the cooldown ends after a post this session (a `/reload` keeps it) (card 5, fix round 3;
   `/dt recruit nudge off` stops it).
 - **Reads another player:** your target's name, realm, class and level, only when you press
-  `/dt gank` (card 4, `dt_pvp` R1).
+  `/dt gank` (card 4, `dt_pvp` R1). Your target's **name only**, only when you press Challenge target
+  or type `/dt gamble deathroll <stake>` with no name, and only to challenge a party member (`dt_gamble2` T5).
 - **Posts to a public channel:** `/dt recruit`, one line per typed command or click, guild
   officers only, to General (card 5, `dt_prep` R1-R2 as amended by the rulings round).
 - **Switches a client log:** only by the player's click on a secure button running the client's own
