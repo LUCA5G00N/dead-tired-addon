@@ -64,7 +64,7 @@ do
   check("with LDB: DT's objects registered there too", lib:GetDataObjectByName("DeadTired_who") ~= nil
     and lib:GetDataObjectByName("DeadTired_DeadTired") ~= nil)
   check("R-P4: other addons' objects are listed but unticked: the bar shows DT's own only",
-    texts(c) == "Dead Tired | DT: 0 online" and #c.DT.barList() == 5)
+    texts(c) == "Dead Tired | DT: 0 online" and #c.DT.barList() == 6)
   c:slash("bar add AtlasLoot"); c:slash("bar add recount")
   check("with LDB: ticked, the bar hosts other addons' launchers and data sources", texts(c) == "Dead Tired | DT: 0 online | AtlasLoot | DPS 0"
     or texts(c) == "Dead Tired | DT: 0 online | DPS 0 | AtlasLoot")
@@ -184,20 +184,20 @@ do
   local DT = c.DT
   local function order() local o = {} for _, e in ipairs(DT.barList()) do o[#o + 1] = e.name .. (e.on and "+" or "-") end return table.concat(o, " ") end
   check("R-P4: unticked by default: every other addon's object, DT's own ticked, Session waits",
-    order() == "DeadTired+ who+ session- AtlasLoot- Prat-3.0- BugSack-")
+    order() == "DeadTired+ who+ session- gamble- AtlasLoot- Prat-3.0- BugSack-")
   check("R-P4: the bar shows the ticked ones only", texts(c) == "Dead Tired | DT: 0 online")
   -- tick from the settings card
   c:slash("settings")
   local card
   for _, r in ipairs(DT._settingsView.rows()) do if r.setting and r.setting.key == "objects" then card = r end end
-  check("R-P4: the bar's settings card lists every object, in order", card and #card.subs == 6 and card.subs[4].label.text == "AtlasLoot"
+  check("R-P4: the bar's settings card lists every object, in order", card and #card.subs == 7 and card.subs[5].label.text == "AtlasLoot"
     and card.subs[1].grip ~= nil and card.subs[1].tick ~= nil)
-  local sub = card.subs[4]
+  local sub = card.subs[5]
   sub.tick:SetChecked(true); sub.tick.scripts.OnClick(sub.tick)
   check("R-P4: tick adds it to the bar", texts(c) == "Dead Tired | DT: 0 online | AtlasLoot")
   -- typed verbs
   c:slash("bar add prat")
-  check("R-P4: /dt bar add <label> ticks it", texts(c):find("Prat", 1, true) == nil and DT.barList()[5].on
+  check("R-P4: /dt bar add <label> ticks it", texts(c):find("Prat", 1, true) == nil and DT.barList()[6].on
     and c:said("bar.Prat-3.0 = on"))
   check("colour codes: another addon's colour code is shown, not escaped", texts(c):find("|cff8080ff3.0|r", 1, true) ~= nil
     and texts(c):find("||cff", 1, true) == nil)
@@ -209,13 +209,13 @@ do
   DT.barMove("Prat-3.0", 1)
   check("R-P4 move: to position 1", order():sub(1, 9) == "Prat-3.0+" and texts(c):sub(1, 14) == "|cff8080ff3.0|")
   DT.barMove("Prat-3.0", 2)
-  check("R-P4 move: down one", order() == "DeadTired+ Prat-3.0+ who+ session- AtlasLoot- BugSack-")
+  check("R-P4 move: down one", order() == "DeadTired+ Prat-3.0+ who+ session- gamble- AtlasLoot- BugSack-")
   DT.barMove("Prat-3.0", 1)
-  check("R-P4 move: up one", order() == "Prat-3.0+ DeadTired+ who+ session- AtlasLoot- BugSack-")
+  check("R-P4 move: up one", order() == "Prat-3.0+ DeadTired+ who+ session- gamble- AtlasLoot- BugSack-")
   DT.barMove("who", 99)
-  check("R-P4 move: past the end goes last", order() == "Prat-3.0+ DeadTired+ session- AtlasLoot- BugSack- who+")
+  check("R-P4 move: past the end goes last", order() == "Prat-3.0+ DeadTired+ session- gamble- AtlasLoot- BugSack- who+")
   c:slash("bar move who 2")
-  check("R-P4: /dt bar move <name> <n>", order() == "Prat-3.0+ who+ DeadTired+ session- AtlasLoot- BugSack-" and c:said("bar.who at 2"))
+  check("R-P4: /dt bar move <name> <n>", order() == "Prat-3.0+ who+ DeadTired+ session- gamble- AtlasLoot- BugSack-" and c:said("bar.who at 2"))
   check("R-P4: the bar follows the order", texts(c) == "|cff8080ff3.0|r | DT: 0 online | Dead Tired")
   c:slash("bar list")
   check("R-P4: /dt bar list (Port 2: names, not live text)", c:said("bar.list: 1 Prat (Prat-3.0) [on], 2 Who [on], 3 Dead Tired (DeadTired) [on]") ~= nil)
@@ -226,7 +226,7 @@ do
   local grip
   for _, sb in ipairs(card.subs) do if sb.item and sb.item.name == "BugSack" then grip = sb.grip end end
   grip.scripts.OnDragStart(grip); grip.scripts.OnDragStop(grip)
-  check("R-P4 drag: a row dragged by its grip lands where it's dropped", order() == "Prat-3.0+ BugSack- who+ DeadTired+ session- AtlasLoot-")
+  check("R-P4 drag: a row dragged by its grip lands where it's dropped", order() == "Prat-3.0+ BugSack- who+ DeadTired+ session- gamble- AtlasLoot-")
   -- Session ticked on
   c:slash("bar add session")
   check("R-P4: Session can be ticked on", texts(c):find("Session 0:00", 1, true) ~= nil)
@@ -238,7 +238,7 @@ do
   lib:NewDataObject("Prat-3.0", { type = "launcher", label = "Prat", text = "|cff8080ff3.0|r" })
   local o2 = {}
   for _, e in ipairs(r.DT.barList()) do o2[#o2 + 1] = e.name .. (e.on and "+" or "-") end
-  check("R-P4: order and ticks saved through /reload", table.concat(o2, " ") == "Prat-3.0+ BugSack- who+ DeadTired+ session+ AtlasLoot-")
+  check("R-P4: order and ticks saved through /reload", table.concat(o2, " ") == "Prat-3.0+ BugSack- who+ DeadTired+ session+ gamble- AtlasLoot-")
   check("nothing errors", #c.errors == 0 and #r.errors == 0)
 end
 
@@ -263,7 +263,7 @@ do
   for _, it in ipairs(DT.setting("bar", "objects").items()) do labels[#labels + 1] = it.label end
   local L = table.concat(labels, ",")
   check("Port 2: the list names each object, never its live text (BugSack, not 0; Recruit, not Recruit 8:23)",
-    L == "Dead Tired,Who,Recruit,Session,BugSack,Prat")
+    L == "Dead Tired,Who,Recruit,Session,The Crypt's Table,BugSack,Prat")
   c:slash("settings")
   local card
   for _, r in ipairs(DT._settingsView.rows()) do if r.setting and r.setting.key == "objects" then card = r end end
@@ -271,7 +271,7 @@ do
   for _, sb in ipairs(card.subs) do if sb.item then shown[#shown + 1] = sb.label.text end end
   check("Port 2: the settings card shows the names", table.concat(shown, ",") == L)
   c:slash("bar list")
-  check("Port 2: /dt bar list shows the names", c:said("bar.list: 1 Dead Tired (DeadTired) [on], 2 Who [on], 3 Recruit [on], 4 Session [off], 5 BugSack [off], 6 Prat (Prat-3.0) [off]") ~= nil)
+  check("Port 2: /dt bar list shows the names", c:said("bar.list: 1 Dead Tired (DeadTired) [on], 2 Who [on], 3 Recruit [on], 4 Session [off], 5 The Crypt's Table (gamble) [off], 6 BugSack [off], 7 Prat (Prat-3.0) [off]") ~= nil)
   check("Port 2: the bar itself still shows the live text", (function()
     for _, b in ipairs(DT._bar.buttons()) do if b.shown and b.entry and b.entry.name == "recruit" then return b.text.text == "Recruit 8:23" end end
   end)())

@@ -30,6 +30,14 @@
 --   CHIPS  { b, w, bb, we } | { off = "1" }
 -- Players are named by their full name (Forever's two-part name), as the roll lines name them (probe,
 -- 23 Nov). Two players with the same full name can't sit at one table.
+--
+-- Round 2 (dt_gamble2, 0.7.0; T1-T12, PR #42): the New game panel, challenge your target (T5: the target's
+-- NAME only, on press, party members only, read in readTarget() alone), Accept/Decline, Cancel/Leave,
+-- Rematch / Double or nothing / Same again, the your-turn glow and an opt-in sound, a bar launcher.
+--   DECLINE { h = <host key>, g = n }          from the challenged player
+--   LEAVE   { h = <host key>, g = n }          from a joiner, before the call
+--   FOLD    { g = n, why = "cancel" }          the host cancelled (0.6.0 clients read it as a plain fold)
+--   GAME    { ..., re = "1"|"2" }              a rematch / double or nothing (0.6.0 clients ignore re)
 local ADDON, ns = ...
 local DT = ns.DT
 local try, clean = DT.try, DT.clean
@@ -63,7 +71,17 @@ local WRONG_RANGE = "%s rolled the wrong range."
 local DISPUTED = "Disputed. Nothing moved."
 local FOLDED = "The table folds. Nothing moved."
 local TIMED_OUT = "Nobody rolled for too long. The table folds. Nothing moved."
-local USAGE = "/dt gamble [join|deathroll <name> <stake>|highlow <stake>|call|roll|board [on|off]]"
+local USAGE = "/dt gamble [join|decline|leave|cancel|deathroll [<name>] <stake>|highlow <stake>|call|roll|rematch|double|again|board|sound]"
+local DECLINED = "%s declined."
+local CANCELLED = "%s cancelled."
+local LEFT = "%s left the table."
+local NO_TARGET = "Target a party member first."
+local NOT_RUNNING = "Not running Dead Tired."
+local OVER_CAP = "Over the 500 cap."
+local PANEL_HEAD = "New game: pick a stake, then a game."
+local REMATCH_LINE = "%s wants a rematch for %d."
+local DOUBLE_LINE = "%s says double or nothing: %d."
+local SOUND_KIT_ID = 8960                -- SOUNDKIT.READY_CHECK, used when the SOUNDKIT table isn't there
 local STAKE_LINE = "A stake is a whole number from 2 to 500."
 local POOR = "You hold %d chips. Not enough for that stake."
 local NO_PARTY = "You need a party. The dead don't gamble alone."
@@ -242,6 +260,9 @@ end
 
 local games = {}            -- [id] = game, this session only
 local order = {}            -- ids, newest last
+local selected              -- the game you last clicked in the table window
+local selectedAt = 0        -- `ticks` when you clicked it
+local ticks = 0             -- goes up with every line any game logs: which game changed last
 local timeout = TIMEOUT
 local redraw
 local listener
@@ -249,6 +270,8 @@ local listener
 local function gameId(host, n) return host .. "#" .. n end
 
 local function addLog(g, line)
+  ticks = ticks + 1
+  g.changed = ticks
   g.log[#g.log + 1] = line
   while #g.log > LOG_MAX do table.remove(g.log, 1) end
 end
@@ -261,6 +284,11 @@ local function amIn(g)
 end
 
 local function live(g) return g.state == "open" or g.state == "rolling" end
+
+-- A game is yours if you host it, joined it, or were challenged to it (T11: who gets the printed lines).
+local function involved(g)
+  return g.mine or g.joined or (g.kind == "dr" and g.opp ~= nil and lower(g.opp) == lower(myName()))
+end
 
 -- The CHAT_MSG_SYSTEM listener exists only while a game you're in is open (working rules).
 local function listening()
@@ -322,6 +350,7 @@ local function expect(g, names, ph)
   g.seen = {}
 end
 
+local afterStart                         -- turnCheck, set once it exists
 local function startRolling(g)
   g.state = "rolling"
   g.base = nil
@@ -334,6 +363,7 @@ local function startRolling(g)
     addLog(g, "Everyone rolls 1-" .. g.s .. ".")
   end
   touch(g)
+  if afterStart then afterStart() end
 end
 
 -- Phase results: the rolls of phase ph, as { [lower name] = roll }.
@@ -443,6 +473,39 @@ local function rollFor(g, name, roll, lo, hi)
   return true
 end
 
+-- Your roll's range in game g, or nil when it isn't your turn.
+local function myRange(g)
+  if not g or g.state ~= "rolling" or not amIn(g) then return nil end
+  local me = lower(myName())
+  if g.kind == "dr" then
+    if lower(g.players[g.turn]) == me then return g.cur end
+    return nil
+  end
+  if g.want and g.want[me] and not g.seen[me] then return g.s end
+  return nil
+end
+
+local sounds = 0
+local function turnSound()
+  if DT.get("gamble", "sound") ~= true then return end                     -- guard: sound only when switched on
+  local kit = clean(try(function() return SOUNDKIT and SOUNDKIT.READY_CHECK end)) or SOUND_KIT_ID
+  sounds = sounds + 1
+  try(PlaySound, kit)
+end
+DT._gambleSounds = function() return sounds end
+
+
+-- T6: when it becomes your turn in any game you're in: the sound (if on). The glow follows in fill().
+local function turnCheck()
+  for _, g in pairs(games) do
+    local now = myRange(g) ~= nil
+    if now and not g.wasMine then turnSound() end
+    g.wasMine = now
+  end
+end
+
+afterStart = function() turnCheck() end
+
 onSystem = function(msg)
   if not DT.enabled("gamble") then return end                              -- guard: module switch (rolls)
   local name, roll, lo, hi = DT.readRoll(msg)
@@ -454,6 +517,7 @@ onSystem = function(msg)
       if rollFor(g, name, roll, lo, hi) then moved = true; touch(g) end
     end
   end
+  turnCheck()
   if moved and redraw then redraw() end
 end
 DT._gambleSystem = function(msg) return onSystem(msg) end
@@ -494,7 +558,7 @@ end
 local function finish(g, state, line)
   g.state = state
   addLog(g, line)
-  if amIn(g) then DT.out(line) end
+  if amIn(g) or involved(g) then DT.out(line) end
   relisten()
   if redraw then redraw() end
 end
@@ -593,7 +657,7 @@ local function partyMatch(text)
   local p = party()
   local want = lower(DT.trim(text) or "")
   if not want or want == "" then return nil end
-  if p[want] then return p[want] end
+  if p[want] then return p[want] end                                       -- guard: a named or targeted player must be in your party
   local hit
   for low, full in pairs(p) do
     if low:match("^(%S+)") == want then
@@ -604,7 +668,7 @@ local function partyMatch(text)
   return hit
 end
 
-local function startDeathroll(args)
+local function startDeathroll(args, re)
   local who, s = args:match("^(.-)%s+(%S+)$")
   local stake = stakeOf(s)
   if not who or who == "" then return DT.out(USAGE) end
@@ -621,8 +685,10 @@ local function startDeathroll(args)
   local n = nextN()
   local g = openFor(DT.myKey(), n, "dr", stake, opp)
   if not g then return end
-  DT.send("GAME", { g = tostring(n), k = "dr", s = tostring(stake), o = opp })
-  addLog(g, "You challenge " .. opp .. " to a deathroll for " .. stake .. ". Waiting for them to join.")
+  DT.send("GAME", { g = tostring(n), k = "dr", s = tostring(stake), o = opp, re = re })
+  addLog(g, re == "2" and ("You say double or nothing to " .. opp .. ": " .. stake .. ". Waiting for them.")
+    or re == "1" and ("You offer " .. opp .. " a rematch for " .. stake .. ". Waiting for them.")
+    or ("You challenge " .. opp .. " to a deathroll for " .. stake .. ". Waiting for them to join."))
   DT.gambleView(g.id)
 end
 
@@ -644,10 +710,100 @@ local function join(id)
   if not inParty(g.hostName) then return DT.out(g.hostName .. " isn't in your party any more.") end
   if not canAfford(g.s) then return end
   g.joined = true
+  g.left = nil
   DT.send("JOIN", { h = g.host, g = tostring(g.n) })
   addLog(g, "You join. Waiting for the call.")
   relisten()
   if redraw then redraw() end
+end
+
+-- T2: decline a challenge to you.
+local function challengedOpen(g)
+  return g and g.kind == "dr" and g.state == "open" and not g.mine and not g.joined
+    and lower(g.opp) == lower(myName())
+end
+
+local function lastWhere(test)
+  for i = #order, 1, -1 do
+    local g = games[order[i]]
+    if g and test(g) then return g end
+  end
+end
+
+local function decline(g)
+  g = g or lastWhere(challengedOpen)
+  if not challengedOpen(g) then return DT.out("No challenge to decline.") end
+  DT.send("DECLINE", { h = g.host, g = tostring(g.n) })
+  g.state = "declined"
+  addLog(g, "You declined.")
+  if redraw then redraw() end
+end
+
+-- T3: the host cancels before rolling; a joiner leaves before the call.
+local function cancel(g)
+  g = g or lastWhere(function(c) return c.mine and c.state == "open" end)
+  if not g or not g.mine or g.state ~= "open" then                         -- guard: cancel only by the host, before rolling
+    return DT.out("No game of yours to cancel.")
+  end
+  DT.send("FOLD", { g = tostring(g.n), why = "cancel" })
+  finish(g, "folded", CANCELLED:format(g.hostName))
+end
+
+local function leave(g)
+  g = g or lastWhere(function(c) return c.joined and c.state == "open" end)
+  if not g or not g.joined or g.state ~= "open" then                       -- guard: leave only before the call
+    return DT.out("No table to leave.")
+  end
+  DT.send("LEAVE", { h = g.host, g = tostring(g.n) })
+  g.joined, g.left = false, true
+  addLog(g, "You left the table.")
+  relisten()
+  if redraw then redraw() end
+end
+
+-- T4, T7: a rematch or double or nothing after a settled deathroll, from either player; always a new challenge.
+local function settledDuel(g)
+  return g and g.kind == "dr" and g.state == "settled" and amIn(g)
+end
+
+local function rematchProblem(g, mult)
+  if not settledDuel(g) then return "No deathroll to replay." end
+  local s = g.s * mult
+  if s > MAX_STAKE then return OVER_CAP end                                -- guard: double respects the cap
+  local t = wallet(true)
+  if not t or t.b < s then return POOR:format(t and t.b or 0) end          -- guard: double respects what you hold
+  return nil, s
+end
+
+local function rematch(g, mult)
+  g = g or lastWhere(settledDuel)
+  local why, s = rematchProblem(g, mult)
+  if why then return DT.out(why) end
+  local me = lower(myName())
+  local other = lower(g.players[1]) == me and g.players[2] or g.players[1]
+  startDeathroll(other .. " " .. s, tostring(mult))
+end
+
+local function again(g)
+  g = g or lastWhere(function(c) return c.mine and c.kind == "hl" and c.state == "settled" end)
+  if not g or not g.mine or g.kind ~= "hl" or g.state ~= "settled" then return DT.out("No table of yours to run again.") end
+  startHighLow(g.s)
+end
+
+-- T5: the target's name, only at a press. The only read of the target in this file. Whether they're in
+-- your party is checked where every named challenge is: startDeathroll's partyMatch.
+local function readTarget()
+  local isPlayer = clean(try(UnitIsPlayer, "target"))
+  local name = DT.fullName(clean(try(GetUnitName, "target", true)))
+  if not name or isPlayer ~= true then return nil, NO_TARGET end           -- guard: target only a player
+  if lower(name) == lower(myName()) then return nil, NO_TARGET end
+  return name
+end
+
+local function challengeTarget(stake)
+  local name, why = readTarget()
+  if not name then return DT.out(why) end
+  startDeathroll(name .. " " .. stake)
 end
 
 -- ---------------------------------------------------------------- receiving
@@ -674,6 +830,7 @@ DT.on("GAME", function(from, f)
   if not n or not s or (f.k ~= "dr" and f.k ~= "hl") then bad() return end -- guard: GAME validation
   if f.k == "dr" and not nameOk(f.o) then bad() return end
   if f.k == "hl" and f.o ~= nil then bad() return end
+  if f.re ~= nil and (f.k ~= "dr" or (f.re ~= "1" and f.re ~= "2")) then bad() return end   -- guard: re validation
   local hostName = DT.nameOf(from)
   if not inParty(hostName) then return end                                 -- D2: not our party, not our game
   if games[gameId(from, n)] then return end
@@ -682,8 +839,11 @@ DT.on("GAME", function(from, f)
     addLog(g, hostName .. " challenges " .. f.o .. " to a deathroll for " .. s .. ".")
   else
     local g = newGame(from, n, f.k, s, hostName, f.o)
-    addLog(g, f.k == "dr" and (hostName .. " challenges you to a deathroll for " .. s .. ". Join to accept.")
+    addLog(g, f.re == "1" and (REMATCH_LINE:format(hostName, s) .. " Accept or decline.")
+      or f.re == "2" and (DOUBLE_LINE:format(hostName, s) .. " Accept or decline.")
+      or f.k == "dr" and (hostName .. " challenges you to a deathroll for " .. s .. ". Accept or decline.")
       or (hostName .. " opens a high-low table at " .. s .. ". Join if you dare."))
+    if f.k == "dr" then DT.out(g.log[#g.log]) end
   end
   if redraw then redraw() end
 end)
@@ -726,7 +886,7 @@ DT.on("CALL", function(from, f)
   if #names < 2 or #names > MAX_PLAYERS or lower(names[1]) ~= lower(DT.nameOf(from)) then bad() return end
   if not g or g.state ~= "open" then return end
   g.players = names
-  if not amIn(g) then
+  if not amIn(g) or g.left then
     g.joined = false
     g.state = "closed"
     addLog(g, "The table closed without you.")
@@ -756,9 +916,46 @@ end)
 
 DT.on("FOLD", function(from, f)
   if not DT.enabled("gamble") then return end
+  if f.why ~= nil and f.why ~= "cancel" then bad() return end
   local g = fromGame(from, f)
   if not g then return end
-  if live(g) then finish(g, "folded", FOLDED) end
+  if live(g) then finish(g, "folded", f.why == "cancel" and CANCELLED:format(g.hostName) or FOLDED) end
+end)
+
+local function hostGame(f)
+  local n = int(f.g, 9)
+  if not n or type(f.h) ~= "string" or #f.h > 80 then return nil, true end
+  if not DT.sameKey(f.h, DT.myKey()) then return nil end
+  return games[gameId(DT.myKey(), n)]
+end
+
+DT.on("DECLINE", function(from, f)
+  if not DT.enabled("gamble") then return end
+  local g, isBad = hostGame(f)
+  if isBad then bad() return end                                           -- guard: DECLINE validation
+  if not g or not g.mine or g.kind ~= "dr" or g.state ~= "open" then return end
+  local who = DT.nameOf(from)
+  if lower(who) ~= lower(g.opp) then return end                            -- guard: decline only from the challenged
+  finish(g, "folded", DECLINED:format(who))
+end)
+
+DT.on("LEAVE", function(from, f)
+  if not DT.enabled("gamble") then return end
+  local g, isBad = hostGame(f)
+  if isBad then bad() return end                                           -- guard: LEAVE validation
+  if not g or not g.mine or g.state ~= "open" then return end              -- guard: leave only before the call
+  local who = DT.nameOf(from)
+  for i = 2, #g.players do
+    if lower(g.players[i]) == lower(who) then
+      table.remove(g.players, i)
+      addLog(g, LEFT:format(who))
+      DT.out(LEFT:format(who))
+      if g.kind == "hl" then armClose(g) end
+      touch(g)
+      if redraw then redraw() end
+      return
+    end
+  end
 end)
 
 local function validChips(f)
@@ -879,7 +1076,7 @@ end
 
 -- ---------------------------------------------------------------- the table window
 
-local vp, list, model, status, buttons, selected
+local vp, list, model, status, buttons
 
 local function gameRow(g)
   local what = g.kind == "dr" and ("Deathroll: " .. g.hostName .. " v " .. (g.opp or "?")) or ("High-low: " .. g.hostName)
@@ -897,26 +1094,24 @@ function DT.gambleGameRows()
   return rows
 end
 
+-- The game the window shows (walk, 24 Nov 23:52: a joiner's window fell back to an older deathroll after a
+-- high-low settled): the newest-changed game you're in, were challenged to, or can join; a game you clicked
+-- stays until something newer happens in one of those. With none of yours, the clicked one, then the newest.
 local function current()
-  local g = selected and games[selected]
-  if g then return g end
-  for i = #order, 1, -1 do
-    local c = games[order[i]]
-    if c and (c.mine or c.joined or joinable(c)) then return c end
+  local best
+  for _, id in ipairs(order) do
+    local c = games[id]
+    if c and (involved(c) or amIn(c) or joinable(c)) and (not best or (c.changed or 0) > (best.changed or 0)) then
+      best = c
+    end
   end
-  for i = #order, 1, -1 do if games[order[i]] then return games[order[i]] end end
+  local clicked = selected and games[selected]
+  if clicked and (not best or selectedAt >= (best.changed or 0)) then return clicked end   -- guard: a click holds until something newer
+  if best then return best end
+  return clicked or (order[#order] and games[order[#order]])
 end
 
-local function rollRange(g)
-  if not g or g.state ~= "rolling" or not amIn(g) then return nil end
-  local me = lower(myName())
-  if g.kind == "dr" then
-    if lower(g.players[g.turn]) == me then return g.cur end
-    return nil
-  end
-  if g.want and g.want[me] and not g.seen[me] then return g.s end
-  return nil
-end
+local function rollRange(g) return myRange(g) end
 DT._gambleRange = function() return rollRange(current()) end
 
 local function doRoll()
@@ -946,6 +1141,7 @@ local function statusText(g)
 end
 
 local STATUS_TOP, BUTTON_ROOM = 110, 28
+local BUTTON_W, BUTTON_GAP, BUTTON_PAD = 70, 6, 24      -- the least width; a label's own width + padding sets the rest
 
 -- The status block keeps to the room between the list and the buttons: the oldest log lines go
 -- first (the balance line and the whose-turn line stay).
@@ -961,29 +1157,218 @@ local function setStatus(text)
   end
 end
 
-local function fill()
+-- ---------------------------------------------------------------- the New game panel (T1)
+
+-- A button as wide as its label needs (walk, 24 Nov 23:16: "Challenge target" and "Open high-low" ran into each
+-- other at a fixed 92). The button's own font string measures it; DT.measure stands in where that can't.
+local function fitWidth(b, label)
+  local fs = clean(try(b.GetFontString, b))
+  local w = fs and clean(try(fs.GetStringWidth, fs))
+  if type(w) ~= "number" or w <= 0 then w = (DT.measure(label, "body") or (#label * 7)) * 1.15 end
+  local width = math.max(BUTTON_W, math.ceil(w) + BUTTON_PAD)              -- guard: a button fits its label
+  b:SetSize(width, 22)
+  b.dtWidth = width
+  return width
+end
+
+local panel, pmodel, plist, pstake, phead
+local fill                                      -- defined below; showPanel needs it
+local stake = 50                                -- the last stake used, this session only
+
+local function runningNow()
+  local out = {}
+  for _, r in ipairs(DT.whoRows and DT.whoRows() or {}) do
+    if r.when == "this session" then
+      local n = DT.nameOf(r.key)
+      if n then out[n:lower()] = true end
+    end
+  end
+  return out
+end
+
+function DT.gamblePartyRows()
+  local p = party()
+  local me = lower(myName())
+  local runs = runningNow()
+  local rows = {}
+  for low, full in pairs(p) do
+    if low ~= me then
+      local on = runs[low] == true
+      rows[#rows + 1] = { name = full, runs = on, state = on and "Dead Tired" or "no addon", search = full }
+    end
+  end
+  table.sort(rows, function(x, y)
+    if x.runs ~= y.runs then return x.runs end
+    return x.name:lower() < y.name:lower()
+  end)
+  return rows
+end
+
+local function panelStake()
+  local typed = pstake and DT.trim(pstake:GetText() or "") or ""
+  local s = stakeOf(typed ~= "" and typed or tostring(stake))
+  if not s then DT.out(STAKE_LINE) return nil end
+  stake = s
+  return s
+end
+
+local function showPanel(on)
+  if not panel then return end
+  panel:SetShown(on)
+  status:SetShown(not on)                                                  -- walk, 24 Nov: nothing shows through the panel
+  list.frame:SetShown(not on)
+  if on then
+    for _, b in pairs(buttons) do b:Hide() end
+  else
+    fill()
+  end
+  if on then
+    pmodel:set(DT.gamblePartyRows())
+    plist:refresh()
+    pstake:SetText(tostring(stake))
+  end
+end
+
+local function fromPanel(fn)
+  return function()
+    local s = panelStake()
+    if not s then return end
+    showPanel(false)
+    fn(s)
+  end
+end
+
+-- ---------------------------------------------------------------- the action buttons
+
+local function layout(shown, parent)
+  local x = 0
+  for _, b in ipairs(shown) do
+    b:ClearAllPoints()
+    b:SetPoint("BOTTOMLEFT", parent or vp.body, "BOTTOMLEFT", x, 0)
+    b:Show()
+    x = x + (b.dtWidth or BUTTON_W) + BUTTON_GAP
+  end
+  return x - BUTTON_GAP
+end
+DT._gambleRowWidth = function(list) local x = 0 for _, b in ipairs(list) do x = x + b.dtWidth + BUTTON_GAP end return x - BUTTON_GAP end
+
+local function setOn(b, on, why)
+  b.dtDisabled = not on
+  b.dtWhy = why
+  if on then try(b.Enable, b) else try(b.Disable, b) end
+end
+
+fill = function()
   model:set(DT.gambleGameRows())
   list:refresh()
   local g = current()
   setStatus(statusText(g))
-  if buttons then
-    buttons.join:SetShown(g ~= nil and joinable(g))
-    buttons.roll:SetShown(rollRange(g) ~= nil)
-    buttons.call:SetShown(g ~= nil and g.mine and g.kind == "hl" and g.state == "open")
+  if not buttons then return end
+  for _, b in pairs(buttons) do b:Hide() end
+  if panel and panel:IsShown() then return end
+  local shown = {}
+  local function add(b) shown[#shown + 1] = b end
+  if g and joinable(g) then
+    local label = g.kind == "dr" and "Accept" or "Join"
+    buttons.join:SetText(label)
+    fitWidth(buttons.join, label)
+    add(buttons.join)
+    if challengedOpen(g) then add(buttons.decline) end
   end
+  if rollRange(g) ~= nil then add(buttons.roll) end
+  if g and g.mine and g.kind == "hl" and g.state == "open" then add(buttons.call) end
+  if g and g.mine and g.state == "open" then add(buttons.cancel) end
+  if g and g.joined and g.state == "open" then add(buttons.leave) end
+  if settledDuel(g) then
+    add(buttons.rematch)
+    local why = rematchProblem(g, 2)
+    setOn(buttons.double, why == nil, why)
+    add(buttons.double)
+  end
+  if g and g.mine and g.kind == "hl" and g.state == "settled" then add(buttons.again) end
+  add(buttons.new)
+  layout(shown)
+  buttons.glow:SetShown(buttons.roll:IsShown())                           -- T6: the glow follows your turn
 end
 
 redraw = function() if model and vp and vp:IsShown() then fill() end end
 
-local function button(parent, label, fn)
+local function button(parent, label, fn, tip)
   local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-  b:SetSize(96, 22)
   b:SetText(label)
+  fitWidth(b, label)
   b:SetScript("OnClick", function()
+    if b.dtDisabled then if b.dtWhy then DT.out(b.dtWhy) end return end
     local ok, err = pcall(fn)
     if not ok then DT.fail("gamble", "click " .. label, err) end
   end)
+  b:SetScript("OnEnter", function()
+    local tt = DT.tooltip()
+    tt:SetOwner(b, "ANCHOR_TOP")
+    tt:AddLine(label)
+    if tip then tt:AddLine(tip, 0.8, 0.8, 0.8, true) end
+    if b.dtWhy then tt:AddLine(b.dtWhy, 1, 0.4, 0.4, true) end
+    tt:Show()
+  end)
+  b:SetScript("OnLeave", function() DT.tooltip():Hide() end)
   return b
+end
+
+local function buildPanel()
+  panel = CreateFrame("Frame", nil, vp.body)
+  panel:SetAllPoints(vp.body)
+  panel.dtWidth, panel.dtHeight = vp.body.dtWidth, vp.body.dtHeight
+  try(panel.SetFrameLevel, panel, (clean(try(vp.body.GetFrameLevel, vp.body)) or 1) + 10)
+  local bg = panel:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints(panel)
+  bg:SetColorTexture(0.04, 0.06, 0.04, 0.97)
+  phead = DT.text(panel, "line", { width = panel.dtWidth, window = "gamble" })
+  phead:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, 0)
+  DT.setText(phead, PANEL_HEAD)
+  local stakes = {}
+  for i, v in ipairs({ 10, 50, 100, 250, 500 }) do
+    local b = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+    b:SetSize(48, 22)
+    b:SetText(tostring(v))
+    b:SetPoint("TOPLEFT", panel, "TOPLEFT", (i - 1) * 52, -22)
+    b:SetScript("OnClick", function() stake = v; pstake:SetText(tostring(v)) end)
+    stakes[i] = b
+  end
+  pstake = CreateFrame("EditBox", nil, panel, "InputBoxTemplate")
+  pstake:SetSize(60, 22)
+  pstake:SetPoint("TOPLEFT", panel, "TOPLEFT", 5 * 52 + 8, -22)
+  try(pstake.SetAutoFocus, pstake, false)
+  try(pstake.SetNumeric, pstake, true)
+  try(pstake.SetMaxLetters, pstake, 3)
+  pmodel = DT.listModel()
+  local holder = CreateFrame("Frame", nil, panel)                          -- the member list sits below the stakes
+  holder:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, -52)
+  holder:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, BUTTON_ROOM)
+  holder.dtWidth, holder.dtHeight = panel.dtWidth, (panel.dtHeight or 200) - 52 - BUTTON_ROOM
+  plist = DT.list(holder, pmodel, { count = 5, tipCovers = { "name" },
+    empty = function(m) if #m.rows == 0 then return "Nobody else in your party." end end,
+    onClick = function(row)
+      if not row.runs then return DT.out(DT.safe(row.name, NAME_MAX) .. " isn't running Dead Tired.") end
+      local s = panelStake()
+      if not s then return end
+      showPanel(false)
+      startDeathroll(row.name .. " " .. s)
+    end,
+    tip = function(row, tt)
+      tt:AddLine(DT.safe(row.name, 48))
+      tt:AddLine(row.runs and "Click for a deathroll at the stake above." or NOT_RUNNING, 0.7, 0.7, 0.7)
+    end,
+    columns = { { key = "name", flex = true }, { key = "state", fixed = true, colour = "muted" } } })
+  panel.buttons = {
+    target = button(panel, "Challenge target", fromPanel(function(s) challengeTarget(s) end),
+      "A deathroll with the party member you have targeted."),
+    table = button(panel, "Open high-low", fromPanel(function(s) startHighLow(s) end),
+      "A high-low table for your party at the stake above."),
+    back = button(panel, "Back", function() showPanel(false) end),
+  }
+  layout({ panel.buttons.target, panel.buttons.table, panel.buttons.back }, panel)
+  panel.stakes = stakes
+  panel:Hide()
 end
 
 local function build()
@@ -992,26 +1377,44 @@ local function build()
   vp = DT.viewport({ id = "gamble", title = TITLE, width = 420, height = 380, footer = TABLE_FOOTER })
   list = DT.list(vp.body, model, { count = 4, tipCovers = { "name" },
     empty = function(m) if #m.rows == 0 then return EMPTY end end,
-    onClick = function(row) selected = row.id; fill() end,
+    onClick = function(row) selected = row.id; selectedAt = ticks; fill() end,
     tip = function(row, tt) tt:AddLine(DT.safe(row.name, 64)); tt:AddLine("Click to show this game.", 0.6, 0.6, 0.6) end,
     columns = { { key = "name", flex = true }, { key = "stake", fixed = true, colour = "muted" },
       { key = "state", fixed = true } } })
   status = DT.text(vp.body, "block", { width = vp.body.dtWidth, window = "gamble" })
   status:SetPoint("TOPLEFT", vp.body, "TOPLEFT", 0, -STATUS_TOP)
+  local function cur() return current() end
   buttons = {
-    join = button(vp.body, "Join", function() local g = current(); join(g and g.id) end),
+    join = button(vp.body, "Join", function() local g = cur(); join(g and g.id) end),
+    decline = button(vp.body, "Decline", function() decline(cur()) end),
     roll = button(vp.body, "Roll", doRoll),
-    call = button(vp.body, "Final call", function() local g = current(); if g then closeTable(g) end end),
+    call = button(vp.body, "Final call", function() local g = cur(); if g then closeTable(g) end end),
+    cancel = button(vp.body, "Cancel", function() cancel(cur()) end),
+    leave = button(vp.body, "Leave", function() leave(cur()) end),
+    rematch = button(vp.body, "Rematch", function() rematch(cur(), 1) end, "The same stake again. They must accept."),
+    double = button(vp.body, "Double or nothing", function() rematch(cur(), 2) end, "Twice the stake. They must accept."),
+    again = button(vp.body, "Same again", function() again(cur()) end, "A new table at the same stake."),
+    new = button(vp.body, "New game", function() showPanel(true) end),
   }
-  buttons.join:SetPoint("BOTTOMLEFT", vp.body, "BOTTOMLEFT", 0, 0)
-  buttons.roll:SetPoint("BOTTOM", vp.body, "BOTTOM", 0, 0)
-  buttons.call:SetPoint("BOTTOMRIGHT", vp.body, "BOTTOMRIGHT", 0, 0)
+  local glow = buttons.roll:CreateTexture(nil, "OVERLAY")
+  glow:SetAllPoints(buttons.roll)
+  glow:SetColorTexture(1, 0.82, 0.2, 0.35)
+  try(glow.SetBlendMode, glow, "ADD")
+  glow:Hide()
+  buttons.roll:SetScript("OnUpdate", function()
+    if glow:IsShown() then
+      local t = clean(try(GetTime)) or 0
+      try(glow.SetAlpha, glow, 0.25 + 0.25 * math.abs(math.sin(t * 3)))
+    end
+  end)
+  buttons.glow = glow
+  buildPanel()
 end
 
 function DT.gambleView(id)
   if not DT.isMember() then return end
   build()
-  if id then selected = id end
+  if id then selected = id; selectedAt = ticks end
   fill()
   vp:Show()
 end
@@ -1025,6 +1428,17 @@ local function verb(args)
   if lw == "" then return DT.gambleView() end
   if lw == "join" then return join() end
   if lw == "roll" then return doRoll() end
+  if lw == "decline" then return decline() end
+  if lw == "cancel" then return cancel() end
+  if lw == "leave" then return leave() end
+  if lw == "rematch" then return rematch(nil, 1) end
+  if lw == "double" then return rematch(nil, 2) end
+  if lw == "again" then return again() end
+  local snd = lw:match("^sound%s+(%a+)$")
+  if snd == "on" or snd == "off" then
+    DT.set("gamble", "sound", snd == "on")
+    return DT.out(snd == "on" and "A bell when it's your roll." or "No bell. You'll have to pay attention.")
+  end
   if lw == "call" then
     local g = current()
     if g and g.mine and g.kind == "hl" and g.state == "open" then return closeTable(g) end
@@ -1037,6 +1451,11 @@ local function verb(args)
     return DT.out(sw == "on" and "You're on the board." or "You're off the board. Your chips are your own business.")
   end
   local rest = a:match("^[Dd][Ee][Aa][Tt][Hh][Rr][Oo][Ll][Ll]%s+(.+)$")
+  if rest and rest:match("^%S+$") then                                     -- T5: a stake and no name: your target
+    local s = stakeOf(rest)
+    if not s then return DT.out(STAKE_LINE) end
+    return challengeTarget(s)
+  end
   if rest then return startDeathroll(rest) end
   local s = lw:match("^highlow%s+(%S+)$")
   if s then
@@ -1087,11 +1506,23 @@ DT.module({
   settings = {
     { key = "board", type = "bool", default = true, label = "On the board", verb = "gamble board on|off",
       desc = "Puts your chips and this week's winnings on the guild's board once you've played. Off takes you off everyone's board." },
+    { key = "sound", type = "bool", default = false, label = "Your-turn bell", verb = "gamble sound on|off",
+      desc = "A short sound when it becomes your roll. The Roll button glows either way." },
   },
   verbs = {
-    { verb = "gamble", usage = "gamble [join|deathroll <name> <stake>|highlow <stake>|call|roll|board]", fn = verb },
+    { verb = "gamble", usage = "gamble [join|decline|leave|cancel|deathroll [<name>] <stake>|highlow <stake>|call|roll|rematch|double|again|board|sound]", fn = verb },
     { verb = "debug gamble", usage = "debug gamble fast|slow", fn = debugVerb },
   },
+  ldb = { type = "launcher", text = TITLE, label = TITLE, icon = "Interface\\Icons\\INV_Misc_Coin_01", offByDefault = true,
+    OnClick = function(_, button)
+      if button == "RightButton" then DT.gambleBoardView() else DT.gambleView() end
+    end,
+    OnTooltipShow = function(tt)
+      local t = wallet(true)
+      tt:AddLine(TITLE)
+      tt:AddLine("You hold " .. (t and t.b or START) .. " chips.", 1, 1, 1)
+      tt:AddLine("Click: the table. Right-click: the ledger.", 0.7, 0.7, 0.7)
+    end },
   init = function() store(); prune() end,
   onDisable = function() relisten() end,
   fit = function()
@@ -1101,6 +1532,7 @@ DT.module({
     for i = 1, LOG_MAX do addLog(g, "Bartholomew Longname-Grimshaw rolls 500 (1-500), and it is very long " .. i .. ".") end
     model:set({ gameRow(g) }); list:refresh()
     setStatus(statusText(g))
+    pmodel:set({ { name = "Bartholomew Longname-Grimshaw", runs = false, state = "no addon" } }); plist:refresh()
     buildBoard(); fillBoard()
   end,
 })
@@ -1113,4 +1545,6 @@ DT._gamble = { games = function() return games end, order = function() return or
   BEATDOWN = BEATDOWN, NO_RESET = NO_RESET, OUT_OF_TURN = OUT_OF_TURN, WRONG_RANGE = WRONG_RANGE,
   DISPUTED = DISPUTED, FOLDED = FOLDED, TIMED_OUT = TIMED_OUT, OFF = OFF, POOR = POOR, STAKE_LINE = STAKE_LINE,
   NO_PARTY = NO_PARTY, TIMEOUT = TIMEOUT, CLOSE_AFTER = CLOSE_AFTER, BOARD_CAP = BOARD_CAP, WALLET_CAP = WALLET_CAP,
-  timeout = function() return timeout end, select = function(id) selected = id end }
+  timeout = function() return timeout end, select = function(id) selected = id; selectedAt = ticks end,
+  panel = function() return panel end, plist = function() return plist end, pstake = function() return pstake end,
+  OVER_CAP = OVER_CAP, NO_TARGET = NO_TARGET }

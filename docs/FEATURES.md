@@ -398,6 +398,18 @@ Blizzard's pin (Tim, 20:29).
 - **W4** `way.arrow` and `way.pin`, both on. **W5** Within 5 yards it clears itself; `/dt way clear`.
 - **W6** One waypoint per character, kept over a `/reload`, never shared. **W7** 0.5.0.
 
+## Ruled 24 Nov (for `dt_gamble2`, 0.7.0)
+Brief `docs/COWORK_BRIEF_dt_gamble2.md`, T1–T12, ratified by Tim's merge of PR #42 (24 Nov, with a comment accepting
+Claude's proposals as written).
+- **T1** the New game panel (party buttons, DT runners first; stakes 10/50/100/250/500 or typed).
+- **T2** Accept/Decline (`DECLINE`). **T3** Cancel (a `FOLD` with `why = "cancel"`) and Leave (`LEAVE`), before rolling only.
+- **T4/T7** Rematch, Double or nothing (either player; always a new challenge that needs Accept; `GAME re`), and Same
+  again for a high-low host (Lilbit's re-bet).
+- **T5** Challenge your target: the name only, on press, a party member only (a new *reads another player* line in `CLAUDE.md`).
+- **T6** the Roll button glows on your turn; `gamble.sound` (off by default) plays READY_CHECK.
+- **T8** a bar launcher, off until ticked (`/dt bar add gamble`), like Session. **T9** 0.6.0 peers still settle games.
+- Ideas, not ruled: the right-click party-portrait menu.
+
 ## Ruled 23 Nov (for `dt_gamble`, 0.6.0)
 Brief `docs/COWORK_BRIEF_dt_gamble.md`, D1–D10 ratified by Tim's merge of PR #38 (23 Nov). Tim's answers at 20:10;
 the roll probe at 20:14–20:16 (`RANDOM_ROLL_RESULT` = `%s rolls %d (%d-%d)`; own and a party member's rolls

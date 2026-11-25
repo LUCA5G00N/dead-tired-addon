@@ -19,8 +19,8 @@ check except G6 needs a guildie on 0.7.0 in your party. G12 needs a third guildi
       0.6.0 guard, was removed once, turned a named check red, and was restored.
 
 ## In game [G]
-- [ ] G6 Alone: the Table button is on the DT bar. Left-click opens the table, right-click opens the ledger, and
-      the tooltip shows your chips.
+- [ ] G6 Alone: `/dt bar add gamble` puts the Table button on the DT bar (it's off until ticked, like Session: see
+      the report). Left-click opens the table, right-click opens the ledger, and the tooltip shows your chips.
 - [ ] G7 **New game**: press the guildie's name, then **50**, then **Deathroll**. They see `Accept` and `Decline`,
       and press Accept. Play to the end. Both of you then see **Rematch** and **Double or nothing**.
 - [ ] G8 Press **Double or nothing**. They see `<you> says double or nothing: 100.` and press **Decline**. Your
