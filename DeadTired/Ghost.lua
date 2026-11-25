@@ -2,7 +2,7 @@
 -- second player, so shared features can be walked alone.
 --   Restless Ghost, on the reserved realm DTGHOST (key "DTGHOST-Restless Ghost").
 --   /dt debug ghost on|off             answer your STASHQ, PREPQ and WHO for this session (never saved)
---   /dt debug ghost hello|death|gank|played|tally|chips|stash|prep|all   the ghost sends one message of that kind
+--   /dt debug ghost hello|death|gank|played|tally|chips|quests|stash|prep|all   the ghost sends one message of that kind
 -- A ghost message is built with Comms' own encode and handed to Comms' own inbound with the sender
 -- string "Restless Ghost-DTGHOST": decoding, the key check and every handler run as for a real
 -- message. It never reaches AceComm, ChatThrottleLib or SendAddonMessage. While one is delivered,
@@ -106,6 +106,8 @@ local SAY = {
   tally = function() return "TALLY", { n = "13", w = "2", we = tostring(DT.weekEnd and DT.weekEnd() or 0), hc = "0" } end,
   -- 0.6.0 (dt_gamble Task 6): 1,250 chips, up 250 this week, its biggest loss 40.
   chips = function() return "CHIPS", { b = "1250", w = "250", bb = "40", we = tostring(DT.weekEnd and DT.weekEnd() or 0) } end,
+  -- 0.8.0 (dt_guildquests Task 5): three bag steps, three Horde-side books.
+  quests = function() return "QUESTS", { bag = "123", lib = "79095,79094,79096" } end,
   stash = function()
     local q, me = lastQ.STASHQ, myKey()
     if not q or not me then return nil end
@@ -160,7 +162,7 @@ local function verb(args)
     if w == "prep" then return DT.out("Ask first: /dt prep roll.") end
     return DT.out("The ghost couldn't say that.")
   end
-  return DT.out("/dt debug ghost on|off|hello|death|gank|played|tally|chips|stash|prep|all")
+  return DT.out("/dt debug ghost on|off|hello|death|gank|played|tally|chips|quests|stash|prep|all")
 end
 
 DT.module({

@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.7.0" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.8.0" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
@@ -326,7 +326,7 @@ do
   local S = c.DT._selftest
   local kinds, tally = {}, nil
   for _, smp in ipairs(S.samples()) do kinds[#kinds + 1] = smp[1]; if smp[1] == "TALLY" then tally = smp[2] end end
-  check("0.4.0: S8 and S10 have a TALLY sample (19 kinds since 0.7.0)", tally ~= nil and #kinds == 19)
+  check("0.4.0: S8 and S10 have a TALLY sample (20 kinds since 0.8.0)", tally ~= nil and #kinds == 20)
   check("0.4.0: the TALLY sample passes the deathboard's own validation", tally and c.DT._deathboard.valid(tally) ~= nil)
   local cap
   for _, k in ipairs(S.CAPS) do if k[1] == "deathboard" and k[2] == "board" then cap = k[3] end end
@@ -372,6 +372,13 @@ do
   check("0.6.0: the CHIPS sample passes the gamble's own validation", c.DT._gamble.validChips(kinds.CHIPS) ~= nil)
   check("0.7.0: S8 and S10 have DECLINE and LEAVE", kinds.DECLINE ~= nil and kinds.LEAVE ~= nil)
   check("0.7.0: S4 checks UnitIsPlayer and PlaySound", have.UnitIsPlayer and have.PlaySound)
+  check("0.8.0: S4 checks the quest flags, IsOnQuest and the faction", have["C_QuestLog.IsQuestFlaggedCompleted"]
+    and have["C_QuestLog.IsOnQuest"] and have.UnitFactionGroup)
+  check("0.8.0: S8 and S10 have a QUESTS sample that passes its own validation", kinds.QUESTS ~= nil
+    and c.DT._questsValid(kinds.QUESTS) ~= nil)
+  local qcap
+  for _, k in ipairs(S.CAPS) do if k[1] == "quests" then qcap = k[3] end end
+  check("0.8.0: S9 checks quests.board against 200", qcap == 200)
 end
 
 H.finish("selftest")

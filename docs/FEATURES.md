@@ -398,6 +398,17 @@ Blizzard's pin (Tim, 20:29).
 - **W4** `way.arrow` and `way.pin`, both on. **W5** Within 5 yards it clears itself; `/dt way clear`.
 - **W6** One waypoint per character, kept over a `/reload`, never shared. **W7** 0.5.0.
 
+## Ruled 23 Nov (for `dt_guildquests`, 0.8.0)
+Brief `docs/COWORK_BRIEF_dt_guildquests.md`, Q1–Q9, ratified by Tim's merge of PR #39 (version per PR #42). The
+Restless Dead Pilgrimage's first round. The book IDs were confirmed in game on 25 Nov 00:33: The Lessons of Ta'zo
+(79094) read false before the hand-in and true after it.
+- **Q1** Progress is the game's own (`IsQuestFlaggedCompleted`). A failed or secret read counts as not done.
+- **Q2** The Sleeping Bag Pilgrimage: one quest, seven steps; Rekindle is optional. **Q3** Friends of the Library: book by
+  book over `DT.WAY_BOOKS`, with the next reward tier.
+- **Q4** Shared by default, with an opt-out (a ruled exception in `CLAUDE.md`). Nothing is sent before there's anything done.
+- **Q5** Next step, a book row and Nearest book all go through `DT.waySet`. **Q6** The board, and First to the bag.
+  **Q7** One window, two tabs. **Q8** Quiet. **Q9** 0.8.0.
+
 ## Ruled 24 Nov (for `dt_gamble2`, 0.7.0)
 Brief `docs/COWORK_BRIEF_dt_gamble2.md`, T1–T12, ratified by Tim's merge of PR #42 (24 Nov, with a comment accepting
 Claude's proposals as written).
