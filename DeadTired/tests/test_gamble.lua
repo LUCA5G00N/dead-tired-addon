@@ -54,6 +54,16 @@ local function stub(c)
   rawset(env, "SOUNDKIT", { READY_CHECK = 8960 })
   c.played = {}
   rawset(env, "PlaySound", function(kit) c.played[#c.played + 1] = kit end)
+  c.bells, c.ringing = {}, {}
+  rawset(env, "PlaySoundFile", function(file, channel)
+    if c.noBell then return false end
+    c.bells[#c.bells + 1] = { file, channel }; c.played[#c.played + 1] = file
+    local h = #c.bells; c.ringing[h] = true
+    return true, h
+  end)
+  local cs = rawget(env, "C_Sound") or {}
+  cs.IsPlaying = function(h) return c.ringing[h] == true end
+  rawset(env, "C_Sound", cs)
   c.rolls = {}
   rawset(env, "RandomRoll", function(lo, hi)
     local v = table.remove(c.rolls, 1) or lo
@@ -881,11 +891,34 @@ do
   a:slash("gamble sound on")
   check("T6: (a switched on after its turn came: no sound for that turn)", #a.played == 0)
   a.rolls = { 4 }; a:slash("gamble roll"); w:advance(1)
-  check("T6: with it on, the turn coming round plays one sound (READY_CHECK)", #b.played == 1 and b.played[1] == 8960)
+  check("T6: with it on, the turn coming round plays one sound (0.7.1: the Undercity bell, on SFX)",
+    #b.played == 1 and b.played[1] == 565853 and b.bells[1][2] == "SFX")
   b.rolls = { 1 }; b:slash("gamble roll"); w:advance(1)
   check("T6: the glow goes when the game ends", not btn(a, "glow"):IsShown() and not btn(b, "glow"):IsShown())
   check("T6: the sound card: typed form and description", b.DT.setting("gamble", "sound").verb == "gamble sound on|off"
     and b.DT.setting("gamble", "sound").default == false)
+end
+
+-- ---------------------------------------------------------------- 0.7.1: the bell
+do
+  local w, a, b = table3()
+  a:slash("gamble"); b:slash("gamble")
+  a:slash("gamble sound on"); b:slash("gamble sound on")
+  a:slash("gamble deathroll Sap 50"); w:advance(1)
+  b:slash("gamble join"); w:advance(1)
+  check("0.7.1: a's first turn tolls the bell", #a.bells == 1 and a.bells[1][1] == 565853)
+  a.rolls = { 40 }; a:slash("gamble roll"); w:advance(1)
+  b.rolls = { 30 }; b:slash("gamble roll"); w:advance(1)
+  check("0.7.1: still tolling: no second bell over the first", #a.bells == 1 and a.DT._gambleSounds() == 1)
+  a.ringing[1] = nil
+  a.rolls = { 20 }; a:slash("gamble roll"); w:advance(1)
+  b.noBell = true; b.ringing = {}
+  b.rolls = { 10 }; b:slash("gamble roll"); w:advance(1)
+  check("0.7.1: the bell done, the next turn tolls again", #a.bells == 2)
+  a.rolls = { 5 }; a:slash("gamble roll"); w:advance(1)
+  check("0.7.1: a client that can't play the bell gets the old chime", b.played[#b.played] == 8960)
+  b.rolls = { 1 }; b:slash("gamble roll"); w:advance(1)
+  check("0.7.1: the card says bell", b.DT.setting("gamble", "sound").desc:find("Undercity bell", 1, true) ~= nil)
 end
 
 -- ---------------------------------------------------------------- T8: the bar
