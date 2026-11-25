@@ -81,7 +81,8 @@ local OVER_CAP = "Over the 500 cap."
 local PANEL_HEAD = "New game: pick a stake, then a game."
 local REMATCH_LINE = "%s wants a rematch for %d."
 local DOUBLE_LINE = "%s says double or nothing: %d."
-local SOUND_KIT_ID = 8960                -- SOUNDKIT.READY_CHECK, used when the SOUNDKIT table isn't there
+local SOUND_KIT_ID = 8960                -- SOUNDKIT.READY_CHECK: the fallback when the bell can't play
+local BELL_FILE = 565853                -- sound/doodad/belltollhorde.ogg: the Undercity toll (0.7.1, Tim 25 Nov)
 local STAKE_LINE = "A stake is a whole number from 2 to 500."
 local POOR = "You hold %d chips. Not enough for that stake."
 local NO_PARTY = "You need a party. The dead don't gamble alone."
@@ -485,11 +486,21 @@ local function myRange(g)
   return nil
 end
 
-local sounds = 0
+local sounds, bell = 0, nil
 local function turnSound()
   if DT.get("gamble", "sound") ~= true then return end                     -- guard: sound only when switched on
-  local kit = clean(try(function() return SOUNDKIT and SOUNDKIT.READY_CHECK end)) or SOUND_KIT_ID
+  if bell and clean(try(function() return C_Sound and C_Sound.IsPlaying(bell) end)) == true then
+    return                                                                 -- guard: one bell at a time
+  end
   sounds = sounds + 1
+  local will, handle = nil, nil
+  if type(PlaySoundFile) == "function" then
+    local ok, w, h = pcall(PlaySoundFile, BELL_FILE, "SFX")
+    if ok then will, handle = clean(w), clean(h) end
+  end
+  if will then bell = handle return end
+  bell = nil                                                               -- guard: no bell, the old chime
+  local kit = clean(try(function() return SOUNDKIT and SOUNDKIT.READY_CHECK end)) or SOUND_KIT_ID
   try(PlaySound, kit)
 end
 DT._gambleSounds = function() return sounds end
@@ -1507,7 +1518,7 @@ DT.module({
     { key = "board", type = "bool", default = true, label = "On the board", verb = "gamble board on|off",
       desc = "Puts your chips and this week's winnings on the guild's board once you've played. Off takes you off everyone's board." },
     { key = "sound", type = "bool", default = false, label = "Your-turn bell", verb = "gamble sound on|off",
-      desc = "A short sound when it becomes your roll. The Roll button glows either way." },
+      desc = "The Undercity bell tolls when it becomes your roll. The Roll button glows either way." },
   },
   verbs = {
     { verb = "gamble", usage = "gamble [join|decline|leave|cancel|deathroll [<name>] <stake>|highlow <stake>|call|roll|rematch|double|again|board|sound]", fn = verb },

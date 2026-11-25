@@ -88,7 +88,7 @@ do
     and #c.printed == 1)
   for _, id in ipairs(IDS) do check("healthy: " .. id .. " passes", passed(c, id)) end
   check("healthy: S2 recorded as information", line(c, "S2"):find(": info - build 70245, interface 16001", 1, true) ~= nil)
-  check("the record: version, build, interface, key, source", rec.version == "0.7.0" and rec.build == "70245"
+  check("the record: version, build, interface, key, source", rec.version == "0.7.1" and rec.build == "70245"
     and rec.interface == 16001 and rec.key == c:key() and rec.source == "game" and rec.pass == 10 and rec.fail == 0
     and #rec.lines == 11 and type(rec.at) == "string")
   check("healthy: the .toc and DT.VERSION agree (G1)", TOC_VERSION == c.DT.VERSION)
