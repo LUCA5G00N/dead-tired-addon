@@ -68,7 +68,9 @@ and do not widen them. A new exception needs its own ruling in a brief.
 - **Switches a client log:** only by the player's click on a secure button running the client's own
   `/combatlog` or `/chatlog` (card 7 R4). Never by calling `LoggingCombat`/`LoggingChat` with an
   argument, never switching a log off, never reading a log.
-- **Shares without a separate opt-in:** a gank log, when you make it (card 4 R2).
+- **Shares without a separate opt-in:** a gank log, when you make it (card 4 R2). Guild quest progress: which of
+  the sleeping-bag steps and library books (DT's own 47 quest IDs, nothing else from the quest log) you've done,
+  on by default, `/dt quests share off` withdraws it from every board (`dt_guildquests` Q4, Tim 23 Nov).
 
 ## Code rules
 - Lua 5.1 (what WoW runs). One SavedVariables table: `DeadTiredDB` (account-wide). Character keys

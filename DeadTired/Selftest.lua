@@ -45,6 +45,8 @@ DT.REQUIRED = {
   "RandomRoll", "GetNumGroupMembers", "IsInRaid",
   -- 0.7.0 (dt_gamble2): the target check (T5) and the your-turn sound (T6).
   "UnitIsPlayer", "PlaySound",
+  -- 0.8.0 (dt_guildquests): the game's own quest flags (Q1) and step 1's faction (Q2).
+  "C_QuestLog.IsQuestFlaggedCompleted", "C_QuestLog.IsOnQuest", "UnitFactionGroup",
 }
 
 -- Every migration flag DT defines (Migrate.lua; realm034 is set by Keys' store on first use).
@@ -54,7 +56,7 @@ local FLAGS = { "port1", "port2", "skin031", "realm034" }
 local CAPS = {
   { "crypt", "deaths", 100 }, { "gank", "logs", 500 }, { "realms", "byChar", 200 },
   { "realms", "byServer", 200 }, { "comms", "senders", 50 }, { "comms", "mismatches", 10 },
-  { "deathboard", "board", 200 }, { "way", "current", 50 }, { "gamble", "board", 200 }, { "gamble", "wallet", 50 },
+  { "deathboard", "board", 200 }, { "way", "current", 50 }, { "gamble", "board", 200 }, { "gamble", "wallet", 50 }, { "quests", "board", 200 },
 }
 
 -- One sample of every message kind (S8 and S10). Query kinds are safe here: S8 runs with every
@@ -80,6 +82,7 @@ local function samples(me)
     { "FOLD", { g = "1" } },
     { "DECLINE", { h = me, g = "1" } },
     { "LEAVE", { h = me, g = "1" } },
+    { "QUESTS", { bag = "123", lib = "79094" } },
     { "CHIPS", { b = "1250", w = "250", bb = "40", we = "1794600000" } },
   }
 end
